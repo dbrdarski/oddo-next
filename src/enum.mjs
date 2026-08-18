@@ -4,6 +4,7 @@
 
 import { canonical } from './intern.mjs'
 import { contractCheck } from './contract.mjs'
+import { learn } from './facts.mjs'
 
 const once = (fn, cached = false, cache) => (...args) => (
   cached || (cache = fn(...args), cached = true), cache
@@ -13,7 +14,13 @@ const memoize = (fn, cache = Object.create(null)) => (key) => (
   key in cache || (cache[key] = fn(key)), cache[key]
 )
 
-export const argContracts = (...argContracts) => (resultContract) => argContracts
+// The hidden class whose declaration is currently being resolved; the
+// factory puts it on deck so the result contract lands on the right key.
+let resolving
+
+export const argContracts = (...argContracts) => (resultContract) => (
+  learn(resolving, 'produces', resultContract), argContracts
+)
 
 // const generic = (typeContract) => (value) => {
 //   if (typeContract == null) {
@@ -70,7 +77,12 @@ const lazyEnumFactory = (name, fn) => {
     (...args) => {
       // The gate constructs; the interner only caches. A duplicate
       // construction is discarded in favor of the canonical instance.
+      // resolving is saved/restored so a build that calls another enum
+      // mid-resolve cannot steal this declaration's key.
+      const parent = resolving
+      resolving = constructor
       const instance = constructor.from(fn(...args))
+      resolving = parent
       return canonical(constructor, instance, instance)
     }
   )
