@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node test.mjs",
-    "test:browser": "parcel index.html --port 3000"
+    "start": "parcel index.html tests.html --port 3000"
   },
   "devDependencies": {
     "parcel": "^2.16.4"

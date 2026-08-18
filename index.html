@@ -3,31 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>oddo.next tests</title>
+  <title>oddo.next playground</title>
   <style>
     :root { color-scheme: light dark; }
     body {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      max-width: 720px;
+      max-width: 860px;
       margin: 2rem auto;
       padding: 0 1rem;
-      line-height: 1.6;
+      line-height: 1.5;
     }
+    header { display: flex; justify-content: space-between; align-items: baseline; }
     h1 { font-size: 1.2rem; }
-    h2 { font-size: 0.95rem; margin: 1.5rem 0 0.5rem; opacity: 0.7; }
-    #summary { opacity: 0.8; }
-    .case { display: flex; gap: 0.6em; align-items: baseline; }
-    .mark { font-weight: bold; }
-    .pass .mark { color: #2da44e; }
-    .fail .mark { color: #d1242f; }
-    .fail .label { opacity: 0.85; }
-    .error { font-size: 0.8em; opacity: 0.55; margin-left: 0.5em; }
+    nav a { opacity: 0.7; }
+    .bar { display: flex; gap: 0.5rem; margin: 0.75rem 0; align-items: center; }
+    select, button { font: inherit; padding: 0.25rem 0.75rem; }
+    textarea {
+      width: 100%; min-height: 240px; box-sizing: border-box;
+      font: inherit; line-height: 1.5; padding: 0.75rem;
+      tab-size: 2; resize: vertical;
+    }
+    #output { padding: 0.75rem; min-height: 3rem; white-space: pre-wrap; border-left: 3px solid #8884; }
+    .err { color: #d1242f; }
+    .hint { font-size: 0.8em; opacity: 0.55; }
   </style>
 </head>
 <body>
-  <h1>oddo.next</h1>
-  <p id="summary">running…</p>
-  <div id="results"></div>
-  <script type="module" src="test/browser.mjs"></script>
+  <header>
+    <h1>oddo.next playground</h1>
+    <nav><a href="tests.html">tests →</a></nav>
+  </header>
+  <div class="bar">
+    <select id="examples"></select>
+    <button id="run">Run ⌘⏎</button>
+    <button id="clear">Clear</button>
+  </div>
+  <textarea id="editor" spellcheck="false"></textarea>
+  <p class="hint" id="scope"></p>
+  <div id="output"></div>
+  <script type="module" src="playground.mjs"></script>
 </body>
 </html>

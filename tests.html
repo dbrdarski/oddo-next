@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>oddo.next tests</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      line-height: 1.6;
+    }
+    header { display: flex; justify-content: space-between; align-items: baseline; }
+    h1 { font-size: 1.2rem; }
+    nav a { opacity: 0.7; }
+    h2 { font-size: 0.95rem; margin: 1.5rem 0 0.5rem; opacity: 0.7; }
+    #summary { opacity: 0.8; }
+    .case { display: flex; gap: 0.6em; align-items: baseline; }
+    .mark { font-weight: bold; }
+    .pass .mark { color: #2da44e; }
+    .fail .mark { color: #d1242f; }
+    .fail .label { opacity: 0.85; }
+    .error { font-size: 0.8em; opacity: 0.55; margin-left: 0.5em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>oddo.next tests</h1>
+    <nav><a href="index.html">← playground</a></nav>
+  </header>
+  <p id="summary">running…</p>
+  <div id="results"></div>
+  <script type="module" src="test/browser.mjs"></script>
+</body>
+</html>
