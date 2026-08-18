@@ -22,15 +22,19 @@ html {
   background-image:
     radial-gradient(900px 500px at 70% -10%, rgba(0, 119, 182, 0.25), transparent 70%),
     linear-gradient(180deg, var(--navy-deepest), var(--navy-deep) 700px);
+    filter: saturate(0.6);
 }
 
 body {
+  min-width: 100vw;
+  min-height: 100vh;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   max-width: 860px;
-  margin: 0 auto;
+  margin: 0;
   padding: 2.5rem 1.25rem 4rem;
   line-height: 1.6;
   color: var(--foam);
+  backdrop-filter: grayscale(0.5) saturate(1);
 }
 
 ::selection { background: var(--blue); color: var(--foam); }

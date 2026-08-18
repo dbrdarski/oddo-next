@@ -42,11 +42,11 @@ const generic = (state, i = 0) => [
   }
 ]
 
-const genericsProxy = (generic) => new Proxy({}, { get: () => generic() })
+function* generics(generic) { while (true) yield generic() }
 
 export const Enum = (build) => {
   const [initGenerics, createGeneric] = generic()
-  const resolve = once(() => build(argContracts, genericsProxy(createGeneric)))
+  const resolve = once(() => build(argContracts, generics(createGeneric)))
   return (...args) => {
     initGenerics()
     const definitions = resolve()

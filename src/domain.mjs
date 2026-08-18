@@ -20,14 +20,14 @@ import { Number } from './numeric.mjs'
 
 export const { Add, Sub, Mul, LL, Numeric, Union } = createEnums(() => class {
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
-  Union = Enum(($, { T1, T2 }) => $(T1, T2)(contractCheck(value => value instanceof T1 || value instanceof T2)))
+  Union = Enum(($, [T1, T2]) => $(T1, T2)(contractCheck(value => value instanceof T1 || value instanceof T2)))
   Numeric = Enum($ => $(Number)(Number))
   // Numeric = Enum($ => $(Number)(Union(Number, Indeterminate)))
   // Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
   Add = Enum($ => $(Numeric, Numeric)(Numeric)) // add needs to be extend from numewric <- this enables Add(Add) Add -> Numeric
   Sub = Enum($ => $(Numeric, Numeric)(Numeric))
   Mul = Enum($ => $(Numeric, Numeric)(Numeric))
-  Equals = Enum(($, { E }) => $(E)(E))
+  Equals = Enum(($, [E]) => $(E)(E))
   Call = argContracts
   LL = Enum($ => $(Numeric, Optional(LL)))
 })
