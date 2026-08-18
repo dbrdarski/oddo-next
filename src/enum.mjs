@@ -14,12 +14,8 @@ const memoize = (fn, cache = Object.create(null)) => (key) => (
   key in cache || (cache[key] = fn(key)), cache[key]
 )
 
-// The hidden class whose declaration is currently being resolved; the
-// factory puts it on deck so the result contract lands on the right key.
-let resolving
-
-export const argContracts = (...argContracts) => (resultContract) => (
-  learn(resolving, 'produces', resultContract), argContracts
+export const argContracts = (constructor) => (...argContracts) => (resultContract) => (
+  learn(constructor, 'produces', resultContract), argContracts
 )
 
 // const generic = (typeContract) => (value) => {
@@ -46,10 +42,10 @@ function* generics(generic) { while (true) yield generic() }
 
 export const Enum = (build) => {
   const [initGenerics, createGeneric] = generic()
-  const resolve = once(() => build(argContracts, generics(createGeneric)))
-  return (...args) => {
+  const resolve = once((constructor) => build(argContracts(constructor), generics(createGeneric)))
+  return (constructor, ...args) => {
     initGenerics()
-    const definitions = resolve()
+    const definitions = resolve(constructor)
     if (args.length > definitions.length)
       throw Error(`Too many arguments: expected up to ${definitions.length}, but got ${args.length}.`)
     for (let i = 0; i < definitions.length; i++)
@@ -72,17 +68,16 @@ const lazyEnumFactory = (name, fn) => {
     }
   })
 
+  // The declaration learns against its class through this binding - the
+  // key travels lexically, so nested resolves cannot interfere.
+  const validate = fn.bind(null, constructor)
+
   return contractCheck(
     v => v instanceof constructor,
     (...args) => {
       // The gate constructs; the interner only caches. A duplicate
       // construction is discarded in favor of the canonical instance.
-      // resolving is saved/restored so a build that calls another enum
-      // mid-resolve cannot steal this declaration's key.
-      const parent = resolving
-      resolving = constructor
-      const instance = constructor.from(fn(...args))
-      resolving = parent
+      const instance = constructor.from(validate(...args))
       return canonical(constructor, instance, instance)
     }
   )

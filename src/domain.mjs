@@ -2,8 +2,8 @@
 // Domain Definition
 // ==========================================
 
-import { Enum, createEnums, argContracts } from './enum.mjs'
-import { contractCheck, Optional } from './contract.mjs'
+import { Enum, createEnums } from './enum.mjs'
+import { contractCheck } from './contract.mjs'
 import { Number } from './numeric.mjs'
 
 // const Union = (conA, conB) => value => value instanceof conA || value instanceof conB
@@ -18,9 +18,15 @@ import { Number } from './numeric.mjs'
     But this is a problem for non Union members (like Union(Number, Indeterminate))
 */
 
-export const { Add, Sub, Mul, LL, Numeric, Union } = createEnums(() => class {
+export const { Add, Sub, Mul, LL, Numeric, Union, Optional } = createEnums(() => class {
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
-  Union = Enum(($, [T1, T2]) => $(T1, T2)(contractCheck(value => value instanceof T1 || value instanceof T2)))
+  Union = Enum(
+    ($, [T1, T2]) => $(T1, T2)(T1, T2),
+    contractCheck((T1, T2) => value => value instanceof T1 || value instanceof T2)
+  )
+  Optional = Enum(
+    ($, [T]) => $(T)(T),
+    contractCheck(T => value => value == null || value instanceof T))
   Numeric = Enum($ => $(Number)(Number))
   // Numeric = Enum($ => $(Number)(Union(Number, Indeterminate)))
   // Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
@@ -28,6 +34,5 @@ export const { Add, Sub, Mul, LL, Numeric, Union } = createEnums(() => class {
   Sub = Enum($ => $(Numeric, Numeric)(Numeric))
   Mul = Enum($ => $(Numeric, Numeric)(Numeric))
   Equals = Enum(($, [E]) => $(E)(E))
-  Call = argContracts
   LL = Enum($ => $(Numeric, Optional(LL)))
 })
