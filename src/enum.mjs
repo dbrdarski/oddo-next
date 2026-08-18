@@ -2,7 +2,7 @@
 // Enum & Factory Infrastructure
 // ==========================================
 
-import { internEnum } from './intern.mjs'
+import { canonical } from './intern.mjs'
 import { contractCheck } from './contract.mjs'
 
 const once = (fn, cached = false, cache) => (...args) => (
@@ -67,7 +67,12 @@ const lazyEnumFactory = (name, fn) => {
 
   return contractCheck(
     v => v instanceof constructor,
-    (...args) => internEnum(constructor, fn(...args))
+    (...args) => {
+      // The gate constructs; the interner only caches. A duplicate
+      // construction is discarded in favor of the canonical instance.
+      const instance = constructor.from(fn(...args))
+      return canonical(constructor, instance, instance)
+    }
   )
 }
 

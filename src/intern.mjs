@@ -2,6 +2,12 @@
 // Unified Structural Interning Engine
 // ==========================================
 
+// The interner never creates a value it returns. It only decides which
+// already-created reference is the canonical one: on a hit the given value
+// is discarded, on a miss it is frozen and becomes canonical. Values enter
+// one level at a time - children must already be interned (or primitive)
+// before their container is constructed, so no walk ever recurses.
+
 const isReferential = (value) => value !== null && (typeof value === 'object' || typeof value === 'function');
 
 const createNode = () => ({
@@ -10,25 +16,30 @@ const createNode = () => ({
   ref: null
 });
 
-const arrayRoot = createNode();
-const objectRoot = new WeakMap();
+const root = createNode();
 
 const finalizer = new FinalizationRegistry((leaf) => {
   leaf.ref = null;
 });
 
-const internArray = (elements) => {
-  let current = arrayRoot;
-  for (let i = 0; i < elements.length; i++) {
-    const item = elements[i];
-    const map = isReferential(item) ? current.objects : current.primitives;
+const step = (current, item) => {
+  const map = isReferential(item) ? current.objects : current.primitives;
+  let next = map.get(item);
+  if (!next) {
+    next = createNode();
+    map.set(item, next);
+  }
+  return next;
+};
 
-    let next = map.get(item);
-    if (!next) {
-      next = createNode();
-      map.set(item, next);
-    }
-    current = next;
+export const canonical = (tag, parts, value) => {
+  let current = step(root, tag);
+  for (const part of parts) {
+    // Every interned value is frozen, so an unfrozen object can never be a
+    // legitimate child - it is a raw literal that skipped its constructor.
+    if (part !== null && typeof part === 'object' && !Object.isFrozen(part))
+      throw TypeError(`Not an interned value: ${part}`);
+    current = step(current, part);
   }
 
   if (current.ref) {
@@ -36,82 +47,16 @@ const internArray = (elements) => {
     if (cached) return cached;
   }
 
-  Object.freeze(elements);
-  current.ref = new WeakRef(elements);
-  finalizer.register(elements, current);
+  Object.freeze(value);
+  current.ref = new WeakRef(value);
+  finalizer.register(value, current);
 
-  return elements;
+  return value;
 };
 
-const internObject = (obj) => {
-  const keys = Object.keys(obj).sort();
-  const values = keys.map(k => intern(obj[k]));
+export const Tuple = (...elements) => canonical(Tuple, elements, elements);
 
-  const shapeRef = internArray(keys);
-  const valuesRef = internArray(values);
-
-  let shapeMap = objectRoot.get(shapeRef);
-  if (!shapeMap) {
-    shapeMap = new WeakMap();
-    objectRoot.set(shapeRef, shapeMap);
-  }
-
-  let leaf = shapeMap.get(valuesRef);
-  if (leaf && leaf.ref) {
-    const cached = leaf.ref.deref();
-    if (cached) return cached;
-  }
-
-  if (!leaf) {
-    leaf = { ref: null };
-    shapeMap.set(valuesRef, leaf);
-  }
-
-  const internedObj = {};
-  for (let i = 0; i < shapeRef.length; i++) {
-    internedObj[shapeRef[i]] = valuesRef[i];
-  }
-  Object.freeze(internedObj);
-
-  leaf.ref = new WeakRef(internedObj);
-  finalizer.register(internedObj, leaf);
-
-  return internedObj;
-};
-
-export const internEnum = (constructor, elements) => {
-  const internedElements = elements.map(intern);
-
-  // Prepend constructor as the first discriminator node in the path
-  const path = [constructor, ...internedElements];
-
-  let current = arrayRoot;
-  for (const item of path) {
-    const map = isReferential(item) ? current.objects : current.primitives;
-    let next = map.get(item);
-    if (!next) {
-      next = createNode();
-      map.set(item, next);
-    }
-    current = next;
-  }
-
-  if (current.ref) {
-    const cached = current.ref.deref();
-    if (cached) return cached;
-  }
-
-  const instance = constructor.from(internedElements);
-  Object.freeze(instance);
-
-  current.ref = new WeakRef(instance);
-  finalizer.register(instance, current);
-
-  return instance;
-};
-
-export const intern = (value) => {
-  if (value === null || typeof value !== 'object') return value;
-  if (Array.isArray(value)) return internArray(value.map(intern));
-  return internObject(value);
+export const Record = (obj, parts = []) => {
+  for (const key of Object.keys(obj).sort()) parts.push(key, obj[key]);
+  return canonical(Record, parts, obj);
 };
