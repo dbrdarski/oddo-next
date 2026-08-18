@@ -39,6 +39,33 @@ log('stands at Numeric seats:', n instanceof Numeric)
 log('at a strict Number seat:', n instanceof Number)`,
   },
   {
+    name: 'Structural sharing',
+    code: `const shared = Tuple(1, 2)
+const a = Record({ left: shared, right: Tuple(3, 4) })
+const b = Record({ right: Tuple(3, 4), left: Tuple(1, 2) })
+
+// deep equality is one pointer comparison - no walking
+log('whole records:', a === b)
+log('children shared:', a.left === shared && b.left === shared)`,
+  },
+  {
+    name: 'Define your own enum',
+    code: `// a contract is a predicate behind instanceof
+const Even = contractCheck(v => typeof v === "number" && v % 2 === 0)
+log('4 is Even:', 4 instanceof Even, '| 3 is Even:', 3 instanceof Even)
+
+// an enum is a gated constructor: args checked, result declared, node interned
+const { Pair } = createEnums(() => class {
+  Pair = Enum($ => $(Even, Even)(Even))
+})
+const p = Pair(2, 4)
+log(p, '- interned:', p === Pair(2, 4))
+
+// declared result: a Pair stands wherever Even is demanded, so pairs nest
+log(Pair(6, Pair(2, 4)))
+try { Pair(3, 4) } catch (e) { log(String(e)) }`,
+  },
+  {
     name: 'Facts & the gate',
     code: `const n = Add(Numeric(1), Numeric(2))
 log('declared result is Numeric:', producedOf(n) === Numeric)
@@ -46,6 +73,15 @@ log('Numeric(1) at a Number seat:', Numeric(1) instanceof Number)
 
 // raw literals at Numeric seats are stage 2 - today the gate refuses:
 try { Add(1, 2) } catch (e) { log(String(e)) }`,
+  },
+  {
+    name: 'Facts by identity',
+    code: `// the facts store is keyed by canonical references - and since
+// structurally equal means pointer-equal, a fact written against
+// Tuple(1, 2) is readable from ANY Tuple(1, 2)
+learn(Tuple(1, 2), 'label', "origin pair")
+log('read back:', fact(Tuple(1, 2), 'label'))
+log('other tuples unaffected:', fact(Tuple(1, 3), 'label') === undefined)`,
   },
 ]
 
