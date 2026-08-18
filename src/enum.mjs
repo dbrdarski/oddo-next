@@ -1,0 +1,78 @@
+// ==========================================
+// Enum & Factory Infrastructure
+// ==========================================
+
+import { internEnum } from './intern.mjs'
+import { contractCheck } from './contract.mjs'
+
+const once = (fn, cached = false, cache) => (...args) => (
+  cached || (cache = fn(...args), cached = true), cache
+)
+
+const memoize = (fn, cache = Object.create(null)) => (key) => (
+  key in cache || (cache[key] = fn(key)), cache[key]
+)
+
+export const argContracts = (...argContracts) => (resultContract) => argContracts
+
+// const generic = (typeContract) => (value) => {
+//   if (typeContract == null) {
+//     typeContract = value.constructor
+//     return true
+//   } else {
+//     return value instanceof typeContract
+//   }
+// }
+
+const generic = (state, i = 0) => [
+  () => { state = [] },
+  (index = i++) => (value) => {
+    if (state[index] == null) {
+      state[index] = value.constructor
+      return true
+    }
+    return value instanceof state[index]
+  }
+]
+
+const genericsProxy = (generic) => new Proxy({}, { get: () => generic() })
+
+export const Enum = (build) => {
+  const [initGenerics, createGeneric] = generic()
+  const resolve = once(() => build(argContracts, genericsProxy(createGeneric)))
+  return (...args) => {
+    initGenerics()
+    const definitions = resolve()
+    if (args.length > definitions.length)
+      throw Error(`Too many arguments: expected up to ${definitions.length}, but got ${args.length}.`)
+    for (let i = 0; i < definitions.length; i++)
+      // if (!definitions[i](args[i]))
+      if (!(args[i] instanceof definitions[i]))
+        throw TypeError(`Validation failed at index ${i} for value: ${args[i]}`)
+    return args
+  }
+}
+
+const lazyEnumFactory = (name, fn) => {
+  const constructor = class extends Array { }
+  Object.defineProperty(constructor.prototype, Symbol.toStringTag, { value: name })
+  Object.defineProperty(constructor.prototype, 'toString', {
+    value: function () {
+      const args = Array.from(this)
+        .map(arg => typeof arg === 'string' ? `"${arg}"` : String(arg))
+        .join(', ')
+      return `${name}(${args})`
+    }
+  })
+
+  return contractCheck(
+    v => v instanceof constructor,
+    (...args) => internEnum(constructor, fn(...args))
+  )
+}
+
+export const createEnums = (
+  Def,
+  def = once(() => new (Def())),
+  memo = memoize(key => lazyEnumFactory(key, def()[key]))
+) => new Proxy({}, { get: (target, prop) => memo(prop) })
