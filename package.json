@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test.mjs"
+    "test": "node test.mjs",
+    "test:browser": "parcel index.html"
+  },
+  "devDependencies": {
+    "parcel": "^2.16.4"
   }
 }
