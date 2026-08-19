@@ -9,7 +9,7 @@
 import { Tuple, Record } from '../src/intern.mjs'
 import { producedOf } from '../src/contract.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
-import { Add, Sub, Mul, LL, Numeric, Union } from '../src/domain.mjs'
+import { Add, Sub, Mul, Div, LL, Numeric, Union, Range } from '../src/domain.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
@@ -60,6 +60,18 @@ export const suites = [
     test('a form is NOT a Number', () => !(new ZeroDivision(1) instanceof Number)),
     test('forms are childable: Add(1, 1/0) constructs and interns', () =>
       Add(1, new ZeroDivision(2)) === Add(1, new ZeroDivision(2))),
+  ]),
+
+  suite('Div & Range', [
+    test('Div nests at Numeric seats', () => Add(1, Div(6, 2)) === Add(1, Div(6, 2))),
+    test('Div produces Numeric', () => producedOf(Div(6, 2)) === Numeric),
+    test('Range(0, 100) is interned', () => Range(0, 100) === Range(0, 100)),
+    test('different bounds, different ranges', () => Range(0, 100) !== Range(0, 1)),
+    test('Range(0, Infinity) constructs', () => String(Range(0, Infinity)) === 'Range(0, Infinity)'),
+    test('Range(5, 1) rejected by input validation', () => throws(() => Range(5, 1))),
+    test('membership: 50 in Range(0, 100)', () => 50 instanceof Range(0, 100)),
+    test('membership: 200 not in Range(0, 100)', () => !(200 instanceof Range(0, 100))),
+    test('a Tuple is not in a Range (no coercion)', () => !(Tuple(50) instanceof Range(0, 100))),
   ]),
 
   suite('Raw literals, Union, LL - landed with the result-slot design', [

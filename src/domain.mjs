@@ -17,7 +17,7 @@ import { Number, Indeterminate } from './numeric.mjs'
     But this is a problem for non Union members (like Union(Number, Indeterminate))
 */
 
-export const { Add, Sub, Mul, LL, Numeric, Union, Optional, Equals } = createEnums(() => class {
+export const { Add, Sub, Mul, Div, LL, Numeric, Union, Optional, Equals, Range } = createEnums(() => class {
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
   Union = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2))
@@ -28,6 +28,10 @@ export const { Add, Sub, Mul, LL, Numeric, Union, Optional, Equals } = createEnu
   Add = Enum($ => $(Numeric, Numeric)(Numeric))
   Sub = Enum($ => $(Numeric, Numeric)(Numeric))
   Mul = Enum($ => $(Numeric, Numeric)(Numeric))
+  Div = Enum($ => $(Numeric, Numeric)(Numeric))
   Equals = Enum(($, [E]) => $(E)(E => value => value === E))
+  Range = Enum($ => $(Number, Number)((lo, hi) => value =>
+    value instanceof Number && lo <= value && value <= hi),
+    (lo, hi) => lo <= hi)
   LL = Enum($ => $(Numeric, Optional(LL))(LL))
 })
