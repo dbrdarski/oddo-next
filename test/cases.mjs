@@ -45,11 +45,12 @@ export const suites = [
     test('add node stands at Numeric seats', () => Add(Numeric(1), Numeric(2)) instanceof Numeric),
     test('Add(Add(...)) nests and interns', () =>
       Add(Numeric(1), Add(Numeric(2), Numeric(3))) === Add(Numeric(1), Add(Numeric(2), Numeric(3)))),
-    test('Numeric(1) stands at Number seats (its declared result)', () => Numeric(1) instanceof Number),
+    test('Numeric(1) is a Numeric', () => Numeric(1) instanceof Numeric),
+    test('strict Number seats reject Numeric boxes (discharge discipline)', () => !(Numeric(1) instanceof Number)),
     test('add node does NOT stand at strict Number seats', () => !(Add(Numeric(1), Numeric(2)) instanceof Number)),
   ]),
 
-  suite('Pending - stage 2 & unruled threads (expected red today)', [
+  suite('Raw literals, Union, LL - landed with the result-slot design', [
     test('Add(1, 2) with raw literals', () => String(Add(1, 2)) === 'Add(1, 2)'),
     test('Add(1, Mul(2, Sub(5, 3))) with raw literals', () =>
       Add(1, Mul(2, Sub(5, 3))) === Add(1, Mul(2, Sub(5, 3)))),

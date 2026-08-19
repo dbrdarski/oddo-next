@@ -3,8 +3,7 @@
 // ==========================================
 
 import { Enum, createEnums } from './enum.mjs'
-import { contractCheck } from './contract.mjs'
-import { Number } from './numeric.mjs'
+import { Number, Indeterminate } from './numeric.mjs'
 
 // const Union = (conA, conB) => value => value instanceof conA || value instanceof conB
 
@@ -18,21 +17,17 @@ import { Number } from './numeric.mjs'
     But this is a problem for non Union members (like Union(Number, Indeterminate))
 */
 
-export const { Add, Sub, Mul, LL, Numeric, Union, Optional } = createEnums(() => class {
+export const { Add, Sub, Mul, LL, Numeric, Union, Optional, Equals } = createEnums(() => class {
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
-  Union = Enum(
-    ($, [T1, T2]) => $(T1, T2)(T1, T2),
-    contractCheck((T1, T2) => value => value instanceof T1 || value instanceof T2)
-  )
-  Optional = Enum(
-    ($, [T]) => $(T)(T),
-    contractCheck(T => value => value == null || value instanceof T))
-  Numeric = Enum($ => $(Number)(Number))
+  Union = Enum(($, [T1, T2]) =>
+    $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2))
+  Optional = Enum(($, [T]) =>
+    $(T)(T => value => value == null || value instanceof T))
+  Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
   // Numeric = Enum($ => $(Number)(Union(Number, Indeterminate)))
-  // Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
-  Add = Enum($ => $(Numeric, Numeric)(Numeric)) // add needs to be extend from numewric <- this enables Add(Add) Add -> Numeric
+  Add = Enum($ => $(Numeric, Numeric)(Numeric))
   Sub = Enum($ => $(Numeric, Numeric)(Numeric))
   Mul = Enum($ => $(Numeric, Numeric)(Numeric))
-  Equals = Enum(($, [E]) => $(E)(E))
-  LL = Enum($ => $(Numeric, Optional(LL)))
+  Equals = Enum(($, [E]) => $(E)(E => value => value === E))
+  LL = Enum($ => $(Numeric, Optional(LL))(LL))
 })

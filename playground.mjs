@@ -67,12 +67,13 @@ try { Pair(3, 4) } catch (e) { log(String(e)) }`,
   },
   {
     name: 'Facts & the gate',
-    code: `const n = Add(Numeric(1), Numeric(2))
+    code: `const n = Add(1, 2)
+log('raw literals pass (transparency):', String(n))
 log('declared result is Numeric:', producedOf(n) === Numeric)
-log('Numeric(1) at a Number seat:', Numeric(1) instanceof Number)
+log('n stands at Numeric seats:', n instanceof Numeric)
 
-// raw literals at Numeric seats are stage 2 - today the gate refuses:
-try { Add(1, 2) } catch (e) { log(String(e)) }`,
+// strict Number seats still reject what is not a literal number:
+log('a box at a strict Number seat:', Numeric(1) instanceof Number)`,
   },
   {
     name: 'Facts by identity',

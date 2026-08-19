@@ -135,6 +135,10 @@ prove an admission rejects it loudly at construction. The three verdicts
 (proven / refuted-with-witness / unproven) belong to the algebra's
 boundary — NEXT's full analyzer, not the demonstrator.
 
+A factory's membership resolves the declaration on demand — first need,
+not first construction: `Add(1, 1)` asks `Numeric` before `Numeric` ever
+ran, so the check itself triggers the (once-cached) resolve.
+
 Termination is structural, not assumed: membership descends through frozen,
 acyclic contract nodes to ground checks; finite declarations, finite
 descent.
