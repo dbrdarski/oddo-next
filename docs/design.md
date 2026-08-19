@@ -122,9 +122,18 @@ membership includes its declared contract's members.
 because solve-time dispatch will depend on shape tests; a widened default
 would make `3 instanceof Add` true.
 
-`sub` is interned identity for now — the seam where the rule table
-(unions, ranges, singletons) and the three verdicts
-(proven / refuted-with-witness / unproven) grow later.
+`sub` is interned identity today, growing rule by rule with each rule's
+first consumer (§7). Its domain is the calculable algebra — `Equals`,
+`Range`, `Union`, the kinds, transparent boxes — where every contract
+exposes its structure (a singleton its value, a range its endpoints, a
+union its branches, a box its contract), every pair is decidable, and
+boolean answers are final truth, not approximation: `sub(Equals(1),
+Range(0, 100))` is a computed yes, `sub(Range(0, 10), Range(5, 100))` a
+computed no. Opaque predicates (`contractCheck(v => ...)`) sit outside the
+algebra by design: `sub` grants them identity only, and a gate that cannot
+prove an admission rejects it loudly at construction. The three verdicts
+(proven / refuted-with-witness / unproven) belong to the algebra's
+boundary — NEXT's full analyzer, not the demonstrator.
 
 Termination is structural, not assumed: membership descends through frozen,
 acyclic contract nodes to ground checks; finite declarations, finite
@@ -196,13 +205,20 @@ through membership, nodes enter through their recorded facts.
 
 ## 7. Parked (open, deliberately)
 
-- The `sub` rule table and the three verdicts (identity today). What a
-  union node "produces" reopens here, if a consumer appears.
-- Indeterminate forms as gated interned values — `DivZero(a)` / `ModZero(a)`
-  keyed by (form, operand) so `1/0 !== 2/0`; required before an
-  Indeterminate can be anyone's child (the frozen door); the
-  `extends Number` vehicle dies then.
-- Variadic seats / N-ary `Union` (binary nests meanwhile).
+- `sub` rules, each landing with its first consumer: the transparency hop
+  and the union rules with `Div`, containment with `Range`, the singleton
+  rule (`sub(Equals(v), B)` = `v instanceof B`) when `Equals` nodes reach
+  seats. What a union node "produces" reopens here, if a consumer appears.
+- Indeterminate construction: the classes stay — they already serve as an
+  open ground contract through the prototype chain, and R-3 already holds
+  (a form fails the typeof `Number` contract). The one missing piece is
+  interning: constructors return the canonical instance (keyed by class +
+  operand, so `1/0 !== 2/0`), which also makes the forms frozen and able
+  to be children. Lands with `Div`. Final form names open (the sketch says
+  `ZeroDivision`/`ZeroMod`; the NEXT ruling says `DivZero`/`ModZero`).
+- Canonical forms for contract nodes: `Union(A, B)` and `Union(B, A)` are
+  different nodes for the same set; flattening/dedup/ordering has no
+  consumer yet.
 - The solve tier: `solve : Node → Node`, links never merges.
 - `Range` — needs input validation (`lo <= hi`) and an interval membership
   function — lands with the rule table.
@@ -220,6 +236,18 @@ through membership, nodes enter through their recorded facts.
   checks take parameters; the declaration is pure and cached.
 - A multi-entry result slot ("produces A or B" as a bare list): unions are
   written explicitly, `Union(A, B)`.
+- N-ary unions (`Union(A, B, C)`): binary only; nesting composes any union,
+  and the flat form multiplies spellings of one set.
+- Reimplementing the kinds — `Tuple`, `Record` — or the Indeterminate
+  classes as enums. The kinds and the enum factories are peer doors on the
+  interner, not layers; something becomes an enum only when it already has
+  the enum shape (a tag that is its identity, fixed contract-checked
+  seats) with zero new machinery. The Indeterminate classes already do
+  their contract job natively; deleting them solved no contract problem.
+- Building the three verdicts into the demonstrator's `sub`: inside the
+  calculable algebra boolean is complete; the boundary case (opaque
+  predicates) is handled by keeping them outside the algebra, not by
+  adding verdicts.
 - Membership smuggled into the result position as a side-channel, or
   carried via `contractCheck` wrappers around validators.
 - Machinery-level `Optional` and `extendFn` (retired; prototype-inheritance
