@@ -8,12 +8,17 @@
 
 import { Tuple, Record } from '../src/intern.mjs'
 import { producedOf } from '../src/contract.mjs'
+import { Enum, createEnums } from '../src/enum.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import { Add, Sub, Mul, Div, LL, Numeric, Union, Range } from '../src/domain.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
 const throws = (run) => { try { run(); return false } catch { return true } }
+
+const { Twin } = createEnums(() => class {
+  Twin = Enum(($, [E]) => $(E, E)(E => value => value === E))
+})
 
 export const suites = [
 
@@ -60,6 +65,14 @@ export const suites = [
     test('a form is NOT a Number', () => !(new ZeroDivision(1) instanceof Number)),
     test('forms are childable: Add(1, 1/0) constructs and interns', () =>
       Add(1, new ZeroDivision(2)) === Add(1, new ZeroDivision(2))),
+  ]),
+
+  suite('Generic binding', [
+    test('a repeated seat matches the same value', () => String(Twin(7, 7)) === 'Twin(7, 7)'),
+    test('a repeated seat rejects a different value', () => throws(() => Twin(7, 8))),
+    test('null is a bindable value: Twin(null, null) constructs', () => String(Twin(null, null)) === 'Twin(null, null)'),
+    test('null does not match 1: Twin(null, 1) rejected', () => throws(() => Twin(null, 1))),
+    test('undefined does not match 5: Twin(undefined, 5) rejected', () => throws(() => Twin(undefined, 5))),
   ]),
 
   suite('Div & Range', [

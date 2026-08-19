@@ -30,12 +30,13 @@ export const argContracts = (constructor) => (...argContracts) => (result) => (
 
 // A generic seat binds the call argument itself on first use; a repeated
 // seat re-checks by identity - under interning, === is value equality.
+// Unbound is an array hole, so null and undefined are bindable values.
 const generic = (state, i = 0) => [
   () => { state = [] },
   (index = i++) => contractCheck((value) => (
-    state[index] == null
-      ? (state[index] = value, true)
-      : value === state[index]
+    index in state
+      ? value === state[index]
+      : (state[index] = value, true)
   ))
 ]
 
