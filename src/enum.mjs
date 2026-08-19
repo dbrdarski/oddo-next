@@ -28,15 +28,6 @@ export const argContracts = (constructor) => (...argContracts) => (result) => (
   argContracts
 )
 
-// const generic = (typeContract) => (value) => {
-//   if (typeContract == null) {
-//     typeContract = value.constructor
-//     return true
-//   } else {
-//     return value instanceof typeContract
-//   }
-// }
-
 // A generic seat binds the call argument itself on first use; a repeated
 // seat re-checks by identity - under interning, === is value equality.
 const generic = (state, i = 0) => [

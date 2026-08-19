@@ -19,11 +19,6 @@ export const contractCheck = (validatorFn, contract = {}) => Object.defineProper
   { value: (v) => validatorFn(v) || sub(producedOf(v), contract) }
 )
 
-// export const Optional = (validator) => contractCheck(
-//   validator[Symbol.hasInstance],
-//   v => v == null ? true : v instanceof validator
-// )
-
 // export function extendFn(fn, parent) {
 //     fn.prototype = Object.create(parent.prototype);
 //     fn.prototype.constructor = fn;

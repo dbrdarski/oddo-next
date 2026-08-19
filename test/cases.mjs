@@ -8,7 +8,7 @@
 
 import { Tuple, Record } from '../src/intern.mjs'
 import { producedOf } from '../src/contract.mjs'
-import { Number } from '../src/numeric.mjs'
+import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import { Add, Sub, Mul, LL, Numeric, Union } from '../src/domain.mjs'
 
 const suite = (title, cases) => ({ title, cases })
@@ -48,6 +48,18 @@ export const suites = [
     test('Numeric(1) is a Numeric', () => Numeric(1) instanceof Numeric),
     test('strict Number seats reject Numeric boxes (discharge discipline)', () => !(Numeric(1) instanceof Number)),
     test('add node does NOT stand at strict Number seats', () => !(Add(Numeric(1), Numeric(2)) instanceof Number)),
+  ]),
+
+  suite('Indeterminate forms', [
+    test('interned: same operand, same instance', () => new ZeroDivision(1) === new ZeroDivision(1)),
+    test('operand is in the identity: 1/0 differs from 2/0', () => new ZeroDivision(1) !== new ZeroDivision(2)),
+    test('forms are distinct doors: 1/0 differs from 1%0', () => new ZeroDivision(1) !== new ZeroMod(1)),
+    test('the box carries the operand back (valueOf)', () => +new ZeroMod(2) === 2),
+    test('a form is an Indeterminate', () => new ZeroDivision(1) instanceof Indeterminate),
+    test('a form is a Numeric (union branch)', () => new ZeroDivision(1) instanceof Numeric),
+    test('a form is NOT a Number', () => !(new ZeroDivision(1) instanceof Number)),
+    test('forms are childable: Add(1, 1/0) constructs and interns', () =>
+      Add(1, new ZeroDivision(2)) === Add(1, new ZeroDivision(2))),
   ]),
 
   suite('Raw literals, Union, LL - landed with the result-slot design', [

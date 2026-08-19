@@ -2,6 +2,7 @@
 // Numeric Tower: Number & Indeterminate
 // ==========================================
 
+import { canonical } from './intern.mjs'
 import { contractCheck } from './contract.mjs'
 
 /*
@@ -28,17 +29,21 @@ export const Number = contractCheck(
 )
 
 export class Indeterminate extends globalThis.Number { }
+
+// The Number box carries the operand (valueOf() gives it back); the door
+// keys identity by (form, operand), so 1/0 and 2/0 are distinct values.
 export class ZeroDivision extends Indeterminate {
-  constructor() {
-    super()
-    // intern ZeroDivision
+  constructor(operand) {
+    super(operand)
+    return canonical(ZeroDivision, [operand], this)
   }
 }
 ZeroDivision.prototype[Symbol.toStringTag] = "Indeterminate(ZeroDivision)"
+
 export class ZeroMod extends Indeterminate {
-  constructor() {
-    super()
-    // intern ZeroMod
+  constructor(operand) {
+    super(operand)
+    return canonical(ZeroMod, [operand], this)
   }
 }
 
