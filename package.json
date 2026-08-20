@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node test.mjs",
+    "test": "node test.mjs && node test/run.mjs",
     "start": "parcel index.html tests.html --port 3000"
   },
   "devDependencies": {
