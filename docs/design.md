@@ -36,10 +36,10 @@ nodes and contract pairs later. Nothing is ever stored on a value or a
 class — a value is pure structure, indistinguishable fresh or analyzed, and
 facts never participate in identity.
 
-Current entries: `constructor → 'produces'` — the declared result contract,
-recorded at first resolve (contract-form results only; see §3). Planned:
-solved forms (`Add(1,2)` links to `Equals(3)`, never merges), sub verdicts
-on pairs.
+Current entries: `constructor → 'produces'` — the declared result, recorded
+at first resolve: a contract, or the declaration's own generic, stored as
+itself and answering per node (§5). Planned: solved forms (`Add(1,2)` links
+to `Equals(3)`, never merges), sub verdicts on pairs.
 
 ## 3. Enums: the three elements
 
@@ -145,18 +145,31 @@ descent.
 
 ## 5. Generics
 
-Generics are the declarative layer, and they live **only at the seats**:
-array-destructured (positional; an infinite generator hands them out), they
-bind the call argument itself on first use; a repeated seat re-checks by
-identity, which under interning is value equality (`Twin = Enum(($, [E]) =>
-$(E, E)(E))`: `Twin(7, 7)` passes, `Twin(7, 8)` is rejected).
+Generics are the declarative layer: array-destructured (positional; an
+infinite generator hands them out), they bind the call argument itself on
+first use; a repeated seat re-checks by identity, which under interning is
+value equality (`Twin = Enum(($, [E]) => $(E, E)(E))`: `Twin(7, 7)` passes,
+`Twin(7, 8)` is rejected).
+
+**A generic in the result slot means "makes what it holds"** (ruled with
+the Twin arc). The write stays one uniform line — the store holds the
+generic itself, the deferred thing, never a flattened copy. The generic's
+carrier is a **thunk over the node it is asked about**: seats claim their
+generics once at resolve (first seat wins for a repeated generic), and
+`producedOf` calls a stored generic with the node, which answers from its
+own element — `producedOf(Twin(2, 2))` is `2`, per node, forever, immune
+to whatever was constructed since. Per-class sentence, per-node truth.
+(`sub` has no rules for value-shaped facts yet, so "makes 1" does not yet
+stand at `Numeric` seats — that flips deliberately when the singleton
+rules land, §7.)
 
 Membership functions never reference the seat generics. Their parameters
 receive the node's elements positionally — the node is the storage of what
 was bound, and the parameter names (`T1`, `T2`) match the generic names by
 convention only. The declaration is resolved once per enum (`once` stays);
 bindings live exactly as long as one construction's validation, with a
-single reader. No state survives a job; no state is read by checks.
+single reader. No register survives a job; no register is read by checks
+or by facts.
 
 ## 6. The domain
 
@@ -236,6 +249,14 @@ through membership, nodes enter through their recorded facts.
   state with a second reader — staleness and nested-check interference by
   construction. Parameters, which the language makes fresh per call, do the
   job with nothing to guard.
+- A produces thunk reading the per-call registers (answering with whatever
+  the last call bound): the same second-reader disease one level down —
+  demonstrated poisonable, one unrelated `Twin(Numeric, Numeric)` flipped
+  an unrelated `Add(t, 2)` from rejected to constructed. A stored generic
+  answers **for the node it is asked about**, never from ambient state.
+- Flattening a generic result at the write (storing its resolved value or
+  its seat index instead of the generic itself): the store keeps the
+  deferred thing; resolution happens at read, with the node in hand.
 - Per-construction build runs (deleting the `once`): unnecessary once
   checks take parameters; the declaration is pure and cached.
 - A multi-entry result slot ("produces A or B" as a bare list): unions are
