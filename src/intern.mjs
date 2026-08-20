@@ -18,8 +18,11 @@ const createNode = () => ({
 
 const root = createNode();
 
+// A finalizer may fire late: its value died, but an equal construction may
+// already occupy the slot. Clear only when the current ref is actually dead,
+// so a stale finalizer can never evict a live canonical.
 const finalizer = new FinalizationRegistry((leaf) => {
-  leaf.ref = null;
+  leaf.ref?.deref() ?? (leaf.ref = null);
 });
 
 const step = (current, item) => {
