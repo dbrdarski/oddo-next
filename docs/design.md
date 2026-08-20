@@ -230,23 +230,19 @@ through membership, nodes enter through their recorded facts.
 
 ## 7. Parked (open, deliberately)
 
-- `sub` rules, each landing with its first consumer: the transparency hop
-  and the union rules with `Div`, containment with `Range`, the singleton
-  rule (`sub(Equals(v), B)` = `v instanceof B`) when `Equals` nodes reach
-  seats. What a union node "produces" reopens here, if a consumer appears.
-- Indeterminate construction: the classes stay — they already serve as an
-  open ground contract through the prototype chain, and R-3 already holds
-  (a form fails the typeof `Number` contract). The one missing piece is
-  interning: constructors return the canonical instance (keyed by class +
-  operand, so `1/0 !== 2/0`), which also makes the forms frozen and able
-  to be children. Lands with `Div`. Final form names open (the sketch says
-  `ZeroDivision`/`ZeroMod`; the NEXT ruling says `DivZero`/`ModZero`).
+- `sub` rules, each landing when something first invokes it: containment
+  when two `Range`s meet at `sub`, the singleton rule (`sub(Equals(v), B)`
+  = `v instanceof B`) when `Equals` nodes reach seats, the transparency
+  hop and union rules when a declared result is the union itself. (`Div`
+  and `Range` landed without needing any of them — `Div`'s recorded result
+  IS the seat's contract, so identity suffices.) What a union node
+  "produces" reopens here, if a consumer appears.
+- Final Indeterminate form names: the sketch says `ZeroDivision`/`ZeroMod`;
+  the NEXT ruling says `DivZero`/`ModZero`.
 - Canonical forms for contract nodes: `Union(A, B)` and `Union(B, A)` are
   different nodes for the same set; flattening/dedup/ordering has no
   consumer yet.
 - The solve tier: `solve : Node → Node`, links never merges.
-- `Range` — needs input validation (`lo <= hi`) and an interval membership
-  function — lands with the rule table.
 
 ## 8. Ruled out (do not reintroduce)
 
