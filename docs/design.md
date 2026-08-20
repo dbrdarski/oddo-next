@@ -27,6 +27,14 @@ Consequence: structurally equal means pointer-equal, so `===` is value
 equality, deep equality is one pointer comparison, and canonical references
 are perfect keys.
 
+Two boundary facts, stated so they are read as chosen: the JS surface is a
+demonstrator, not a hardened API — the door's frozen guard catches
+accidents (raw literals that skipped their constructor), not fence-hoppers;
+an arbitrary object frozen by hand is outside the model, and legitimate
+values exist only through the front doors. And `+0`/`-0` collapse to one
+key (JS Map semantics) — deliberate, not accidental: NEXT numbers are
+exact rationals, and rationals have no signed zero.
+
 ## 2. Facts (landed)
 
 Everything the system derives about canonical references lives in one
