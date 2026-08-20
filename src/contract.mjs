@@ -4,8 +4,10 @@
 
 import { fact } from './facts.mjs'
 
-// What a value stands for: the declared result of the constructor that made it.
-export const producedOf = (v) => fact(v?.constructor, 'produces')
+// What a value stands for: the declared result of the constructor that made
+// it. A stored generic is a thunk - it answers for the node it is asked about.
+export const producedOf = (v, p = fact(v?.constructor, 'produces')) =>
+  p?.generic ? p(v) : p
 
 // Subcontract, degenerate: interned identity. This is the seam where the
 // rule table (ranges, unions, singletons) and the three verdicts grow.

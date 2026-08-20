@@ -20,6 +20,7 @@ const isCheck = (x) => typeof x === 'function' && !x.prototype && !Object.hasOwn
 const membership = (check) => function (v) { return check(...this)(v) || sub(producedOf(v), this) }
 
 export const argContracts = (constructor) => (...argContracts) => (result) => (
+  argContracts.forEach((c, i) => c?.generic && (c.seat ??= i)),
   isCheck(result)
     ? Object.defineProperty(constructor.prototype, Symbol.hasInstance, { value: membership(result) })
     : (learn(constructor, 'produces', result),
@@ -31,13 +32,16 @@ export const argContracts = (constructor) => (...argContracts) => (result) => (
 // A generic seat binds the call argument itself on first use; a repeated
 // seat re-checks by identity - under interning, === is value equality.
 // Unbound is an array hole, so null and undefined are bindable values.
+// The carrier is a thunk over the node it is asked about - a stored
+// generic answers "what does this node make" from the node itself.
 const generic = (state, i = 0) => [
   () => { state = [] },
-  (index = i++) => contractCheck((value) => (
-    index in state
-      ? value === state[index]
-      : (state[index] = value, true)
-  ))
+  (index = i++, thunk = Object.assign((node) => node[thunk.seat], { generic: true })) =>
+    contractCheck((value) => (
+      index in state
+        ? value === state[index]
+        : (state[index] = value, true)
+    ), thunk)
 ]
 
 function* generics(generic) { while (true) yield generic() }
@@ -53,7 +57,7 @@ export const Enum = (build, input) => {
     for (let i = 0; i < definitions.length; i++)
       // if (!definitions[i](args[i]))
       if (!(args[i] instanceof definitions[i]))
-        throw TypeError(`Validation failed at index ${i} for value: ${args[i]}`)
+        throw TypeError(`Validation failed at index ${i} for value: ${JSON.stringify(args[i])}`)
     if (input && !input(...args))
       throw TypeError(`Input validation failed for values: ${args}`)
     return args

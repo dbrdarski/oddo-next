@@ -17,7 +17,7 @@ const test = (label, run) => ({ label, run })
 const throws = (run) => { try { run(); return false } catch { return true } }
 
 const { Twin } = createEnums(() => class {
-  Twin = Enum(($, [E]) => $(E, E)(E => value => value === E))
+  Twin = Enum(($, [E]) => $(E, E)(E))
 })
 
 export const suites = [
@@ -73,6 +73,20 @@ export const suites = [
     test('null is a bindable value: Twin(null, null) constructs', () => String(Twin(null, null)) === 'Twin(null, null)'),
     test('null does not match 1: Twin(null, 1) rejected', () => throws(() => Twin(null, 1))),
     test('undefined does not match 5: Twin(undefined, 5) rejected', () => throws(() => Twin(undefined, 5))),
+    test('a Twin makes what it holds: producedOf(Twin(2, 2)) is 2', () => producedOf(Twin(2, 2)) === 2),
+    test('a Twin is not its element: Twin(1, Twin(2, 2)) rejected', () => throws(() => Twin(1, Twin(2, 2)))),
+    test('the same twin twice: Twin(Twin(1,1), Twin(1,1)) constructs', () =>
+      String(Twin(Twin(1, 1), Twin(1, 1))) === 'Twin(Twin(1, 1), Twin(1, 1))'),
+    test('answers are node-anchored: churn cannot flip them', () => {
+      const t = Twin(1, 1)
+      Twin(9, 9)
+      return producedOf(t) === 1
+    }),
+    test('binding a contract elsewhere cannot admit a twin', () => {
+      const t = Twin(1, 1)
+      Twin(Numeric, Numeric)
+      return throws(() => Add(t, 2))
+    }),
   ]),
 
   suite('Div & Range', [
