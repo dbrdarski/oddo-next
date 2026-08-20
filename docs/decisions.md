@@ -63,3 +63,23 @@ ruling (obsolete), §8 gains the import itself to the ruled-out list.
 
 **Status.** Diagnosis ruled. Implementation waits on: the plan written
 against the doc, the `Numeric(Numeric(1))` ruling, and an explicit go.
+
+## 2026-08-20 — canonicalization is one logic (ruling)
+
+**Ruling (Dane).** Canonicalization is not layers; it is one logic applied
+to different areas: **at the door, where order carries no meaning, parts
+enter in canonical order — interning then makes canonical mean identical.**
+The mechanism already exists and has run since the first commit: `Record`
+sorts its entries (`Record({a, b}) === Record({b, a})`). The same move,
+per area: a union's branches; a commutative operation's operands (`Add`,
+not `Sub`/`Div`). Values are born canonical; no pass, no rewrite step.
+
+Number canonicalization (rational reduction) is out of scope for this
+project at this phase.
+
+Withdrawn en route: the claim that `Add(1,2)`/`Add(2,1)` sameness
+"surfaces through solve" — an extrapolation from links-never-merges that
+was never ruled.
+
+**Open.** How an area declares its order-insensitivity (Record's is
+intrinsic; enums would state it) — shaped when wanted; nothing landed.
