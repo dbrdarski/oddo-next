@@ -52,12 +52,15 @@ export const Enum = (build, input) => {
   const validator = (constructor, ...args) => {
     genericState(() => [])
     const definitions = resolve(constructor)
+    // A contract-valued Enum's seats configure its check; only structural
+    // Enums admit contracts as pattern parts.
+    const structural = !isContract(constructor.prototype)
     if (args.length > definitions.length)
       throw Error(`Too many arguments: expected up to ${definitions.length}, but got ${args.length}.`)
     for (let i = 0; i < definitions.length; i++)
       // if (!definitions[i](args[i]))
       if (!(
-        !definitions[i].generic && isContract(args[i]) ||
+        structural && !definitions[i].generic && isContract(args[i]) ||
         args[i] instanceof definitions[i]
       ))
         throw TypeError(`Validation failed at index ${i} for value: ${JSON.stringify(args[i])}`)
@@ -96,7 +99,7 @@ const lazyEnumFactory = (name, fn) => {
       const instance = constructor.from(validate(...args))
       return canonical(constructor, instance, instance)
     },
-    { constructor }
+    { kind: constructor }
   )
 }
 

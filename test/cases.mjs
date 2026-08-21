@@ -41,8 +41,10 @@ export const suites = [
     test('Add and Mul of equal elements stay distinct', () =>
       Add(Numeric(1), Numeric(2)) !== Mul(Numeric(1), Numeric(2))),
     test('node instanceof its own factory', () => Add(Numeric(1), Numeric(2)) instanceof Add),
-    test('factory and node expose the same constructor', () => Add.constructor === Add(1, 2).constructor),
-    test('different factories expose different constructors', () => Add.constructor !== Mul.constructor),
+    test('factory kind is the node constructor', () => Add.kind === Add(1, 2).constructor),
+    test('different factories expose different kinds', () => Add.kind !== Mul.kind),
+    test('a resolved factory does not stand at its result contract', () =>
+      (Mul(1, 2), !(Mul instanceof Numeric))),
     test('enum node as record child keeps identity', () => { const n = Numeric(7); return Record({ n }).n === n }),
     test('Tuple(1) and Numeric(1) live in different namespaces', () => Tuple(1) !== Numeric(1)),
   ]),
@@ -101,6 +103,8 @@ export const suites = [
     test('different bounds, different ranges', () => Range(0, 100) !== Range(0, 1)),
     test('Range(0, Infinity) constructs', () => String(Range(0, Infinity)) === 'Range(0, Infinity)'),
     test('Range(5, 1) rejected by input validation', () => throws(() => Range(5, 1))),
+    test('Range bounds must be Numbers, not contracts', () =>
+      throws(() => Range(Equals(1), Equals(2)))),
     test('membership: 50 in Range(0, 100)', () => 50 instanceof Range(0, 100)),
     test('membership: 200 not in Range(0, 100)', () => !(200 instanceof Range(0, 100))),
     test('a Tuple is not in a Range (no coercion)', () => !(Tuple(50) instanceof Range(0, 100))),
@@ -187,6 +191,18 @@ export const suites = [
       throws(() => match(Mul(1, 2))(
         ($, [a, b]) => $(Add(a, b))(() => false)
       ))),
+    test('a structural node can hold a contract part', () => Add(Number, 2)[0] === Number),
+    test('the same shape is legal as a pattern', () =>
+      match(Add(1, 9))(
+        ($, [b]) => $(Add(Number, b))(b => b === 9)
+      )),
+    test('case declarations can contain nested matches', () =>
+      match(Add(1, 2))(
+        ($, [a, b]) => {
+          const inner = match(1)($ => $(Number)(value => value))
+          return $(Add(a, b))((a, b) => inner === 1 && a === 1 && b === 2)
+        }
+      )),
   ]),
 
 ]

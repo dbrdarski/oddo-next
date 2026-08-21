@@ -54,7 +54,7 @@ const result = match(value)(
 
 log('value:', value)
 log('captures:', result)
-log('exact Add shape:', value.constructor === Add.constructor)`,
+log('exact Add shape:', value.constructor === Add.kind)`,
   },
   {
     name: 'Match repeated & wildcard',
