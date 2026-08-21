@@ -13,12 +13,19 @@ export const producedOf = (v, p = fact(v?.constructor, 'produces')) =>
 // rule table (ranges, unions, singletons) and the three verdicts grow.
 export const sub = (a, b) => a === b
 
+export const isContract = (value) =>
+  value != null && typeof value[Symbol.hasInstance] === 'function'
+
 // Membership is "stands at": the base test, or the value was admitted as
 // something that satisfies the demanded contract.
-export const contractCheck = (validatorFn, contract = {}) => Object.defineProperty(
+export const contractCheck = (validatorFn, contract = {}, extend = {}) => Object.defineProperties(
   contract,
-  Symbol.hasInstance,
-  { value: (v) => validatorFn(v) || sub(producedOf(v), contract) }
+  {
+    ...Object.getOwnPropertyDescriptors(extend),
+    [Symbol.hasInstance]: {
+      value: (v) => validatorFn(v) || sub(producedOf(v), contract)
+    }
+  }
 )
 
 // export function extendFn(fn, parent) {

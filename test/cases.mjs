@@ -9,8 +9,9 @@
 import { Tuple, Record } from '../src/intern.mjs'
 import { producedOf } from '../src/contract.mjs'
 import { Enum, createEnums } from '../src/enum.mjs'
+import { match, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
-import { Add, Sub, Mul, Div, LL, Numeric, Union, Range } from '../src/domain.mjs'
+import { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range } from '../src/domain.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
@@ -40,6 +41,8 @@ export const suites = [
     test('Add and Mul of equal elements stay distinct', () =>
       Add(Numeric(1), Numeric(2)) !== Mul(Numeric(1), Numeric(2))),
     test('node instanceof its own factory', () => Add(Numeric(1), Numeric(2)) instanceof Add),
+    test('factory and node expose the same constructor', () => Add.constructor === Add(1, 2).constructor),
+    test('different factories expose different constructors', () => Add.constructor !== Mul.constructor),
     test('enum node as record child keeps identity', () => { const n = Numeric(7); return Record({ n }).n === n }),
     test('Tuple(1) and Numeric(1) live in different namespaces', () => Tuple(1) !== Numeric(1)),
   ]),
@@ -87,6 +90,8 @@ export const suites = [
       Twin(Numeric, Numeric)
       return throws(() => Add(t, 2))
     }),
+    test('different contract values still fail a repeated generic seat', () =>
+      throws(() => Twin(Number, Numeric))),
   ]),
 
   suite('Div & Range', [
@@ -108,6 +113,80 @@ export const suites = [
     test('Union(Numeric(1), Numeric(2)) - generics thread', () =>
       String(Union(Numeric(1), Numeric(2))) === 'Union(Numeric(1), Numeric(2))'),
     test('LL(Numeric(1)) - result-stage thread', () => String(LL(Numeric(1))) === 'LL(Numeric(1))'),
+  ]),
+
+  suite('Pattern matching', [
+    test('an exact Enum shape captures its seats', () => {
+      const result = match(Add(1, 2))(
+        ($, [a, b]) => $(Add(a, b))((a, b) => [a, b]),
+        $ => $(_)(() => null)
+      )
+      return result[0] === 1 && result[1] === 2
+    }),
+    test('different Enum constructors do not structurally match', () =>
+      match(Mul(1, 2))(
+        ($, [a, b]) => $(Add(a, b))(() => false),
+        $ => $(_)(() => true)
+      )),
+    test('nested Enum shapes capture in generic creation order', () => {
+      const result = match(Add(1, Mul(2, 3)))(
+        ($, [a, b, c]) => $(Add(a, Mul(b, c)))((a, b, c) => [a, b, c])
+      )
+      return result[0] === 1 && result[1] === 2 && result[2] === 3
+    }),
+    test('a repeated capture succeeds by identity', () =>
+      match(Add(2, 2))(
+        ($, [a]) => $(Add(a, a))(a => a === 2),
+        $ => $(_)(() => false)
+      )),
+    test('a repeated capture mismatch falls through', () =>
+      match(Add(2, 3))(
+        ($, [a]) => $(Add(a, a))(() => false),
+        $ => $(_)(() => true)
+      )),
+    test('undefined remains a bindable repeated capture', () =>
+      match(Twin(undefined, undefined))(
+        ($, [a]) => $(Twin(a, a))(a => a === undefined)
+      )),
+    test('Equals provides exact-value matching', () =>
+      match(Add(1, 9))(
+        ($, [b]) => $(Add(Equals(1), b))(b => b === 9),
+        $ => $(_)(() => false)
+      )),
+    test('contract-valued Enum leaves use membership', () =>
+      match(50)(
+        $ => $(Range(0, 100))(value => value === 50),
+        $ => $(_)(() => false)
+      )),
+    test('ordinary contract leaves reuse stands-at membership', () => {
+      const value = Add(1, 2)
+      return match(value)(
+        $ => $(Numeric)(() => true),
+        $ => $(_)(() => false)
+      )
+    }),
+    test('a contract-only case receives its matched value', () =>
+      match(3)(
+        $ => $(Number)(value => value === 3)
+      )),
+    test('a nested wildcard captures nothing', () =>
+      match(Add(1, 9))(
+        ($, [b]) => $(Add(_, b))(b => b === 9)
+      )),
+    test('the first successful case wins', () =>
+      match(3)(
+        $ => $(Number)(() => 1),
+        $ => $(Number)(() => 2)
+      ) === 1),
+    test('failed-case bindings do not leak', () =>
+      match(Add(2, 3))(
+        ($, [a]) => $(Add(a, a))(() => false),
+        ($, [a, b]) => $(Add(a, b))((a, b) => a === 2 && b === 3)
+      )),
+    test('no successful case throws', () =>
+      throws(() => match(Mul(1, 2))(
+        ($, [a, b]) => $(Add(a, b))(() => false)
+      ))),
   ]),
 
 ]

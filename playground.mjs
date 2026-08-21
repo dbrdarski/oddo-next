@@ -4,7 +4,7 @@
 
 // Everything the modules export is in scope of the evaluated code, so the
 // playground speaks the same language as the source: Tuple, Record, the
-// enum factories, contracts, and the facts store.
+// enum factories, contracts, matching, and the facts store.
 
 import * as intern from './src/intern.mjs'
 import * as contract from './src/contract.mjs'
@@ -12,8 +12,9 @@ import * as facts from './src/facts.mjs'
 import * as enums from './src/enum.mjs'
 import * as numeric from './src/numeric.mjs'
 import * as domain from './src/domain.mjs'
+import * as matching from './src/match.mjs'
 
-const api = { ...intern, ...contract, ...facts, ...enums, ...numeric, ...domain }
+const api = { ...intern, ...contract, ...facts, ...enums, ...numeric, ...domain, ...matching }
 const names = Object.keys(api)
 const values = Object.values(api)
 
@@ -37,6 +38,86 @@ log(n)
 log('interned:', n === Add(Numeric(1), Add(Numeric(2), Numeric(3))))
 log('stands at Numeric seats:', n instanceof Numeric)
 log('at a strict Number seat:', n instanceof Number)`,
+  },
+  {
+    name: 'Match structural Enums',
+    code: `const value = Add(1, Mul(2, 3))
+
+const result = match(value)(
+  ($, [a, b, c]) =>
+    $(Add(a, Mul(b, c)))(
+      (a, b, c) => [a, b, c]
+    ),
+
+  $ => $(_)(() => null)
+)
+
+log('value:', value)
+log('captures:', result)
+log('exact Add shape:', value.constructor === Add.constructor)`,
+  },
+  {
+    name: 'Match repeated & wildcard',
+    code: `const describe = value => match(value)(
+  ($, [a]) =>
+    $(Add(a, a))(
+      a => 'same operand: ' + a
+    ),
+
+  ($, [right]) =>
+    $(Add(_, right))(
+      right => 'any left, right: ' + right
+    ),
+
+  $ => $(_)(() => 'not an Add')
+)
+
+log(describe(Add(2, 2)))
+log(describe(Add(2, 3)))
+log(describe(Mul(2, 2)))`,
+  },
+  {
+    name: 'Match contracts & Equals',
+    code: `const exact = value => match(value)(
+  ($, [right]) =>
+    $(Add(Equals(1), right))(
+      right => 'Add starts at 1; right: ' + right
+    ),
+
+  $ => $(_)(() => 'no exact match')
+)
+
+log(exact(Add(1, 9)))
+log(exact(Add(2, 9)))
+
+log(match(50)(
+  $ => $(Range(0, 100))(
+    value => 'inside range: ' + value
+  )
+))
+
+const expression = Add(3, 4)
+log(match(expression)(
+  $ => $(Number)(value => 'strict number: ' + value),
+  $ => $(Numeric)(value => 'stands at Numeric: ' + value)
+))`,
+  },
+  {
+    name: 'Match order & failure',
+    code: `const chosen = match(3)(
+  $ => $(Number)(value => 'first Number case: ' + value),
+  $ => $(Number)(() => 'second Number case'),
+  $ => $(_)(() => 'fallback')
+)
+log(chosen)
+
+try {
+  match(Mul(1, 2))(
+    ($, [a, b]) => $(Add(a, b))(() => 'Add')
+  )
+} catch (error) {
+  log('no match:', String(error))
+}`,
   },
   {
     name: 'Structural sharing',

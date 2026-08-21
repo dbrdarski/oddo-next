@@ -3,7 +3,7 @@
 // ==========================================
 
 import { canonical } from './intern.mjs'
-import { contractCheck, producedOf, sub } from './contract.mjs'
+import { contractCheck, isContract, producedOf, sub } from './contract.mjs'
 import { fact, learn } from './facts.mjs'
 
 const once = (fn, cached = false, cache) => (...args) => (
@@ -34,8 +34,8 @@ export const argContracts = (constructor) => (...argContracts) => (result) => (
 // Unbound is an array hole, so null and undefined are bindable values.
 // The carrier is a thunk over the node it is asked about - a stored
 // generic answers "what does this node make" from the node itself.
-const generic = (state, i = 0) => [
-  () => { state = [] },
+export const generic = (state, i = 0) => [
+  (handler) => handler ? (state = handler(state)) : state,
   (index = i++, thunk = Object.assign((node) => node[thunk.seat], { generic: true })) =>
     contractCheck((value) => (
       index in state
@@ -44,19 +44,22 @@ const generic = (state, i = 0) => [
     ), thunk)
 ]
 
-function* generics(generic) { while (true) yield generic() }
+export function* generics(generic) { while (true) yield generic() }
 
 export const Enum = (build, input) => {
-  const [initGenerics, createGeneric] = generic()
+  const [genericState, createGeneric] = generic()
   const resolve = once((constructor) => build(argContracts(constructor), generics(createGeneric)))
   const validator = (constructor, ...args) => {
-    initGenerics()
+    genericState(() => [])
     const definitions = resolve(constructor)
     if (args.length > definitions.length)
       throw Error(`Too many arguments: expected up to ${definitions.length}, but got ${args.length}.`)
     for (let i = 0; i < definitions.length; i++)
       // if (!definitions[i](args[i]))
-      if (!(args[i] instanceof definitions[i]))
+      if (!(
+        !definitions[i].generic && isContract(args[i]) ||
+        args[i] instanceof definitions[i]
+      ))
         throw TypeError(`Validation failed at index ${i} for value: ${JSON.stringify(args[i])}`)
     if (input && !input(...args))
       throw TypeError(`Input validation failed for values: ${args}`)
@@ -92,7 +95,8 @@ const lazyEnumFactory = (name, fn) => {
       // construction is discarded in favor of the canonical instance.
       const instance = constructor.from(validate(...args))
       return canonical(constructor, instance, instance)
-    }
+    },
+    { constructor }
   )
 }
 
