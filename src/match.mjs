@@ -1,9 +1,14 @@
 import { contractCheck, isContract } from './contract.mjs'
 import { generic, generics } from './enum.mjs'
+import { Tuple } from './intern.mjs'
 
 export const _ = Object.freeze(contractCheck(() => true))
 
 const caseOf = (pattern) => (handler) => [pattern, handler]
+const combined = Symbol()
+
+export const Combine = (...patterns) => (handler) =>
+  [patterns, handler, combined]
 
 const isEnum = (value) =>
   Array.isArray(value) && value.constructor !== Array
@@ -26,12 +31,55 @@ const fits = (pattern, value) => {
   return value === pattern
 }
 
+const combineFits = (patterns, values, genericState) => {
+  if (
+    !Array.isArray(values) ||
+    values.constructor !== Array ||
+    !Object.isFrozen(values) ||
+    patterns.length !== values.length
+  ) return
+
+  try {
+    if (values !== Tuple(...values)) return
+  } catch {
+    return
+  }
+
+  const assigned = Array(patterns.length)
+  const used = Array(patterns.length)
+  const search = (patternIndex) => {
+    if (patternIndex === patterns.length) return true
+
+    for (let valueIndex = 0; valueIndex < values.length; valueIndex++) {
+      if (used[valueIndex]) continue
+
+      const checkpoint = genericState().slice()
+      if (fits(patterns[patternIndex], values[valueIndex])) {
+        assigned[patternIndex] = values[valueIndex]
+        used[valueIndex] = true
+        if (search(patternIndex + 1)) return true
+        used[valueIndex] = false
+      }
+      genericState(() => checkpoint)
+    }
+    return false
+  }
+
+  return search(0) ? assigned : undefined
+}
+
 export const match = (value) => (...cases) => {
   for (const define of cases) {
     const [genericState, createGeneric] = generic()
-    const [pattern, handler] = define(caseOf, generics(createGeneric))
+    const [pattern, handler, kind] = define(caseOf, generics(createGeneric))
 
     genericState(() => [])
+
+    if (kind === combined) {
+      const assigned = combineFits(pattern, value, genericState)
+      if (assigned !== undefined) return handler(...assigned)
+      continue
+    }
 
     if (fits(pattern, value)) {
       const bindings = genericState()

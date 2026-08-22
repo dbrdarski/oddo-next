@@ -120,6 +120,19 @@ try {
 }`,
   },
   {
+    name: 'Match unordered Tuple',
+    code: `const expression = Add(1, 2)
+
+const result = match(Tuple(expression, 3))(
+  $ => Combine(Number, Numeric)(
+    (number, numeric) => [number, numeric]
+  )
+)
+
+log('source order:', Tuple(expression, 3))
+log('pattern order:', result)`,
+  },
+  {
     name: 'Structural sharing',
     code: `const shared = Tuple(1, 2)
 const a = Record({ left: shared, right: Tuple(3, 4) })

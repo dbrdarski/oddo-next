@@ -9,7 +9,7 @@
 import { Tuple, Record } from '../src/intern.mjs'
 import { producedOf } from '../src/contract.mjs'
 import { Enum, createEnums } from '../src/enum.mjs'
-import { match, _ } from '../src/match.mjs'
+import { match, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range } from '../src/domain.mjs'
 
@@ -203,6 +203,77 @@ export const suites = [
           return $(Add(a, b))((a, b) => inner === 1 && a === 1 && b === 2)
         }
       )),
+  ]),
+
+  suite('Combine matching', [
+    test('source order is ignored and handler order follows the patterns', () => {
+      const add = Add(1, 2)
+      const run = values => match(values)(
+        $ => Combine(Number, Numeric)((number, numeric) =>
+          number === 3 && numeric === add),
+        $ => $(_)(() => false)
+      )
+      return run(Tuple(add, 3)) && run(Tuple(3, add))
+    }),
+    test('cardinality must match exactly', () => {
+      const run = values => match(values)(
+        $ => Combine(Number, Number)(() => false),
+        $ => $(_)(() => true)
+      )
+      return run(Tuple(1)) && run(Tuple(1, 2, 3))
+    }),
+    test('the occurrence pool must be a canonical Tuple', () => {
+      const run = values => match(values)(
+        $ => Combine(Number, Number)(() => false),
+        $ => $(_)(() => true)
+      )
+      return run([1, 2]) && run(Object.freeze([1, 2]))
+    }),
+    test('ambiguous assignments use occurrence order', () => {
+      const add = Add(1, 2)
+      return match(Tuple(1, add))(
+        $ => Combine(Numeric, Numeric)((first, second) =>
+          first === 1 && second === add)
+      )
+    }),
+    test('overlapping contracts backtrack instead of matching greedily', () => {
+      const add = Add(1, 2)
+      return match(Tuple(3, add))(
+        $ => Combine(Numeric, Number)((numeric, number) =>
+          numeric === add && number === 3)
+      )
+    }),
+    test('duplicate occurrences remain distinct positions', () =>
+      match(Tuple(2, 2))(
+        $ => Combine(Equals(2), Equals(2))((first, second) =>
+          first === 2 && second === 2)
+      )),
+    test('a failed branch restores its generic bindings', () =>
+      match(Tuple(2, 3))(
+        ($, [a]) => Combine(a, Equals(2))((other, two) =>
+          other === 3 && two === 2)
+      )),
+    test('a partially failed structural fit restores its bindings', () => {
+      const different = Add(1, 2)
+      const same = Add(2, 2)
+      return match(Tuple(different, same))(
+        ($, [a]) => Combine(Add(a, a), Numeric)((matched, remaining) =>
+          matched === same && remaining === different)
+      )
+    }),
+    test('rollback preserves generic holes and earlier bindings', () =>
+      match(Tuple(9, 2, 3))(
+        ($, [a, b]) => Combine(b, a, Equals(2))((first, second, third) =>
+          first === 9 && second === 3 && third === 2)
+      )),
+    test('repeated generics still compare occurrence identity', () => {
+      const run = values => match(values)(
+        ($, [a]) => Combine(a, a)((first, second) =>
+          first === values[0] && second === values[1]),
+        $ => $(_)(() => false)
+      )
+      return run(Tuple(2, 2)) && !run(Tuple(2, 3))
+    }),
   ]),
 
 ]
