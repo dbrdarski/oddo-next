@@ -14,6 +14,14 @@ const memoize = (fn, cache = Object.create(null)) => (key) => (
   key in cache || (cache[key] = fn(key)), cache[key]
 )
 
+const enumFactories = new WeakMap()
+
+export const mapEnum = (value, map, factory =
+  value !== null && typeof value === 'object'
+    ? enumFactories.get(value.constructor)
+    : undefined
+) => factory?.(...value.map(map))
+
 // A bare arrow - no prototype, no hasInstance of its own - can only be a check.
 const isCheck = (x) => typeof x === 'function' && !x.prototype && !Object.hasOwn(x, Symbol.hasInstance)
 
@@ -90,7 +98,7 @@ const lazyEnumFactory = (name, fn) => {
   // Membership can be demanded before any construction (Add(1, 1) asks
   // Numeric before Numeric ever ran), so the check resolves the
   // declaration on demand - first need, not first construction.
-  return contractCheck(
+  const factory = contractCheck(
     (v, transparent = (fact(fn, 'resolve')(constructor), fact(constructor, 'transparent'))) =>
       v instanceof constructor || transparent != null && v instanceof transparent,
     (...args) => {
@@ -101,6 +109,8 @@ const lazyEnumFactory = (name, fn) => {
     },
     { kind: constructor }
   )
+  enumFactories.set(constructor, factory)
+  return factory
 }
 
 export const createEnums = (

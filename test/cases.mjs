@@ -12,6 +12,7 @@ import { Enum, createEnums } from '../src/enum.mjs'
 import { match, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range } from '../src/domain.mjs'
+import { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda, internFn, expand } from '../src/function.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
@@ -20,6 +21,20 @@ const throws = (run) => { try { run(); return false } catch { return true } }
 const { Twin } = createEnums(() => class {
   Twin = Enum(($, [E]) => $(E, E)(E))
 })
+
+const loopForm = () => {
+  const self = OuterRef(0)
+  return Lambda(1, 0, Apply(self, Tuple()))
+}
+
+const countDownForm = () => {
+  const self = OuterRef(0)
+  const argument = CallArgument(0, self)
+  return Lambda(1, 1, Match(argument, Tuple(
+    Arm(Equals(0), 0),
+    Arm(_, Apply(self, Tuple(Sub(argument, 2))))
+  )))
+}
 
 export const suites = [
 
@@ -273,6 +288,247 @@ export const suites = [
         $ => $(_)(() => false)
       )
       return run(Tuple(2, 2)) && !run(Tuple(2, 3))
+    }),
+  ]),
+
+  suite('Canonical functions & recursive expansion', [
+    test('function forms are canonical Enum trees', () =>
+      countDownForm() === countDownForm()),
+    test('a form and its ordered references determine function identity', () => {
+      const form = countDownForm()
+      const fn = internFn(form, form)
+      return fn === internFn(countDownForm(), countDownForm()) && Object.isFrozen(fn)
+    }),
+    test('one lowered form/self application has one canonical identity', () => {
+      const [a, b, c, d] = Array.from(
+        { length: 4 },
+        () => internFn(loopForm(), loopForm())
+      )
+      return a === b && b === c && c === d
+    }),
+    test('different applied references keep the same form distinct', () => {
+      const form = loopForm()
+      const one = internFn(Lambda(0, 0, 1))
+      const two = internFn(Lambda(0, 0, 2))
+      return internFn(form, one) !== internFn(form, two)
+    }),
+    test('outer-reference order participates in function identity', () => {
+      const form = Lambda(2, 0, Tuple(OuterRef(0), OuterRef(1)))
+      return internFn(form, 1, 2) !== internFn(form, 2, 1)
+    }),
+    test('a nonrecursive function simply produces its formula', () => {
+      const self = OuterRef(0)
+      const form = Lambda(1, 1, Add(CallArgument(0, self), 1))
+      const fn = internFn(form, form)
+      return expand(fn) === Add(CallArgument(0, fn), 1)
+    }),
+    test('reaching self leaves the exact residual call', () => {
+      const form = countDownForm()
+      const fn = internFn(form, form)
+      return expand(fn) === Apply(
+        fn,
+        Tuple(Sub(CallArgument(0, fn), 2))
+      )
+    }),
+    test('every recursive call remains in the complete tree', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const form = Lambda(1, 1, Add(
+        Apply(self, Tuple(Sub(argument, 1))),
+        Apply(self, Tuple(Sub(argument, 2)))
+      ))
+      const fn = internFn(form, form)
+      const arrived = CallArgument(0, fn)
+      return expand(fn) === Add(
+        Apply(fn, Tuple(Sub(arrived, 1))),
+        Apply(fn, Tuple(Sub(arrived, 2)))
+      )
+    }),
+    test('a wrapper expands through a recursive callee', () => {
+      const recursiveSelf = OuterRef(0)
+      const recursiveForm = Lambda(1, 1, Apply(
+        recursiveSelf,
+        Tuple(Sub(CallArgument(0, recursiveSelf), 1))
+      ))
+      const recursive = internFn(recursiveForm, recursiveForm)
+
+      const wrapperSelf = OuterRef(0)
+      const wrapperForm = Lambda(2, 1, Apply(
+        OuterRef(1),
+        Tuple(Add(CallArgument(0, wrapperSelf), 2))
+      ))
+      const wrapper = internFn(wrapperForm, wrapperForm, recursive)
+      return expand(wrapper) === Apply(
+        recursive,
+        Tuple(Sub(Add(CallArgument(0, wrapper), 2), 1))
+      )
+    }),
+    test('different-form recursive cycles instantiate lazily', () => {
+      const evenForm = Lambda(2, 1, Apply(
+        OuterRef(1),
+        Tuple(Sub(CallArgument(0, OuterRef(0)), 1))
+      ))
+      const oddForm = Lambda(2, 1, Apply(
+        OuterRef(0),
+        Tuple(Sub(CallArgument(0, OuterRef(1)), 1))
+      ))
+      const even = internFn(evenForm, evenForm, oddForm)
+      const odd = internFn(oddForm, evenForm, oddForm)
+      const argument = CallArgument(0, even)
+      return odd === internFn(oddForm, evenForm, oddForm)
+        && expand(even) === Apply(even, Tuple(Sub(Sub(argument, 1), 1)))
+    }),
+    test('mutual functions preserve their shared external bindings', () => {
+      const evenForm = Lambda(4, 1, Apply(
+        OuterRef(1),
+        Tuple(Sub(CallArgument(0, OuterRef(0)), OuterRef(2)))
+      ))
+      const oddForm = Lambda(4, 1, Apply(
+        OuterRef(0),
+        Tuple(Add(CallArgument(0, OuterRef(1)), OuterRef(3)))
+      ))
+      const references = [evenForm, oddForm, 1, 2]
+      const even = internFn(evenForm, ...references)
+      const argument = CallArgument(0, even)
+      return expand(even) === Apply(
+        even,
+        Tuple(Add(Sub(argument, 1), 2))
+      ) && even !== internFn(evenForm, evenForm, oddForm, 1, 3)
+    }),
+    test('the stack keys recursion by function identity, not shared form', () => {
+      const leafSelf = OuterRef(0)
+      const leafForm = Lambda(1, 1, CallArgument(0, leafSelf))
+      const leaf = internFn(leafForm, leafForm)
+
+      const sharedForm = Lambda(2, 1, Apply(
+        OuterRef(1),
+        Tuple(CallArgument(0, OuterRef(0)))
+      ))
+      const inner = internFn(sharedForm, sharedForm, leaf)
+      const outer = internFn(sharedForm, sharedForm, inner)
+      return expand(outer) === CallArgument(0, outer)
+    }),
+    test('completed helper calls leave no stale stack entry', () => {
+      const helperSelf = OuterRef(0)
+      const helperForm = Lambda(1, 1, Add(CallArgument(0, helperSelf), 1))
+      const helper = internFn(helperForm, helperForm)
+
+      const rootSelf = OuterRef(0)
+      const rootForm = Lambda(2, 1, Add(
+        Apply(OuterRef(1), Tuple(CallArgument(0, rootSelf))),
+        Apply(OuterRef(1), Tuple(CallArgument(0, rootSelf)))
+      ))
+      const root = internFn(rootForm, rootForm, helper)
+      const argument = CallArgument(0, root)
+      return expand(root) === Add(Add(argument, 1), Add(argument, 1))
+    }),
+    test('expansion rebuilds arbitrary existing Enum trees', () => {
+      const self = OuterRef(0)
+      const form = Lambda(1, 1, LL(CallArgument(0, self)))
+      const fn = internFn(form, form)
+      return expand(fn) === LL(CallArgument(0, fn))
+    }),
+    test('Match uses its ordinary generic binding order', () => {
+      const first = MatchArgument(0)
+      const second = MatchArgument(1)
+      const form = Lambda(0, 0, Match(
+        Add(1, 2),
+        Tuple(
+          Arm(Add(second, first), Add(first, second)),
+          Arm(_, 0)
+        )
+      ))
+      return expand(internFn(form)) === Add(2, 1)
+    }),
+    test('a nested Match extends the existing handler bindings', () => {
+      const a = MatchArgument(0)
+      const b = MatchArgument(1)
+      const c = MatchArgument(2)
+      const d = MatchArgument(3)
+      const form = Lambda(0, 0, Match(
+        Add(1, 2),
+        Tuple(Arm(Add(a, b), Match(
+          Add(3, 4),
+          Tuple(Arm(Add(c, d), Tuple(a, b, c, d)))
+        )))
+      ))
+      return expand(internFn(form)) === Tuple(1, 2, 3, 4)
+    }),
+    test('a contract-only Match forwards the matched value', () => {
+      const form = Lambda(0, 0, Match(
+        9,
+        Tuple(Arm(Number, MatchArgument(0)))
+      ))
+      return expand(internFn(form)) === 9
+    }),
+    test('a nested contract value follows the existing bindings', () => {
+      const a = MatchArgument(0)
+      const b = MatchArgument(1)
+      const value = MatchArgument(2)
+      const form = Lambda(0, 0, Match(
+        Add(1, 2),
+        Tuple(Arm(Add(a, b), Match(
+          9,
+          Tuple(Arm(Number, Tuple(a, b, value)))
+        )))
+      ))
+      return expand(internFn(form)) === Tuple(1, 2, 9)
+    }),
+    test('captured patterns are resolved before matching', () => {
+      const form = Lambda(1, 0, Match(
+        0,
+        Tuple(
+          Arm(OuterRef(0), MatchArgument(0)),
+          Arm(_, -1)
+        )
+      ))
+      return expand(internFn(form, Equals(0))) === 0
+    }),
+    test('closed function values remain atomic patterns', () => {
+      const targetForm = loopForm()
+      const target = internFn(targetForm, targetForm)
+      const form = Lambda(1, 0, Match(
+        target,
+        Tuple(
+          Arm(target, 1),
+          Arm(_, 0)
+        )
+      ))
+      return expand(internFn(form, 7)) === 1
+    }),
+    test('a pending call keeps its Match continuation in the tree', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const form = Lambda(1, 1, Match(
+        Apply(self, Tuple(Sub(argument, 1))),
+        Tuple(Arm(_, Add(argument, 1)))
+      ))
+      const fn = internFn(form, form)
+      const arrived = CallArgument(0, fn)
+      return expand(fn) === Match(
+        Apply(fn, Tuple(Sub(arrived, 1))),
+        Tuple(Arm(_, Add(arrived, 1)))
+      )
+    }),
+    test('function syntax rejects invalid references and host functions', () => {
+      const form = loopForm()
+      return throws(() => CallArgument(0))
+        && throws(() => CallArgument(0, 7))
+        && throws(() => Apply(OuterRef(0), Object.freeze([])))
+        && throws(() => Lambda(1, 0, OuterRef(1)))
+        && throws(() => Lambda(0, 0, () => undefined))
+        && throws(() => internFn(form, () => undefined))
+    }),
+    test('CallArgument and Apply temporarily stand at Numeric seats', () => {
+      const form = countDownForm()
+      const fn = internFn(form, form)
+      return producedOf(CallArgument(0, fn)) === Numeric
+        && producedOf(Apply(fn, Tuple(CallArgument(0, fn)))) === Numeric
+    }),
+    test('call arity is checked before a call can residualize', () => {
+      const self = OuterRef(0)
+      const form = Lambda(1, 1, Apply(self, Tuple()))
+      return throws(() => expand(internFn(form, form)))
     }),
   ]),
 

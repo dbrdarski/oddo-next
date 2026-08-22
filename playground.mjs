@@ -19,8 +19,9 @@ import * as enums from './src/enum.mjs'
 import * as numeric from './src/numeric.mjs'
 import * as domain from './src/domain.mjs'
 import * as matching from './src/match.mjs'
+import * as functions from './src/function.mjs'
 
-const api = { ...intern, ...contract, ...facts, ...enums, ...numeric, ...domain, ...matching }
+const api = { ...intern, ...contract, ...facts, ...enums, ...numeric, ...domain, ...matching, ...functions }
 const names = Object.keys(api)
 const values = Object.values(api)
 
@@ -44,6 +45,40 @@ log(n)
 log('interned:', n === Add(Numeric(1), Add(Numeric(2), Numeric(3))))
 log('stands at Numeric seats:', n instanceof Numeric)
 log('at a strict Number seat:', n instanceof Number)`,
+  },
+  {
+    name: 'Function form & recursion',
+    code: `const countDownForm = () => {
+  const self = OuterRef(0)
+  const n = CallArgument(0, self)
+
+  return Lambda(1, 1, Match(n, Tuple(
+    Arm(Equals(0), 0),
+    Arm(_, Apply(self, Tuple(Sub(n, 2))))
+  )))
+}
+
+const form = countDownForm()
+const countDown = internFn(form, form)
+const formula = expand(countDown)
+
+const forkSelf = OuterRef(0)
+const forkArgument = CallArgument(0, forkSelf)
+const forkForm = Lambda(1, 1, Add(
+  Apply(forkSelf, Tuple(Sub(forkArgument, 1))),
+  Apply(forkSelf, Tuple(Sub(forkArgument, 2)))
+))
+const fork = internFn(forkForm, forkForm)
+const forkFormula = expand(fork)
+
+log('form canonical:', form === countDownForm())
+log('function canonical:', countDown === internFn(countDownForm(), countDownForm()))
+log('recursive formula:', formula)
+log('exact call:', formula === Apply(
+  countDown,
+  Tuple(Sub(CallArgument(0, countDown), 2))
+))
+log('both recursive calls survive:', forkFormula)`,
   },
   {
     name: 'Match structural Enums',
