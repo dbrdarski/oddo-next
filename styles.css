@@ -83,22 +83,19 @@ button { cursor: pointer; padding: 0.35rem 1rem; border: 1px solid transparent; 
 #clear { background: transparent; color: var(--ice); border-color: var(--blue); }
 #clear:hover { color: var(--foam); border-color: var(--blue-bright); }
 
-textarea {
+#editor {
   width: 100%;
+  height: 320px;
   min-height: 260px;
-  font: inherit;
-  line-height: 1.6;
-  padding: 0.9rem 1rem;
-  tab-size: 2;
   resize: vertical;
-  color: var(--foam);
-  caret-color: var(--cyan);
+  overflow: hidden;
   background: rgba(2, 62, 138, 0.3);
   border: 1px solid rgba(0, 119, 182, 0.55);
   border-radius: 10px;
   outline: none;
 }
-textarea:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.18); }
+#editor:focus-within { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.18); }
+#editor .cm-editor { height: 100%; background: transparent; }
 
 .hint { font-size: 0.78em; color: var(--ice); opacity: 0.65; }
 

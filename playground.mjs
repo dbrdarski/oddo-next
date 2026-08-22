@@ -2,6 +2,12 @@
 // Browser Playground
 // ==========================================
 
+import { EditorView, minimalSetup } from 'codemirror'
+import { indentWithTab } from '@codemirror/commands'
+import { javascript } from '@codemirror/lang-javascript'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { keymap } from '@codemirror/view'
+
 // Everything the modules export is in scope of the evaluated code, so the
 // playground speaks the same language as the source: Tuple, Record, the
 // enum factories, contracts, matching, and the facts store.
@@ -120,7 +126,7 @@ try {
 }`,
   },
   {
-    name: 'Match unordered Tuple',
+    name: 'Combine: declared order',
     code: `const expression = Add(1, 2)
 
 const result = match(Tuple(expression, 3))(
@@ -131,6 +137,66 @@ const result = match(Tuple(expression, 3))(
 
 log('source order:', Tuple(expression, 3))
 log('pattern order:', result)`,
+  },
+  {
+    name: 'Combine: overlapping contracts',
+    code: `const expression = Add(1, 2)
+
+// 3 satisfies both contracts. Taking it for Numeric first would leave
+// the expression for Number, so Combine backtracks to the valid assignment.
+const result = match(Tuple(3, expression))(
+  $ => Combine(Numeric, Number)(
+    (numeric, number) => [numeric, number]
+  )
+)
+
+log('candidates:', Tuple(3, expression))
+log('Numeric, Number:', result)`,
+  },
+  {
+    name: 'Combine: generic rollback',
+    code: `const result = match(Tuple(2, 3))(
+  ($, [other]) => Combine(other, Equals(2))(
+    (other, two) => [other, two]
+  )
+)
+
+// The first attempt binds other = 2 and then fails Equals(2) against 3.
+// That speculative binding is restored before the successful assignment.
+log('other, exact two:', result)`,
+  },
+  {
+    name: 'Combine: duplicates & repetition',
+    code: `const exactTwos = match(Tuple(2, 2))(
+  $ => Combine(Equals(2), Equals(2))(
+    (first, second) => [first, second]
+  )
+)
+
+const repeated = values => match(values)(
+  ($, [same]) => Combine(same, same)(
+    (first, second) => 'same: ' + first + ', ' + second
+  ),
+  $ => $(_)(() => 'different')
+)
+
+log('two occurrences:', exactTwos)
+log(repeated(Tuple(2, 2)))
+log(repeated(Tuple(2, 3)))`,
+  },
+  {
+    name: 'Combine: exact Tuple cardinality',
+    code: `const pair = values => match(values)(
+  $ => Combine(Number, Number)(
+    (first, second) => 'pair: ' + first + ', ' + second
+  ),
+  $ => $(_)(() => 'not exactly two Numbers')
+)
+
+log(pair(Tuple(1)))
+log(pair(Tuple(1, 2)))
+log(pair(Tuple(1, 2, 3)))
+log('raw Array:', pair([1, 2]))`,
   },
   {
     name: 'Structural sharing',
@@ -180,11 +246,12 @@ log('other tuples unaffected:', fact(Tuple(1, 3), 'label') === undefined)`,
   },
 ]
 
-const editor = document.getElementById('editor')
+const editorRoot = document.getElementById('editor')
 const output = document.getElementById('output')
 const picker = document.getElementById('examples')
 
-document.getElementById('scope').textContent = `in scope: ${names.join(', ')}`
+document.getElementById('scope').textContent =
+  `⌘/Ctrl+Enter runs · Esc then Tab leaves the editor · in scope: ${names.join(', ')}`
 
 for (const { name } of examples) picker.append(new Option(name))
 
@@ -209,13 +276,15 @@ const compile = (code) => {
   catch { return new Function(...names, 'log', code) }
 }
 
+let editor
+
 const run = () => {
   output.textContent = ''
   const log = (...vals) => print(vals.map(v => typeof v === 'string' ? v : show(v)).join(' '))
   const original = console.log
   console.log = (...vals) => { log(...vals); original.apply(console, vals) }
   try {
-    const result = compile(editor.value)(...values, log)
+    const result = compile(editor.state.doc.toString())(...values, log)
     if (result !== undefined) print(`→ ${show(result)}`)
   } catch (e) {
     print(String(e), 'err')
@@ -224,23 +293,72 @@ const run = () => {
   }
 }
 
+const editorTheme = EditorView.theme({
+  '&': {
+    height: '100%',
+    color: 'var(--foam)',
+    backgroundColor: 'transparent',
+  },
+  '&.cm-focused': { outline: 'none' },
+  '.cm-scroller': {
+    overflow: 'auto',
+    fontFamily: 'inherit',
+    lineHeight: '1.6',
+  },
+  '.cm-content': { padding: '0.9rem 0' },
+  '.cm-line': { padding: '0 1rem' },
+  '.cm-gutters': {
+    color: 'var(--ice)',
+    backgroundColor: 'rgba(2, 62, 138, 0.24)',
+    borderRight: '1px solid rgba(0, 119, 182, 0.35)',
+  },
+  '.cm-activeLine, .cm-activeLineGutter': {
+    backgroundColor: 'rgba(0, 180, 216, 0.08)',
+  },
+  '&.cm-focused .cm-cursor': { borderLeftColor: 'var(--cyan)' },
+  '&.cm-focused .cm-selectionBackground, ::selection': {
+    backgroundColor: 'rgba(0, 119, 182, 0.65)',
+  },
+}, { dark: true })
+
+editor = new EditorView({
+  doc: localStorage.getItem('oddo.playground') ?? examples[0].code,
+  parent: editorRoot,
+  extensions: [
+    minimalSetup,
+    javascript(),
+    oneDark,
+    editorTheme,
+    EditorView.lineWrapping,
+    EditorView.contentAttributes.of({
+      'aria-label': 'JavaScript code editor',
+      spellcheck: 'false',
+    }),
+    keymap.of([
+      {
+        key: 'Mod-Enter',
+        run: () => (run(), true),
+      },
+      indentWithTab,
+    ]),
+    EditorView.updateListener.of(update => {
+      if (update.docChanged)
+        localStorage.setItem('oddo.playground', update.state.doc.toString())
+    }),
+  ],
+})
+
 document.getElementById('run').addEventListener('click', run)
 document.getElementById('clear').addEventListener('click', () => { output.textContent = '' })
 
 picker.addEventListener('change', () => {
-  editor.value = examples[picker.selectedIndex].code
-  localStorage.setItem('oddo.playground', editor.value)
+  editor.dispatch({
+    changes: {
+      from: 0,
+      to: editor.state.doc.length,
+      insert: examples[picker.selectedIndex].code,
+    },
+    selection: { anchor: 0 },
+    scrollIntoView: true,
+  })
 })
-
-editor.addEventListener('input', () => localStorage.setItem('oddo.playground', editor.value))
-
-editor.addEventListener('keydown', (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); run() }
-  if (e.key === 'Tab') {
-    e.preventDefault()
-    const { selectionStart: s, selectionEnd } = editor
-    editor.setRangeText('  ', s, selectionEnd, 'end')
-  }
-})
-
-editor.value = localStorage.getItem('oddo.playground') ?? examples[0].code
