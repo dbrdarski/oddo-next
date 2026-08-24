@@ -1,180 +1,221 @@
-# Handover — the pattern-matching arc (2026-08-21)
+# Handover — current matching and canonical-value surface
 
-> **Addendum (later the same day):** the `asPattern` window described in §3 and §5
-> was the regression; Codex removed it. Current resolution in `src/`: no ambient
-> context at all — admission is per-enum. A **structural** enum (its prototype is
-> not a contract: Add, Mul, Twin, …) admits contract parts at non-generic seats
-> anywhere — a partial tree is a legal value (`Add(Number, 2)` constructs). A
-> **contract-valued** enum (Range, Equals, Union, Optional, Numeric) never admits
-> contract parts — `Range(Equals(1), Equals(2))` throws, closing §2.2 structurally.
-> Nested matches are legal (no state to poison). §4's residue consideration is gone
-> with the window; the arm-skip-vs-abort semantics question stands on its own
-> merits, still Dane's to decide. The `kind` rename (§2.1) stands. Board 75/0.
+This document describes committed behavior beginning with `cf99272` and labels the
+later ruled-but-unimplemented canonicalization target separately. `design.md` and
+`decisions.md` remain the design authority. `npm test` reports **109 passing,
+0 failing**.
 
-For the next assistant continuing THIS work: Dane's pattern matching for the Enums,
-the review of it, the two fixes that followed, the pattern/value context mechanism,
-and the one question that is still open. Board is **73 passing, 0 failing** with the
-working tree as described in §5.
+The old ambient pattern-construction window was reverted. There is no `asPattern`
+flag, cleanup protocol, or construction residue in the current design.
 
-Orientation, one line each: `docs/design.md` is the enum-surface authority;
-`docs/decisions.md` holds dated rulings; `docs/recursion-canonicalization-arc.md`
-is the previous arc; the philosophy in force: the constructor gate IS the analysis,
-one universe, throws are refusal verdicts (routine, data-driven, catchable — the
-board's own `throws()` helper treats them as expected outcomes).
+## 1. Canonical values and Enum identity
 
----
+- `Tuple`/`Record` calls and values produced by Enum factories enter through the
+  shared interner. The factories themselves are lazily memoized, not interned.
+- `ZeroDivision` and `ZeroMod` are additional canonical front doors keyed by
+  their form class and operand.
+- Equal live constructions return the same frozen reference.
+- Enum identity is its hidden node class. Factories expose that class as `.kind`;
+  the ordinary JavaScript `.constructor` remains the node's constructor.
+- `mapEnum(value, map)` rebuilds a registered Enum through its original factory, so
+  validation and interning remain the one construction path.
 
-## 1. What Dane built (committed, `ad99ff9`)
+## 2. Structural pattern matching
 
-Ordered pattern matching where **patterns are ordinary nodes** — constructed through
-the same door as values, with contracts sitting in seats as parts.
+`match(value)(...cases)` uses four rules, in this order:
+
+1. `_` matches anything.
+2. A contract pattern uses ordinary membership: `value instanceof pattern`.
+3. An Enum pattern requires the same node constructor and length, then recursively
+   fits its parts.
+4. Every other pattern uses canonical identity: `value === pattern`.
+
+Cases are tried in declaration order and the first fit wins. If no case fits,
+`match` throws `No pattern matched`.
+
+Patterns are ordinary canonical values, not a second pattern hierarchy. Admission
+is decided by the Enum being constructed:
+
+- A structural Enum such as `Add`, `Mul`, or `LL` may hold contract parts at its
+  non-generic seats. Therefore `Add(Number, 2)` is a legal partial structural value
+  and can be used as a pattern.
+- A bare membership-defined Enum pattern is interpreted as a contract and tested
+  by fulfilment before structural Enum matching. For example, `Range(1, 2)` is a
+  membership pattern, while `Range(Equals(1), Equals(2))` is rejected by Range's
+  endpoint seats. The ruled canonicalizer therefore needs an explicit internal
+  structural-decomposition route for contract-valued Enum candidates; that route
+  does not change runtime contract-pattern meaning.
+- Generic seats keep their identity-binding semantics; the structural contract
+  admission rule does not bypass them.
+
+There is no pattern-only construction mode. The same constructor has the same
+meaning everywhere.
+
+## 3. Generic captures and handlers
+
+Each ordered case receives fresh generic state. A generic binds the matched value on
+first use; a repeated occurrence checks canonical identity. Failed cases discard
+their state.
+
+For ordinary ordered cases:
+
+- only generic captures become handler arguments;
+- arguments follow generic creation/declaration order, not their order in the
+  structural pattern;
+- a top-level contract-only pattern receives the matched value;
+- `_` contributes no argument.
+
+Example:
 
 ```js
-match(Add(1, Mul(2, 3)))(
-  ($, [a, b, c]) => $(Add(a, Mul(b, c)))((a, b, c) => [a, b, c]),  // captures
-  ($, [b])       => $(Add(Equals(1), b))(b => ...),               // contract leaf
-  $              => $(Numeric)(value => ...),                      // whole-value contract
-  $              => $(_)(() => ...)                                // wildcard
+match(Add(1, 2))(
+  ($, [a, b]) => $(Add(b, a))((aValue, bValue) => [aValue, bValue])
 )
+// [2, 1] — handler order is [a, b]
 ```
 
-- `src/match.mjs`: `_` wildcard (`contractCheck(() => true)`, frozen); `caseOf` =
-  the `$`; `fits` walks four rules — wildcard, contract (membership/`instanceof`),
-  enum node (same `constructor`, same length, parts recurse), identity (`===`).
-- Captures are the existing generic registers: fresh `generic()` per arm, generics
-  bind through their own contractCheck validators during `fits`, handler receives
-  the bindings in creation order. Failed arms leak nothing.
-- Ordered arms, first fit wins, exhaustion throws `No pattern matched`.
-- Handler convention: a contract-only pattern (not `_`, no bindings) passes the
-  matched value; otherwise the bindings.
-- To let patterns construct: the Enum validator admits contract parts at
-  **non-generic** seats (`isContract` in `src/contract.mjs`; generic seats keep
-  identity semantics untouched); `contractCheck` gained an `extend` parameter
-  (descriptor spread) — use THAT for decorating contracts, never `Object.assign`.
+## 4. Combine
 
-## 2. The review: three findings, three fates
+`Combine(...patterns)` is a case-level matching combinator, not an Enum value.
 
-All three were verified by running them (never claim behavior from memory — he
-checks):
+Its current contract is exact and deterministic:
 
-1. **Factory membership leak — real, fixed (uncommitted).** The factory carried the
-   hidden class as `constructor`, and `producedOf` reads `v.constructor`, so after a
-   factory's first construction the factory itself answered with its products'
-   fact: `Mul(1, 2); Mul instanceof Numeric === true`, and `match(Mul)` against a
-   `$(Numeric)` pattern matched. **Fix (his direction): rename the shared key** —
-   `src/enum.mjs` extends the factory with `{ kind: constructor }`, so
-   `Add.kind === Add(1, 2).constructor`, and `producedOf` no longer sees factories.
-   Board rows updated + a regression row ("a resolved factory does not stand at its
-   result contract"). `match.mjs` needed no change (its `.constructor` reads are
-   node-to-node).
-2. **`Range(Equals(1), Equals(2))` input-validation quirk — RULED NOT AN ISSUE,
-   closed.** (`lo <= hi` string-coerces contract parts; direction-dependent; Dane
-   closed it. Do not reopen.)
-3. **Values could hold contract parts** — `Add(1, Add(Number, 2))` constructed in
-   ordinary code. Ruled: contract parts belong to pattern construction only; values
-   must never hold them. This produced the pattern window (§3).
+- the candidate pool must be a canonical `Tuple`;
+- pattern count and occurrence count must be equal;
+- patterns are not tied to corresponding source positions;
+- each candidate occurrence index is used exactly once;
+- duplicate values remain distinct occurrences;
+- search follows pattern declaration order and candidate occurrence order, so
+  candidate order is the deterministic tie-break when several assignments fit;
+- overlapping contracts use depth-first backtracking;
+- speculative generic bindings are restored after every failed branch;
+- successful handler arguments are the assigned occurrences in pattern order.
 
-## 3. The pattern window (uncommitted) — and how it got its shape
-
-Requirement: contracts legal at seats only while a pattern is being built;
-impossible in value code. A literal extra argument can't reach the user's *nested*
-calls (`$(Add(a, Mul(b, c)))` — the inner `Mul(...)` is the user's own call), so the
-context is ambient — and its final shape is **Dane's**, arrived at over several
-corrections of the assistant's versions:
-
-- Assistant v1: a counter + `asPattern(fn)` with `try/finally` around the whole
-  case. Rejected: procedural style in a functional codebase; a "global patterns
-  count feels super dirty"; and the try-justifications didn't survive scrutiny.
-- Dane's corrections that decided the design:
-  - **The window is exactly case-entry → `$`.** Patterns are created inside
-    `$( /* here */ )( /* and not here */ )`. Handlers are outside the window by
-    construction, not by discipline.
-  - **The exhaustion throw needs no cleanup** — by the time match runs out of
-    arms, every `$` already closed its window.
-  - **There is no "bug throw vs routine throw" taxonomy.** `Add("x", b)` refuses
-    identically in pattern context and value context — same door, same check. A
-    refusal is the system's normal "no".
-- **Final shape** (in the tree now): a boolean register in the codebase's
-  reset-at-entry discipline, three comma-style touch points, no `try` anywhere:
+That last rule intentionally differs from ordinary ordered cases:
 
 ```js
-// contract.mjs
-let pattern = false
-export const asPattern = (on) => (pattern = on, on)
-export const inPattern = () => pattern
-
-// enum.mjs - the admission clause
-!definitions[i].generic && inPattern() && isContract(args[i]) || args[i] instanceof definitions[i]
-
-// match.mjs - each row opens; $ closes; end of match closes
-asPattern(true)
-const [pattern, handler] = define(caseOf, generics(createGeneric))
-...
-const caseOf = (pattern) => (asPattern(false), (handler) => [pattern, handler])
-...
-asPattern(false)
-throw new TypeError('No pattern matched')
+match(Tuple(Add(1, 2), 3))(
+  $ => Combine(Number, Numeric)((number, numeric) => [number, numeric])
+)
+// [3, Add(1, 2)]
 ```
 
-- **Known residue, discussed and accepted-as-known:** a refusal *during pattern
-  construction* (e.g. `$(Range(lo, hi))` with runtime `lo > hi`, or a mis-typed
-  part) propagates out of match with the flag still up; it heals at the next
-  match's first row. Every path that stays inside match is covered. Whether §4
-  changes this is Dane's decision — do not re-litigate the try/finally route.
+Every Combine pattern contributes one handler argument, including contracts and
+wildcards. Generics inside Combine still provide repeated-value and backtracking
+constraints.
 
-Verified at the boundaries: a handler cannot build a contract-part value
-(`Add(Number, 2)` throws inside handlers); the world is clean after an exhaustion
-throw; `Add(Number, 2)` throws in ordinary code while `$(Add(Number, b))` matches.
+## 5. Construction failure is not mismatch
 
-## 4. THE OPEN QUESTION — Dane has not decided; ASK, don't assume
+Pattern construction and fitting are separate phases.
 
-**When a pattern refuses to construct, is that (a) the whole match aborting, or
-(b) just that arm refusing — fall through to the next arm?**
+- If defining a case throws while constructing its pattern, the error propagates
+  and the whole match aborts because no valid pattern was produced.
+- Fallthrough occurs only after a valid pattern has been constructed and `fits`
+  returns false.
 
-Today it is (a). The discussion trail pointing at (b): patterns embed runtime data,
-so a construction refusal can be data-driven, and since refusals are the system's
-one "no", a pattern that can't build for this data looks like an arm that doesn't
-apply — same verdict as `fits` failing. (b) would also close the window on every
-refusal path as a side effect, erasing §3's residue.
+The matcher does not catch construction errors and reinterpret malformed patterns
+as non-matches.
 
-The previous assistant implemented (b) uninvited (an `attempt` try/catch helper in
-`match.mjs`) and was reverted on the spot. The question is genuinely open — bring
-it to Dane as a question, with both consequences stated plainly.
+## 6. Function-level Match
 
-## 5. Working tree at handover (uncommitted; committing is Dane's call)
+Canonical function forms use `Match(scrutinee, Tuple(...Arm))` and delegate fitting
+to the same ordered `match()` implementation. `MatchArgument(index)` represents
+handler bindings in the function formula; nested matches extend the existing sparse
+binding vector. A pending recursive `Apply` in the scrutinee preserves the complete
+Match continuation instead of selecting an arm prematurely.
 
-- `src/enum.mjs` — `{ kind: constructor }` extend; `inPattern()` in the admission
-  clause; import updated.
-- `src/contract.mjs` — the `asPattern`/`inPattern` register (with comment).
-- `src/match.mjs` — window touch points as in §3. (This file was briefly edited
-  without permission and reverted — diff it against §3's description before
-  trusting anything.)
-- `test/cases.mjs` — rows: "factory kind is the node constructor", "different
-  factories expose different kinds", "a resolved factory does not stand at its
-  result contract", "a value cannot hold a contract part", "the same shape is
-  legal as a pattern".
-- `playground.mjs` — demo line uses `Add.kind`.
-- `npm test` → 73/0.
+Function forms currently support ordered Arms only. Value-level Combine is landed,
+but no Combine arm exists in the function Enum vocabulary.
 
-## 6. Where we didn't see eye to eye (this arc)
+See `docs/HANDOVER-recursion.md` for canonical function identity and expansion.
 
-- **try/finally.** The assistant defended it with shifting justifications
-  (cleanup → routine exhaustion throws → throw taxonomies); Dane demolished each
-  and the register discipline won. If you find yourself reaching for a `try`,
-  assume the design is wrong first.
-- **The ambient register.** Dane tolerates the boolean flag; he called the shared
-  global "super dirty" and would take a cleaner mechanism that keeps the surface
-  `$(Add(a, b))` with plain factories. Rejected along the way: counter+finally;
-  `Object.assign` bolt-ons (use `contractCheck`'s `extend`); pattern-ness as a
-  facts classification (proposed, not taken up); per-factory twin pattern doors
-  (parallel mechanism — his kill-word).
-- **Review language.** The first review was written in the assistant's shorthand
-  and was unreadable; the standard is plain language plus tested repros, every
-  claim run before stated, order-of-operations spelled out (the factory leak only
-  appears after a factory's first resolve — that tripped the discussion once).
-- **Authorization.** One violation in this arc: implementing §4(b) off mockery of
-  the assistant's asking-ceremony. Nothing is a go except a go: not agreement, not
-  a diagnosis, not frustration, not mockery of how you ask. When the decision
-  point arrives, state it in one plain line and stop.
+## 7. Formula formation ruling
+
+Formula canonicalization is a factory-formation operation implemented with the
+existing matcher:
+
+```text
+validate arguments
+→ construct the actual Array-subclass Enum candidate
+→ match that candidate to select its canonical replacement
+→ intern the surviving node, or return the canonical replacement
+```
+
+The candidate gives the matcher ordinary Enum structure before publication. It is
+not a second AST or a separate solve-time identity. Rebuilding through `mapEnum`
+continues to use the same public factory, so expanded formulas will receive the same
+formation rules without an `expand`-specific normalizer.
+
+Full polynomial normal form is the canonical algebra for `Number`: distribution,
+coefficient collection and cancellation, identities and zero annihilation,
+coefficient-first ordered factors/terms, a last constant, left-associated products
+and sums, `Pow` for repeated factors, and retained `Sub` for negative later terms
+(a leading negative term uses a signed coefficient such as `Mul(-1, x)`). Geo is a
+separate important contract/domain feature; it does not replace Pow.
+
+There is no `DeterminateNumber`. `Numeric = Union(Number, Indeterminate)`, and the
+Number laws apply on its Number region. The ruled specimen
+`0 * Indeterminate(DivideByZero(...))` remains Indeterminate; its exact cause/Kind
+and broader consuming algebra are deferred. Host JavaScript NaN/infinity/signed-zero
+cases are ingress concerns, not additions to the language Number theory.
+
+Demands and call-admission obligations come from the validated pre-normalization
+candidate. Canonical Match regions retain them only where they apply; no
+always-present accepted-contract field, Top filler, or separate Demand node is
+required. An admitted Pure, safe, completing Number call may disappear from the
+polynomial immediately while its obligations remain accounted for. A later outer
+reference decides whether those obligations discharge, not which canonical body is
+chosen; failure rejects rather than selecting a fallback body.
+
+Canonical function identity remains `(canonical FunctionBody, ...orderedRefs)`.
+The body is canonicalized positionally, references are applied, and retained
+obligations are discharged. There is no application-dependent second normalizer.
+
+The contract target adds `Top`, `Bottom`, one language `Null`, `Intersection`, and
+relative `Difference`, and removes `Optional` in favor of `Union(Null, T)`. Explicit
+host null/undefined normalize at host ingress; omission and missing structure do
+not.
+
+An ordered Match threads a conceptual remainder. Each effective arm is its own
+region intersected with the remaining input region; every exact arm is subtracted
+from that remainder with Difference before the next arm. Thus in
+`Equals(0) => a; Number => b`, the Number arm means
+`Difference(Number, Equals(0))`. `Rest` is only the name of this calculation, not a
+new Enum or pattern. A wildcard at any position receives the current remainder.
+
+Pure exact logical code canonicalizes to region-to-result Match/Arm rows. De Morgan
+and DNF-style splitting are internal techniques, not public nodes. Strict
+conditional seats require Boolean; `~` is legal only there and loosens the seat
+without Booleanizing it. Grouped `~(...)` scopes through nested conditional seats,
+stopping at Lambda and explicit arm boundaries. Loose falsity is `{false, Null}`;
+zero is truthy.
+
+Internal rules may structurally bind operands on a transient candidate before a
+rewrite erases them. Runtime/user matching sees only the canonical value: it never
+recovers source order or erased operands. Closed patterns canonicalize like closed
+data; open patterns describe only surviving canonical structure.
+
+## 8. Implementation backlog
+
+- Replace the temporary `produces`/declared-result bridge. Function
+  `CallArgument`, `Apply`, and `Match` currently rely on it to stand at Numeric
+  seats.
+- Implement the ruled formation hook and internal structural match route; Number
+  polynomial form and Pow; Top/Bottom/Null/Intersection/Difference and Optional
+  removal; contract theory rules; effective Match remainders and Pure logical
+  regions; region exactness and guard/`~` lowering; retained-obligation inference
+  and discharge; Number/Null host ingress; and conformance/property tests.
+- Investigate Geo with its actual domain consumer and specify broader
+  Indeterminate-consuming algebra separately.
+- Any demonstrator-specific `solve` API, termination judgment, or call-domain
+  judgment is a separate layer and does not define formula identity.
+
+## 9. Document map
+
+- `docs/design.md` — current core design and committed surfaces.
+- `docs/decisions.md` — dated rulings and explicitly pending corrections.
+- `docs/HANDOVER-recursion.md` — committed canonical-function behavior.
+- `docs/recursion-canonicalization-arc.md` — historical investigation record;
+  proposals there are not current design unless restated in the files above.
 
 *End of handover.*

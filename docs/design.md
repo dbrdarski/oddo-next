@@ -1,10 +1,14 @@
 # oddo.next — design
 
-Agreed 2026-08-19, before implementation (revised same day: the result slot
-merges C2 and V2). This file is the authority for the enum/contract surface;
-the implementation follows it, and where code and this document disagree,
-the code is wrong. Earlier layers (interner, facts store) are documented
-here as they stand in the code.
+Agreed 2026-08-19, before the enum/contract implementation (revised the same
+day: the result slot merges C2 and V2), and updated through the author rulings of
+2026-08-24. Sections 1–6 preserve the core enum/contract implementation; sections
+7–8 describe matching, canonical functions, and the ruled-but-unimplemented
+canonicalization layer. This file and `decisions.md` remain the authority for the
+surfaces they describe. A subsection explicitly says when it documents current
+code rather than the ruled target.
+
+Current verification: **109 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -15,44 +19,71 @@ remembers it. Values enter one level at a time — children must already be
 interned (or primitive) before their container is constructed — so no walk
 recurses, nothing is copied, and no caller's object is ever rewritten.
 
-- One trie, one walk: every path is tag-prefixed (`Record`, `Tuple`, or the
-  hidden enum class), so namespaces are structurally disjoint.
+- One trie, one walk: every path is prefixed by its door-specific tag
+  (`Record`, `Tuple`, a hidden Enum class, or an Indeterminate-form class), so
+  namespaces are structurally disjoint.
 - An unfrozen object child is a raw literal that skipped its constructor:
   rejected with a TypeError at the door.
 - Construction lives only in the front doors: `Record` (keyed by sorted
-  entries), `Tuple` (keyed by elements), and the enum factories. Calls are
-  never memoized; only construction dedups.
+  entries), `Tuple` (keyed by elements), the Enum factories, and canonical
+  Indeterminate-form constructors such as `ZeroDivision`/`ZeroMod`. Expansion
+  results are not memoized by a separate call cache. Canonical function and
+  call syntax such as `FunctionRef` and `Apply` are still ordinary Enum
+  constructions, so equal nodes deduplicate normally.
 
 Consequence: structurally equal means pointer-equal, so `===` is value
 equality, deep equality is one pointer comparison, and canonical references
 are perfect keys.
+
+The cache stores leaves through `WeakRef`. Canonical identity is therefore a
+live, process-local property: equal values held at the same time share a
+reference, but the interner is not a permanent identifier or serialization
+scheme. A value may be reconstructed after every prior live reference has
+been collected.
 
 Two boundary facts, stated so they are read as chosen: the JS surface is a
 demonstrator, not a hardened API — the door's frozen guard catches
 accidents (raw literals that skipped their constructor), not fence-hoppers;
 an arbitrary object frozen by hand is outside the model, and legitimate
 values exist only through the front doors. And `+0`/`-0` collapse to one
-key (JS Map semantics) — deliberate, not accidental: NEXT numbers are
-exact rationals, and rationals have no signed zero.
+key (JS Map semantics) — deliberate, not accidental: the intended number
+model has no signed zero.
 
 ## 2. Facts (landed)
 
-Everything the system derives about canonical references lives in one
-system-side store (`fact(key, name)` / `learn(key, name, value)`,
-first-write-wins), keyed by the reference itself: hidden classes today,
-nodes and contract pairs later. Nothing is ever stored on a value or a
-class — a value is pure structure, indistinguishable fresh or analyzed, and
-facts never participate in identity.
+System-side metadata lives in one store (`fact(key, name)` /
+`learn(key, name, value)`, first-write-wins), keyed by the relevant reference:
+Enum validators and hidden classes today, nodes and contract pairs later.
+Nothing is attached as a property of a value or class—a value remains pure
+structure, indistinguishable fresh or analyzed, and facts never participate in
+identity.
 
-Current entries: `constructor → 'produces'` — the declared result, recorded
-at first resolve: a contract, or the declaration's own generic, stored as
-itself and answering per node (§5). Planned: solved forms (`Add(1,2)` links
-to `Equals(3)`, never merges), sub verdicts on pairs.
+Current entries are:
+
+- `enum validator → 'resolve'` — the declaration's once-cached resolver;
+- `constructor → 'produces'` — the declared result, recorded at first
+  resolution: a contract, or the declaration's own generic, stored as itself
+  and answering per node (§5);
+- `constructor → 'transparent'` — the identical one-seat/result contract for a
+  transparent Enum.
+
+The canonical-function layer currently uses `produces` as temporary
+scaffolding: `CallArgument`, `Apply`, and `Match` declare `Numeric` so their
+symbolic nodes can occupy existing Numeric seats. That is not a per-function
+input/result signature, and it is not the final account of symbolic result
+shape. The pending correction in `decisions.md` must now account for these
+consumers too.
+
+Future facts may record judgment/solve links and subcontract verdicts on pairs,
+but they do not replace formula canonicalization. Literal folding and every
+other equality-determining normalization happen before interning; they are not
+represented as a later `Add(1, 2) → Equals(3)` solve link.
 
 ## 3. Enums: the three elements
 
-Every enum is a contract; enums are the building blocks of the contract
-system. A declaration has up to three parts:
+Every Enum factory is a contract; membership-defined Enum nodes are contracts
+too. Enums are building blocks of the contract system, but not every structural
+Enum node is itself a contract. A declaration has up to three parts:
 
 ```js
 Name = Enum(
@@ -63,8 +94,8 @@ Name = Enum(
 
 - **Seats** (the first application) — one contract per position, checked at
   every construction. Positional, always.
-- **The result slot** (the second application) — takes exactly one thing,
-  in one of two forms:
+- **The result application** (the second application) — has three current
+  uses:
   - **a contract** — `(Numeric)` — the declarative return: recorded once as
     the `produces` fact. Never "run"; consumed later by *other* seats when
     the node sits in them (`Add(Add(1,2), 3)` works because the inner
@@ -73,18 +104,23 @@ Name = Enum(
     definition: how a value is checked against nodes of this enum. Called
     by the machinery **with the node's elements as arguments**, it returns
     the value-check. Records nothing as a fact.
-  A multi-entry result cannot exist — the slot takes one thing. "Produces A
-  or B" is written explicitly: `(Union(A, B))`.
+  - **empty** — `()` — no meaningful declared result. Canonical function
+    syntax uses this for structural nodes such as `Arm`, `Lambda`, and
+    `FunctionRef`; the current machinery receives `undefined`, which provides
+    no usable `produces` fact.
+  A multi-entry result cannot exist. "Produces A or B" is written explicitly:
+  `(Union(A, B))`.
 - **Input validation** (Enum's optional second argument) — runs at
   construction over all call arguments together, after the seat checks. Its
   only job is what per-position contracts cannot say: relations between
   arguments (`Range` needs `lo <= hi`). Anything about one argument alone
   belongs in a seat.
 
-Telling the two result forms apart needs no marker: a bare arrow — no
-`.prototype`, no `Symbol.hasInstance` of its own — can only be a check.
-Everything else (a factory, a `contractCheck` contract, a class, an
-interned node) is a contract.
+For a nonempty result, telling the two forms apart needs no marker: a bare
+arrow—no `.prototype`, no `Symbol.hasInstance` of its own—can only be a check.
+Everything else is treated as the contract-form result; intended examples are
+an Enum factory, a `contractCheck` contract, a class, or a membership-defined
+contract node. `undefined` is the explicit empty case described above.
 
 **Parameters, not shared variables.** The membership function receives the
 branches as ordinary parameters. JS function parameters are fresh per call
@@ -103,7 +139,22 @@ const outer = Union(inner, String)
 ```
 
 A membership function that instead closed over the seat generics lexically
-would read shared mutable state and is ruled out (§8).
+would read shared mutable state and is ruled out (§10).
+
+Each lazy Enum factory also registers its hidden constructor with the public
+factory. `mapEnum(value, map)` uses that registry to map one level of a known
+Enum value and rebuild it through its original factory. Rebuilding therefore
+reruns per-construction validation, generic binding, and interning while reusing
+the once-resolved declaration and facts. It does not bypass the front door. It
+returns `undefined` for values that are not registered Enums. Recursive
+traversal is the caller's job—canonical-function expansion handles Tuples
+separately and otherwise leaves non-Enum values atomic.
+
+The ruled formula canonicalizer will live on that same front door. Once it lands,
+`mapEnum` reconstruction will therefore validate, construct the real Enum
+candidate, run its matcher-driven formation rules, and intern or return the
+canonical replacement. Callers such as `expand` do not acquire a separate
+normalization pass.
 
 ## 4. Membership
 
@@ -116,10 +167,10 @@ would read shared mutable state and is ruled out (§8).
    *transparent* — then `v instanceof C2`.
 3. **Enum node** `n` of enum `E`: if `E`'s result is the function form,
    apply it to `n`'s own elements and then to `v` (plus the stands-at
-   clause). A transparent enum's node defers to its declared contract the
-   same way. A node of an enum whose result is an opaque contract is not
-   itself a contract — using it as one fails loudly (native error), never
-   silently.
+   clause). A node of an enum whose result is an opaque contract is not itself
+   a contract—using it as one fails loudly (native error), never silently.
+   Transparency widens the factory's membership; it does not turn each
+   transparent wrapper node into a contract.
 
 **Transparency rule**: exactly one seat, a contract-form result, the same
 canonical reference as the seat (interning makes "same" a pointer check) →
@@ -130,18 +181,13 @@ membership includes its declared contract's members.
 because solve-time dispatch will depend on shape tests; a widened default
 would make `3 instanceof Add` true.
 
-`sub` is interned identity today, growing rule by rule with each rule's
-first consumer (§7). Its domain is the calculable algebra — `Equals`,
-`Range`, `Union`, the kinds, transparent boxes — where every contract
-exposes its structure (a singleton its value, a range its endpoints, a
-union its branches, a box its contract), every pair is decidable, and
-boolean answers are final truth, not approximation: `sub(Equals(1),
-Range(0, 100))` is a computed yes, `sub(Range(0, 10), Range(5, 100))` a
-computed no. Opaque predicates (`contractCheck(v => ...)`) sit outside the
-algebra by design: `sub` grants them identity only, and a gate that cannot
-prove an admission rejects it loudly at construction. The three verdicts
-(proven / refuted-with-witness / unproven) belong to the algebra's
-boundary — NEXT's full analyzer, not the demonstrator.
+`sub` is reference identity today. Consequently, no containment is currently
+derived between distinct `Equals`, `Range`, `Union`, kind, or transparent-box
+contracts. Rows such as `sub(Equals(1), Range(0, 100)) → true` and
+`sub(Range(0, 10), Range(5, 100)) → false` describe the parked calculable
+algebra (§9), not current behavior. That future algebra is restricted to
+contracts that expose their structure; opaque `contractCheck` predicates keep
+identity-only treatment.
 
 A factory's membership resolves the declaration on demand — first need,
 not first construction: `Add(1, 1)` asks `Numeric` before `Numeric` ever
@@ -169,7 +215,7 @@ own element — `producedOf(Twin(2, 2))` is `2`, per node, forever, immune
 to whatever was constructed since. Per-class sentence, per-node truth.
 (`sub` has no rules for value-shaped facts yet, so "makes 1" does not yet
 stand at `Numeric` seats — that flips deliberately when the singleton
-rules land, §7.)
+rules land, §9.)
 
 Membership functions never reference the seat generics. Their parameters
 receive the node's elements positionally — the node is the storage of what
@@ -179,10 +225,22 @@ bindings live exactly as long as one construction's validation, with a
 single reader. No register survives a job; no register is read by checks
 or by facts.
 
+The matcher reuses this same `generic`/`generics` primitive. Every case gets
+fresh state; a repeated capture compares by canonical identity. Failed cases
+do not leak bindings. `Combine` checkpoints the binding array with `slice()`
+and restores it after every failed speculative assignment, preserving sparse
+holes as well as values. No second capture implementation exists.
+
 ## 6. The domain
 
+This first listing is the currently landed demonstrator, retained so its traces
+remain checkable. The canonical contract target immediately below supersedes its
+`Optional`/host-null shape; it is not yet implemented.
+
 ```js
-export const { Add, Sub, Mul, LL, Numeric, Union, Optional, Equals } = createEnums(() => class {
+export const {
+  Add, Sub, Mul, Div, LL, Numeric, Union, Optional, Equals, Range
+} = createEnums(() => class {
 
   Union = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2))
@@ -195,8 +253,15 @@ export const { Add, Sub, Mul, LL, Numeric, Union, Optional, Equals } = createEnu
   Add = Enum($ => $(Numeric, Numeric)(Numeric))
   Sub = Enum($ => $(Numeric, Numeric)(Numeric))
   Mul = Enum($ => $(Numeric, Numeric)(Numeric))
+  Div = Enum($ => $(Numeric, Numeric)(Numeric))
 
   Equals = Enum(($, [E]) => $(E)(E => value => value === E))
+
+  Range = Enum(
+    $ => $(Number, Number)((lo, hi) => value =>
+      value instanceof Number && lo <= value && value <= hi),
+    (lo, hi) => lo <= hi
+  )
 
   LL = Enum($ => $(Numeric, Optional(LL))(LL))
 })
@@ -204,16 +269,42 @@ export const { Add, Sub, Mul, LL, Numeric, Union, Optional, Equals } = createEnu
 
 - `Union` — the one genuinely custom membership: the disjunction over its
   branches, received as parameters.
-- `Optional` — "null or member" — an ordinary definition beside `Union`; it
-  is not machinery.
+- `Optional` — the current host-nullish-or-member node. It is superseded by the
+  one-`Null` target below and will be removed.
 - `Numeric` — the transparency rule at work: contract-form result identical
   to its one seat; membership reaches `typeof` through declared structure
   only, nothing repeated anywhere.
-- `Add`/`Sub`/`Mul` — opaque; stand at `Numeric` seats through the recorded
-  fact.
-- `Equals` — the singleton: `value === E`, exact because of interning. Seed
-  of the solved-form bridge.
+- `Indeterminate` — a structured exceptional numeric outcome. It is a branch of
+  `Numeric`, not a `Number`. The ruled specimen does not turn schematic
+  `Indeterminate(DivideByZero(...))` into Number zero under multiplication by
+  zero; it remains in `Indeterminate`. The current code defines peer
+  `ZeroDivision` and `ZeroMod` forms; the exact future
+  cause/Kind and broader consuming algebra are deferred.
+- `Add`/`Sub`/`Mul`/`Div` — opaque; stand at `Numeric` seats through the
+  recorded fact.
+- `Equals` — the singleton: `value === E`, exact because of interning; an
+  exact-value contract for matching and later judgments.
+- `Range` — a membership-defined two-seat Enum whose nodes are contracts. Seat
+  contracts check each endpoint; the input validator enforces `lo <= hi`;
+  membership checks the closed interval. Contract objects are not admitted as
+  its endpoint values.
 - `LL` — result stage applied explicitly (`(LL)`).
+
+### Canonical contract target (ruled; not landed)
+
+- `Top` is the contract fulfilled by every language value; `Bottom` is fulfilled
+  by none. They are the algebraic concepts sometimes called Any and Never. `_`
+  is extensionally the all-values match region while remaining captureless
+  wildcard syntax; future unconstrained contract seats use `Top`, not `_`.
+- There is one language `Null` value and contract. Explicit host `null` and
+  `undefined` normalize to that value only at a host-value ingress. Missing
+  arguments, absent fields, and JavaScript control-flow `undefined` do not.
+- `Optional` is removed. Its former denotation is written `Union(Null, T)`.
+- `Union`, `Intersection`, and relative `Difference` form canonical regions.
+  Union and Intersection flatten, order, deduplicate, and emit one left-associated
+  binary shape. They apply the Top/Bottom, proved-containment, and
+  proved-disjointness laws recorded in `decisions.md`. Unknown relations stay as
+  residual canonical structure.
 
 ### Traces
 
@@ -228,23 +319,337 @@ the `Mul` node fails Numeric's chain (not a number, not an Indeterminate)
 → but its recorded fact is `Numeric` → stands-at → true. Values enter
 through membership, nodes enter through their recorded facts.
 
-## 7. Parked (open, deliberately)
+## 7. Runtime matching (landed)
 
-- `sub` rules, each landing when something first invokes it: containment
-  when two `Range`s meet at `sub`, the singleton rule (`sub(Equals(v), B)`
-  = `v instanceof B`) when `Equals` nodes reach seats, the transparency
-  hop and union rules when a declared result is the union itself. (`Div`
-  and `Range` landed without needing any of them — `Div`'s recorded result
-  IS the seat's contract, so identity suffices.) What a union node
-  "produces" reopens here, if a consumer appears.
-- Final Indeterminate form names: the sketch says `ZeroDivision`/`ZeroMod`;
-  the NEXT ruling says `DivZero`/`ModZero`.
-- Canonical forms for contract nodes: `Union(A, B)` and `Union(B, A)` are
-  different nodes for the same set; flattening/dedup/ordering has no
-  consumer yet.
-- The solve tier: `solve : Node → Node`, links never merges.
+`match(value)(...caseDeclarations)` is an ordered eliminator. Each case
+declaration receives the ordinary `caseOf` constructor (`$`) and a fresh
+iterator of generics. Cases are tried in source order; the first successful
+case returns its handler result. If no case matches, `match` throws a
+`TypeError`.
 
-## 8. Ruled out (do not reintroduce)
+`fits(pattern, value)` has one small decision chain:
+
+1. `_` matches anything and captures nothing.
+2. A contract pattern uses `value instanceof pattern`.
+3. A structural Enum pattern requires the same hidden Enum kind and arity,
+   then recursively fits corresponding seats.
+4. Everything else matches by canonical identity (`===`).
+
+Pattern construction and pattern mismatch are not the same event. A case
+declaration must first produce a valid pattern. If its declaration or Enum
+construction throws, the error propagates and aborts the match. Only a valid,
+successfully constructed pattern for which `fits` returns false falls through
+to the next case. There is no catch-and-skip arm behavior.
+
+Structural Enums may contain contracts in ordinary non-generic seats, so a
+partial tree such as `Add(Number, 2)` is both a legal structural value and a
+pattern. Declared value seats still validate normally: `Range(1, 2)` is valid
+while `Range(Equals(1), Equals(2))` is not. Generic seats retain their generic
+binding behavior; in current code that means `Union`/`Optional` do not yet enforce
+that their supplied branch is itself a contract. Closing too-few-argument and
+non-contract-branch admission is ordinary construction validation required by the
+target, not a new canonicalization relation.
+
+An ordinary successful case calls its handler with generic bindings in generic
+declaration order, not pattern traversal order. Non-generic pattern parts do
+not add handler arguments. As one useful exception, a successful top-level
+contract pattern with no generics passes the matched value itself. `_` still
+passes nothing.
+
+### Combine
+
+`Combine(...patterns)(handler)` is a separate case combinator for unordered
+occurrence assignment. Its matched value must be an exact canonical `Tuple`,
+and tuple cardinality must equal pattern cardinality. It searches for a
+one-to-one assignment from pattern positions to tuple occurrence indexes:
+
+- duplicate values remain separate occurrences;
+- patterns are considered in declaration order;
+- candidate indexes are tried in source order;
+- failed speculative generic bindings are restored before another assignment;
+- backtracking handles overlapping contracts rather than committing greedily.
+
+On success the handler receives every assigned occurrence in pattern order,
+including positions whose patterns are contracts or wildcards. This is
+deliberately different from an ordinary arm, whose handler receives only its
+generic bindings. `Combine` is available in lowercase `match`; the canonical
+function `Match`/`Arm` syntax described next does not encode its private case
+marker.
+
+## 8. Canonical functions and symbolic expansion (landed)
+
+Functions are represented as canonical Enum values, not opaque host
+functions:
+
+```js
+Lambda(referenceCount, callArity, formula)
+OuterRef(index)
+CallArgument(index, owner)
+Apply(owner, Tuple(...arguments))
+Match(value, Tuple(Arm(pattern, continuation), ...))
+MatchArgument(index)
+
+internFn(form, ...orderedReferences) // canonical FunctionRef
+expand(functionRef)                  // residual structural formula
+```
+
+`Lambda` is an already-lowered function form. `OuterRef(i)` names position
+`i` in its ordered reference environment. `internFn` requires exactly the
+form's declared number of references and returns a frozen canonical
+`FunctionRef(form, Tuple(...references))`. Form plus the complete ordered
+environment is function identity: equal inputs reintern, while changing or
+reordering references produces a different function value. No source parser,
+closure inspection, or JavaScript-source canonicalizer is implied by this API.
+
+An internal reference can be stored as a canonical `Lambda` form in the
+environment. When its `OuterRef` is resolved—including in value, pattern, or
+callee position—the form is lazily materialized with the owning function's
+complete ordered environment. This is the same form-first/lazy-resolution
+pattern used by Enum factories. It supports self recursion and different-form
+mutual recursion when the forms share one complete reference layout; the
+construction does not create cyclic JS objects or a separate function-group
+value.
+
+`expand(fn)` is symbolic invocation. It creates one owner-qualified
+`CallArgument(index, fn)` for each declared call argument, then evaluates the
+form by resolving outer references, substituting active call arguments,
+invoking helper function values, and rebuilding registered Enums and canonical
+Tuples through their normal factories. It does not accept concrete call
+arguments and does not make `FunctionRef` a callable host function.
+
+The active call stack is keyed by the exact canonical `FunctionRef`—not just
+its `Lambda` form, and not `(function, arguments)`. Re-entering a function
+already on that stack returns the residual call
+`Apply(functionRef, Tuple(...evaluatedArguments))`. The frame remains active
+through the complete body and is removed in `finally`, so every sibling
+recursive call reached through supported Enum/Tuple traversal survives in the
+formula and completed helpers leave no stale recursion marker. A body containing
+two such calls therefore produces a tree containing both occurrences rather than
+selecting one representative.
+
+### Function Match reuses runtime matching
+
+Canonical `Match` does not implement a second pattern engine. It instantiates
+`MatchArgument(i)` as the corresponding generic, resolves `OuterRef` patterns,
+and delegates the ordered arms to lowercase `match`. Arm order, contract
+membership, structural matching, identity, construction failures, and
+no-match errors consequently retain the semantics from §7.
+
+The selected continuation reads its `MatchArgument` bindings. A nested Match
+extends a copy of the prior binding vector rather than replacing it, including
+sparse generic positions. A contract-only arm appends its forwarded matched
+value. Pattern instantiation does not rewrite inside `Lambda` forms or closed
+`FunctionRef` values; after that, lowercase `fits` may still match their Enum
+structure normally.
+
+If an evaluated Match scrutinee still contains a residual `Apply`, expansion
+does not guess an arm. It rebuilds and preserves the complete Match, including
+all patterns and continuations, with execution disabled. The residual Enum
+tree is the current pre-normalization formula. Once formula formation rules
+land, the same factory transaction may immediately combine or erase an admitted
+pure call while preserving its candidate-derived demands and admission obligations.
+
+### Formula canonicalization at formation (ruled; not landed here)
+
+Every relevant factory produces the canonical result before publication.
+Canonicalization is formation, not a later solver and not a second value universe:
+
+```text
+validate arguments
+→ construct the actual Array-subclass Enum candidate
+→ use structural matching to select the canonical replacement
+→ intern the surviving node, or return the canonical replacement value
+```
+
+The candidate is visible only inside that transaction. The interner remains a
+shallow identity cache. `mapEnum` calls the same public factories, so rebuilt
+formulas use the same rules automatically; `expand` gets no normalization pass.
+
+The existing matcher is the rule engine. Formation needs an explicit structural
+decomposition route because a contract-valued Enum must remain a fulfilment pattern
+in runtime/user matching. The two relations compose: a formation rule decomposes
+an Enum form at its root, while its child patterns may still use ordinary contract
+fulfilment.
+
+#### Number polynomial normal form
+
+`Number` is the polynomial domain. There is no `DeterminateNumber`:
+`Numeric = Union(Number, Indeterminate)`, and an Indeterminate is not a Number.
+
+Formation computes full polynomial normal form: canonical children and positional
+references; associative flattening and stable commutative ordering; literal and
+coefficient folding; distribution into a sum of monomials; coefficient collection,
+including cancellation; identities and zero annihilation; `Pow` for repeated
+factors/non-negative integer powers; and division by a known nonzero literal
+coefficient when the result remains polynomial.
+
+The output has coefficients first, structurally ordered factors and terms, a final
+constant term, and left-associated binary products and sums. `Add(x, x)` becomes `Mul(2, x)`.
+`Sub` remains: a polynomial accumulator may use signed coefficients; a leading
+negative term uses its signed coefficient (for example `Mul(-1, x)`), while the
+emitter uses `Sub` for later negative terms. Removing it would simplify only the
+emitter's output grammar, not the semantic equality.
+
+`Pow` and `Geo` have different roles. Pow is a value expression required by the
+normal form. Geo is an important multiplicative-set contract to be specified with
+its later domain consumer; it does not replace Pow. Variable division,
+transcendental functions, and general exceptional algebra remain outside the first
+polynomial implementation.
+
+The language's `Number` semantics define this algebra. Host JavaScript `NaN`,
+infinities, and signed zero do not expand the language theory; a host-value ingress
+must reject or normalize foreign cases. An exact-rational package is an optional
+implementation technique, not part of the specification.
+
+`Indeterminate` has separately ruled consuming behavior. In particular,
+`0 * Indeterminate(DivideByZero(...))` remains Indeterminate. The exact cause/Kind
+and broader rules are deferred. A `Numeric` expression must therefore preserve its
+Indeterminate region rather than blindly applying a Number-only annihilation law.
+Where consuming behavior is deferred, no Number-only rule decides that region.
+
+#### Retained demands and calls
+
+Formation derives input, safety, purity, result, and completion obligations from
+the pre-normalization expression. Algebra may erase the expression but not its
+meaning. Canonical `Match` regions retain a requirement only where it applies:
+
+```text
+x => 0 * x   → Match(x, Number => 0)
+x => 0       → 0
+```
+
+This avoids an always-present accepted-contract parameter, a Top filler, and a
+separate Demand node. Conditional requirements remain correlated with their arm.
+
+An admitted Pure, safe, completing Number call may likewise be combined or erased
+by the algebra. Its original Apply supplies the obligations. The concrete function
+later bound to an outer reference determines whether those obligations discharge,
+not which polynomial body is selected. Failure rejects the program; it never picks
+a noncanonical fallback or triggers a second normalization.
+
+The existing function architecture remains:
+
+```text
+canonical FunctionBody
++ complete ordered outer references
+= canonical FunctionRef identity
+```
+
+The body is canonicalized positionally first; references are then applied and the
+retained obligations discharged. No accepted-domain field is added to FunctionRef.
+
+#### Canonical regions, Match, and logic
+
+`Top`, `Bottom`, `Null`, `Union`, `Intersection`, and relative `Difference` are the
+canonical region vocabulary described in §6. An ordered Match is converted into
+effective, disjoint exact regions by threading its remainder:
+
+```text
+remaining₀ = incoming region
+ownᵢ       = Intersection(patternRegionᵢ, guardRegionᵢ)
+effectiveᵢ = Intersection(remainingᵢ, ownᵢ)
+
+exact arm:     remainingᵢ₊₁ = Difference(remainingᵢ, ownᵢ)
+non-exact arm: remainingᵢ₊₁ = remainingᵢ
+```
+
+`Rest` is only a conceptual name for `remaining`; it is not an Enum or pattern.
+Every later arm excludes all earlier exact arms. Thus the Number arm in
+`Equals(0) => a; Number => b` has effective region
+`Difference(Number, Equals(0))`. A wildcard's own region is Top, so it receives
+the current remainder. Bottom rows disappear. Reordering and equal-result merging
+happen only after exact disjointification; opaque/non-exact arms retain operational
+order.
+
+For Pure exact logic, canonical meaning is the partial mapping from canonical
+input regions to canonical result values. Emit it as ordinary Match/Arm trees.
+De Morgan and DNF-style splitting are normalization techniques, not public logical
+nodes or a separate BDD identity system.
+
+Strict Match guards, ternary conditions, `!`, and the tested left seats of `&&` and
+`||` demand Boolean. `~` is legal only at a conditional seat and loosens that seat;
+it does not Booleanize. `!` produces Boolean. A grouped `~(...)` scopes through
+nested conditional seats inside that group, including `~(consume(a && b))`, and
+stops at a Lambda or explicit Match-arm boundary. `~consume(a && b)` does not
+loosen the inner group. Loose falsity is exactly `{false, Null}`; zero is truthy.
+
+Pure exact De Morgan/DNF-equivalent spellings collapse to the same region/result
+rows while preserving their original demands. Effectful expressions and non-exact
+ordered Matches are not reordered.
+
+#### Pattern boundary
+
+Formation rules match transient candidates and may bind operands that are erased.
+Runtime/user matches see canonical values only. They do not recover source order or
+erased operands. Closed patterns canonicalize like closed values; open structural
+patterns match only structure that survives. Thus canonical `0` does not match an
+open `Mul(0, a)`, while canonical `Mul(2, x)` may match `Mul(2, a)`. De-Bruijn
+references are already stable structural atoms, so commutative ordering never
+renames parameters.
+
+The historical public `Term`/`Poly` probe is not prescribed. A private accumulator
+may implement polynomial collection, but it publishes ordinary values/Enums. The
+current Add/Mul factories still preserve written trees and fold nothing.
+
+The landed `expand` currently produces a pre-normalization structural residual
+tree. Once the formation hook lands, its `mapEnum` reconstruction automatically
+uses canonical factories. Solving, domain judgment, and termination stay separate.
+
+### Current boundary
+
+This layer performs first-order structural unfolding, not concrete execution,
+termination proof, or algebraic solving. Re-entry of the same function
+residualizes immediately even when its arguments changed. Computed callees
+such as Apply-of-Apply or a Match-produced function and per-form projections of
+heterogeneous reference layouts are not implemented. Lazy mutually recursive forms
+currently share one complete ordered reference ABI.
+
+Recursive rebuilding traverses registered Enum arrays and exact canonical
+Tuples. Pending-call detection scans Array values; both operations leave
+Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
+ordinary ordered Arms only—no function-AST `Combine` or guards.
+`CallArgument`, `Apply`, and `Match` are provisionally Numeric through
+`produces`; replacing that temporary seat-admission plumbing remains open. This
+does not reopen the ruled branch-local Match representation of retained demands or
+add an accepted-domain field to functions.
+Expansion is synchronous recursive descent and has no separate arithmetic
+normalizer or fixed-point engine yet. The missing factory-door normalizer is an
+implementation gap. The host-function guard rejects an ordinary function but
+admits any function
+carrying an own `Symbol.hasInstance` property. It checks presence only—not
+callability, canonical provenance, or full contract validity—which is
+consistent with this demonstrator's non-hardened boundary.
+
+## 9. Implementation backlog and separate future work
+
+- The `produces` correction recorded in `decisions.md`. A class-chain
+  replacement is proposed but not landed; its exact treatment of node-shaped
+  results such as `Numeric(Numeric(1))` remains unresolved.
+- The ruled canonicalization layer is unimplemented: the formation hook and its
+  structural match route; Number polynomial accumulator/emitter and `Pow`; Top,
+  Bottom, Null, Intersection, Difference, and Optional removal; containment and
+  disjointness rules; effective Match remainders; Pure logical region
+  normalization; retained obligations; host ingress for language Number/Null; and
+  conformance/property tests.
+- Region extraction/exactness, guard lowering, conditional-seat Boolean validation,
+  grouped `~` scoping, and obligation inference/discharge are all target work. The
+  landed two-seat `Arm(pattern, result)` and ordinary symbolic Match do not yet
+  provide them.
+- Geo remains an important separate contract/domain feature. Its exact semantics
+  and consumer should be investigated before implementation; it is not a
+  substitute for Pow or polynomial syntax.
+- Broader Indeterminate-consuming algebra and its exact cause/Kind vocabulary.
+- The solve tier: `solve : Node → Node`, links never merges. Landed
+  `expand(FunctionRef)` is not this tier: it unfolds structure until exact
+  function re-entry and currently retains the residual calls in its
+  pre-normalization output. That observation is not a rule that admitted pure
+  calls must survive the future factory canonicalizer. `expand` does not infer a
+  call domain or write solved-form facts.
+- Source-to-`Lambda` lowering and richer function reference layouts. The
+  current API starts with already-canonical forms and one complete ordered
+  reference environment.
+
+## 10. Ruled out (do not reintroduce)
 
 - A second custom-validator argument for output (V2): the result slot's
   function form *is* the membership definition. C2 and V2 were one idea in
@@ -279,8 +684,10 @@ through membership, nodes enter through their recorded facts.
   adding verdicts.
 - Membership smuggled into the result position as a side-channel, or
   carried via `contractCheck` wrappers around validators.
-- Machinery-level `Optional` and `extendFn` (retired; prototype-inheritance
-  route superseded by recorded facts).
+- Keeping `Optional` as a second nullish contract constructor. The canonical
+  language has one Null and writes the former meaning as `Union(Null, T)`.
+  This is independent of the smaller class-chain replacement proposed for
+  `produces`, which remains in §9.
 - Per-node storage of class-level facts; per-node membership closures
   (derivable data is not stored — a node's elements are its storage).
 - `instanceof` behavior on opaque value nodes (silent false) — misuse stays

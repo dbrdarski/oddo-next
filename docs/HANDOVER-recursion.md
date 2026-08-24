@@ -1,197 +1,195 @@
-# Handover — the recursive-function arc & drift-as-the-formula (2026-08-21)
+# Handover — canonical functions and recursive expansion
 
-For the assistant continuing this work. **Everything in this arc is probe-only** —
-none of it is in `src/`. The re-runnable record with the final probe verbatim is
-`docs/recursion-canonicalization-arc.md`; this document is the working handover:
-what's established, in whose words, what's open, and what must not be re-proposed.
+This document describes committed behavior beginning with `cf99272` and labels the
+later ruled-but-unimplemented canonicalization target separately. `design.md` and
+`decisions.md` remain the design authority. `npm test` reports **109 passing,
+0 failing**.
 
----
+## 1. Canonical function values
 
-## 1. Why the arc exists
+Function code is represented by ordinary canonical Enum trees:
 
-Dane: *"let's test the whole logic against a recursive function"* — followed by
-rejecting the first probe, which had a factory tag standing in for the function with
-no body: *"there no CountDown function anywhere shown … you say it holds but should
-I believe you?"* The standard set there governs everything after: **the function
-itself on the table, every number derived from its structure, nothing asserted.**
+- `Lambda(outerReferenceCount, argumentCount, body)` — a lowered function form.
+- `OuterRef(index)` — a hole filled from the form's ordered reference environment.
+- `CallArgument(index, owner)` — argument `index` of an owner expression
+  (`OuterRef`, `Lambda`, or canonical `FunctionRef`).
+- `Apply(callee, Tuple(...arguments))` — a call node.
+- `Arm(pattern, result)` and `Match(scrutinee, Tuple(...arms))` — function-level
+  ordered matching.
+- `MatchArgument(index)` — a handler binding reference inside a Match result.
 
-## 2. The function as structure
-
-The canonical shape comes from NEXT's μ-canonicalization spec v0.6: positional code
-(`$n` for parameters, `@capn` for outer references), names never part of identity.
-As probe enums:
-
-```js
-const ref = CallArgument(null, 0, OuterRef(0))     // "argument 0 of the fn in slot 0"
-const K = Lambda(1, Match(
-  Arm(Eq(ref, 0), 0),                              //  n == 0  ?  0
-  Arm(null, Apply(OuterRef(0), Sub(ref, 2)))       //  : countDown(n - 2)
-))
-```
-
-- **`CallArgument(value, index, function)` is Dane's node and has two forms**:
-  value empty = the definition's unexpanded reference; value filled = the expanded
-  structure at an arrival (`Sub(CallArgument(4, 0, cd), 2)`). One node kind, both
-  interned formulas, drift readable off either. The function seat says *whose*
-  argument this is — self-describing, no de Bruijn depth counting.
-- **`OuterRef(i)`** is the form's parameter — the `(outerReference) =>` of his
-  function form. It survives because the body cannot hold its own form (that's the
-  cycle the design exists to avoid) and externals stay abstracted so twin groups
-  share one form.
-- The whole definition interns: rebuilding K is pointer-equal. Domain `Sub` is the
-  code-former — the body's `n - 2` is the same node kind as any value formula. One
-  universe; no separate op layer.
-
-**Killed wrong turns (do not re-propose):** `Record({arity, stop, step})` with named
-fields; self-reference by factory tag; a `Param` node without the function seat;
-calling the empty value slot a mistake (it isn't — it's the unexpanded form).
-
-## 3. Function identity — Dane's `internFn`, the arc's key result
-
-> fnForm = (outerReference) => () => outerReference()
-> fn = internFn(fnForm, fnForm)
-
-As probed: `fn = Fn(form, group)`, `group = Tuple(...group forms, ...external fns)`.
-**A group-internal reference enters the key as the FORM** — the cycle is cut in the
-key, so no cyclic value ever exists, no construction window, no bisimulation pass.
-**An external reference enters as the interned fn.** Proven by pointer equality:
-
-```
-a = () => b();  b = () => a();  c = () => c()   →  one fn (a === b === c)
-p/q group calling increment vs twin calling decrement  →  distinct (externals in the key)
-countDown: Fn(K, Tuple(K)) === cd               →  the capture resolves through the door
-```
-
-This replaces v0.6's construction-window + rooted-bisimulation machinery for these
-cases with the plain interner. Recursive identity is the door's ordinary job.
-
-## 4. Grounding at the door — no fuel, ever
-
-- **Fuel, budgets, depth caps, evaluation-as-grounding are killed concepts** — by
-  Dane here and by NEXT's termination decisions v4 (read its §5 "KILLED" before
-  proposing any termination machinery; "no third ending; no budget"). countDown and
-  `f(n−2)`-from-1 are that spec's own specimens.
-- The call is a node; **its input-validation slot is the judgment** (the same landed
-  mechanism that refuses `Range(5, 1)`). A refused call never constructs; execution
-  carries no counter because only proven calls exist to run:
-
-```
-Apply(cd, 4)   → constructs → solve = 0
-Apply(cd, 100) → constructs → solve = 0     (depth 51, no bound — depth ≠ non-completion)
-Apply(cd, 5)   → REFUSED (5 not on the derived domain)
-Apply(a)       → REFUSED (no reachable stop — a() never completes)
-```
-
-**Killed wrong turns:** the fueled interpreter; a `CallSite` node next to `Apply`
-(ONE call node; an `OuterRef` callee = composing code, no judgment; a fn callee = a
-demanded call, judged); a raw `Number` argument seat (the seat is the callee's
-*derived* domain); a declared `Numeric` result on the call (that's the produces
-import).
-
-## 5. Drift is the formula — the ruling that names the arc
-
-The assistant collapsed twice and was corrected twice:
-
-1. drift = **−2**, a number read off the tree;
-2. drift = an **`a·n + b` template** with everything else "outside the class" —
-   the same collapse one level up. Dane: *"I want a case that solves all problems,
-   not a single use case"*, then *"Why not `a * n ** z + b`, and a combination of
-   such elements? Why not the actual formula?"*
-
-The standing rule: **the whole tree is the formula.** A number is one collapsed
-reading taken too early. Expansion — composing the formula into its own reference —
-derives everything (this is what `CallArgument` preserves through folding: the
-reference is the part canonicalization must never eat).
-
-## 6. The canonical form is values
-
-No shadow representations — the assistant's coefficient arrays were rejected
-(*"What is this actually, not an Enum type?"*). The canonical form:
+`internFn(form, ...references)` applies a canonical `Lambda` form to its ordered
+reference environment and returns one canonical function value. Its identity is
+exactly:
 
 ```js
-Term = Enum($ => $(Number, Number)(Term))          // a*n**z: (coefficient, exponent)
-Poly = Enum($ => $(Term, Optional(Poly))(Poly))    // ordered terms, highest power first
+(form, Tuple(...references))
 ```
 
-`Poly` is the landed `LL` pattern. Formulas are **born canonical** through three
-constructors (`plus` merges ordered terms, combines like exponents, drops zeros;
-`scale`; `times` distributes) — door-level canonicalization, no normalize pass.
-**One evaluator serves both jobs**: `formula(tree, r)` evaluates the written tree in
-formula-space; canonicalize = evaluate with the reference bound to n
-(`N = Poly(Term(1,1))`); compose/substitute = evaluate with it bound to another
-Poly. Pointer-true consequences: `n−1−1 ≡ n−2`, `(n−2)/2 ≡ n/2−1`,
-`n·n+(n−n) ≡ n·n`, and the *judgments* intern too.
+Rebuilding equal forms with equal ordered references returns the same function
+reference. Changing a reference or its position produces a different function.
+Ordinary host functions are rejected as bodies/references. The current
+demonstrator guard admits a function carrying any own `Symbol.hasInstance`
+property; it checks presence only, not callability or canonical provenance.
+Language-level function values themselves are canonical Enums.
 
-## 7. The judgment: canonical form (total) + solve rows (partial)
+This is a lowered-form API. Source parsing and source-to-`Lambda` lowering are not
+implemented here. Consequently, the `a`/`b`/`c`/`d` collapse discussed during the
+investigation holds when lowering encodes their internal references as the same
+canonical form token. `internFn` does not inspect JavaScript closures to discover
+that lowering.
 
-- **Stage 1 never fails inside the op table** — every step formula gets its
-  canonical form, held and interned, even when nothing can judge it yet.
-- **Stage 2 is a row inventory over canonical families.** The one row built,
-  `Landing(a, b, s)` — the landing set of step `a·n + b` at stop `s`, membership in
-  closed form: `a = 1` pure drift, both directions (countUp `n+3` included:
-  `k = (s−n)/b` whole and positive); `a ≠ 1` geometric around the fixed point
-  `p = b/(1−a)` (distance scales by `a`; member iff a whole number of scalings from
-  the stop); `s = p` the collapse case — only p itself lands (`half = n/2`, the
-  Zeno specimen; JS floats would lie by underflowing to 0, which is exactly why the
-  door judges from the formula and never runs to see).
-- **Refusals name what they cannot judge**: `no solve row yet for canonical form:
-  1*n**2`. Growth = add a row with its soundness story — NEXT's own deferred
-  step-kind ↦ orbit-shape table (`±d` ↦ grid, `×r` ↦ Geo). Never widen a template;
-  never let incompleteness into the representation.
-- **The judge performs zero expansions** — no sampling, no iteration (the
-  two-sample version was corrected away). Composition exists as a demonstrable
-  property, not a judgment step.
+## 2. Recursion without cyclic values
 
-## 8. Open items (Dane's queue, his order)
+An internal function reference is stored as its canonical `Lambda` form in the
+ordered reference environment. When its `OuterRef` is resolved—including in value,
+pattern, or callee position—that form is lazily materialized with the current
+environment:
 
-1. **Calls at value seats without produces** — `q = () => p() + increment()` cannot
-   be written: an `Apply` node doesn't stand at `Add`'s Numeric seats without the
-   diagnosed import. **Dane is solving this himself, properly, without produces**
-   — do not design it for him. The landed pattern matching and Codex's
-   structural-seat admission (structural enums accept contract parts; partial trees
-   are legal values) look like his solution path assembling. Queued tests:
-   `Add(Apply(p), 1)`, the four nesting rows in `docs/decisions.md`, the open
-   `Numeric(Numeric(1))` ruling.
-2. **Multi-call / per-branch judgment** — all probes are one recursive call in one
-   branch. Extending is *"something we should discuss, not a blanket ruling"* (his
-   words). Bring as discussion.
-3. **The produces-import correction** — diagnosed with full evidence in
-   `docs/decisions.md`; still unauthorized.
-4. **Landing the kernel vocabulary** (`Lambda`/`Match`-node/`Arm`/`CallArgument`/
-   `OuterRef`/`Fn`/`Term`/`Poly`/`Landing`) in `src/` — entirely his call; nothing
-   from this arc has landed. Note: the landed `match()` (value-level matcher) and
-   the probe's `Match` AST node are different things — don't conflate them.
-5. Where canonicalization code lives when it lands (formula constructors beside the
-   interner; `Landing` beside `Range`; the row lookup) — sketched only.
+```js
+internFn(referencedForm, ...currentReferences)
+```
 
-## 9. Where we didn't see eye to eye
+No cyclic JavaScript object, function-group value, or separate recursion identity is
+involved in this lowered subset. It supports self recursion, mutual recursion between
+different forms, and shared external references when the forms use the same ordered
+reference layout.
 
-- **The collapses.** Twice the assistant reduced the formula to a solved artifact;
-  Dane's correction stands as method: keep the extended form, derive from it, let
-  rows read canonical shapes and let refusals name them.
-- **Shadow representations.** Canonical forms are enums. Any "internal format"
-  beside the universe is wrong here.
-- **Fuel and its cousins** (budgets, retry caps, sampling counts) — killed on
-  sight, both here and in the NEXT specs.
-- **Invented shapes vs the given ones.** The assistant's Record-function, factory
-  tags, Param-without-function-seat, CallSite all lost to the spec and to Dane's
-  own forms (`CallArgument`, `internFn`) — which had usually been stated earlier
-  and dismissed too quickly. When Dane has given a form, use it before inventing.
-- **"Should I believe you."** Every claim gets run before it is stated; outputs
-  shown; probe vs landed always labeled.
+The recursion check uses the complete canonical function identity, not the form
+alone. Two functions that share a form but have different applied references do not
+stop one another accidentally.
 
-## 10. Pointers
+## 3. Expansion and its stop condition
 
-- `docs/recursion-canonicalization-arc.md` — the full investigation record; its
-  appendix is the final probe, re-runnable as-is.
-- `docs/decisions.md` — the produces diagnosis + breakage inventory;
-  canonicalization-is-one-logic.
-- NEXT normative (`../next/docs/normative/`):
-  `next-mu-canonicalization-specification-v0-6.md` (function shape & identity),
-  `next-kernel-ast-specification-v0-1.md` (Lambda/Match/Apply, desugaring, patterns),
-  `next-termination-decisions-v4.md` (grounding; the KILLED list),
-  `next-application-induction-specification-v0-8.md` and
-  `next-grounding-specification-v0-5.md` (the analyzer core this demonstrator is
-  walking toward).
+`expand(fn)` invokes a canonical function with one symbolic
+`CallArgument(index, fn)` per declared argument.
+
+Evaluation substitutes active call arguments, resolves outer references, evaluates
+helper calls, and rebuilds existing Enum and canonical Tuple trees. When evaluation
+reaches a function identity already active on the call stack, it returns:
+
+```js
+Apply(fn, Tuple(...evaluatedArguments))
+```
+
+At the current commit the residual call stays in the pre-normalization result.
+Every recursive call reached through the supported Enum/Tuple traversal is
+preserved there; a body with two such calls yields a tree containing both.
+Completed helper calls leave the stack, so later independent calls are not mistaken
+for recursion. This is not a permanent canonical-form rule: with the formation hook
+present, that same factory transaction may combine or erase an admitted pure call
+while retaining the demands and admission obligations derived from its candidate.
+
+`expand` extracts the resulting structural formula along the evaluated symbolic
+path. It does not execute recursion to completion, prove termination, derive an
+input domain, or currently simplify arithmetic. At `cf99272`, for example, it
+preserves `Sub(Sub(n, 1), 1)` rather than rewriting it to `Sub(n, 2)`. Implementing
+canonical construction at the relevant formula factory doors is the next step, not
+a placement decision.
+
+Canonicalization of the resulting Enum formulas belongs to their factory doors.
+Each door will validate, construct its actual Array-subclass candidate, use the
+existing matcher to select the canonical replacement, and only then intern or
+return that result. Because `mapEnum` rebuilds through those public factories,
+`expand` does not own a second normalization representation or pass.
+
+## 4. Function-level Match
+
+Function `Match` delegates pattern selection to the ordinary ordered `match()`
+implementation.
+
+- Arms are tried in order; the first fit wins.
+- `MatchArgument(i)` creates or refers to generic binding seat `i`.
+- Handler values follow generic declaration order, including through nested matches.
+- A contract-only arm forwards the matched value.
+- Captured patterns are resolved before matching.
+- Pattern instantiation does not rewrite inside Lambda forms or closed FunctionRef
+  values; ordinary matching can still inspect their Enum structure.
+- If the evaluated scrutinee still contains an `Apply`, the complete `Match`
+  continuation remains residual instead of selecting an arm prematurely.
+
+This is ordered matching. The separate value-level `Combine` combinator is landed
+and tested, but there is no Combine arm in the function Enum vocabulary.
+
+A bare symbolic `CallArgument` is matched using the same ordinary pattern semantics
+as every other value. General symbolic branch judgment is not implemented.
+
+Pattern construction and pattern fitting are different phases. If constructing an
+arm's pattern throws, the match aborts because no valid pattern exists. Fallthrough
+occurs only after a valid pattern has been constructed and fails to fit.
+
+## 5. Validation boundaries
+
+Construction and expansion reject malformed forms and calls:
+
+- reference and argument indices must be non-negative integers;
+- outer references in a Lambda body must fit its declared reference count;
+- `internFn` requires exactly that many applied references;
+- argument and arm collections must be canonical Tuples;
+- callee and CallArgument owner expressions must be an `OuterRef`, `Lambda`, or
+  canonical `FunctionRef`;
+- call arity is checked before a call can become residual;
+- ordinary host functions without an own `Symbol.hasInstance` marker are rejected;
+  the marker is a presence-only demonstrator guard, not provenance validation.
+
+`CallArgument`, `Apply`, and `Match` currently declare `Numeric` as a temporary
+result so they can occupy existing Numeric seats. This relies on the repository's
+current `produces` machinery and is not a final account of function result shape.
+
+## 6. Current test surface
+
+The committed suite covers:
+
+- canonical form and function identity;
+- self and different-form mutual recursion;
+- external-reference identity and ordering;
+- exact recursive residual calls and multiple calls;
+- helper composition and stack cleanup;
+- arbitrary Enum reconstruction through `mapEnum`;
+- ordered, contract-only, and nested Match bindings;
+- captured and closed-function patterns;
+- residual Match continuations;
+- invalid references, host functions, Tuple shape, and arity.
+
+## 7. Current boundaries
+
+The following are not landed:
+
+1. Replacement of the temporary Numeric/`produces` treatment of function
+   expressions.
+2. Implementation of oddo.next's matcher-driven, full-polynomial factory-door
+   canonicalization. `Number` has the full polynomial form: distribution,
+   coefficient collection/cancellation, identities/annihilation, stable ordering,
+   left-associated output, retained `Sub`, and `Pow`. `Geo` remains a separate
+   important contract/domain feature. There is no `DeterminateNumber`; a `Numeric`
+   expression also has an Indeterminate region, and zero multiplication of the
+   ruled DivideByZero-style specimen remains Indeterminate.
+3. Any demonstrator-specific `solve` or call-domain judgment, as a separate layer
+   which does not define formula identity.
+4. The canonical contract/logic layer: Top, Bottom, one Null, Intersection,
+   Difference, Optional removal, effective Match remainders, and Pure exact
+   region-to-result logical normalization, including guard/`~` lowering and host
+   ingress. `Rest` is only the running remainder calculation, not a node.
+5. Retained pre-normalization obligations. They live in branch-local canonical
+   Match regions rather than an always-present function-domain field. The Number
+   algebra may erase a call from its polynomial projection while retaining those
+   obligations; applied outer references later discharge or reject them and never
+   select a different normal form.
+6. Source-to-form lowering above the canonical `Lambda` API.
+7. Recursive environments whose members require different reference layouts or
+   projections.
+8. Computed call targets (such as Apply-of-Apply or Match-produced functions),
+   Record traversal, non-Numeric result contracts, and function-level Combine arms.
+
+Do not infer the probe's `Term`/`Poly` representation, `Landing` node, two-form
+`CallArgument`, `Fn(form, group)`, or a separate recursive identity mechanism from
+older probe documents. The probe's particular node representation is not part of
+the landed design.
+
+The existing matcher is the settled rule engine. Canonicalizer rules use an
+explicit structural route on their transient candidates; runtime bare contract
+patterns retain fulfilment semantics. Runtime matching sees only canonical values
+and never recovers erased source operands. Closed patterns canonicalize like closed
+data; open patterns match only surviving canonical structure.
 
 *End of handover.*
