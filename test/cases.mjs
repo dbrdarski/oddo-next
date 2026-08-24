@@ -11,7 +11,7 @@ import { producedOf } from '../src/contract.mjs'
 import { Enum, createEnums } from '../src/enum.mjs'
 import { match, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
-import { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range } from '../src/domain.mjs'
+import { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range, canonicalizeDomain } from '../src/domain.mjs'
 import { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda, internFn, expand } from '../src/function.mjs'
 
 const suite = (title, cases) => ({ title, cases })
@@ -132,6 +132,18 @@ export const suites = [
     test('Union(Numeric(1), Numeric(2)) - generics thread', () =>
       String(Union(Numeric(1), Numeric(2))) === 'Union(Numeric(1), Numeric(2))'),
     test('LL(Numeric(1)) - result-stage thread', () => String(LL(Numeric(1))) === 'LL(Numeric(1))'),
+  ]),
+
+  suite('Domain canonicalization', [
+    test('a repeated Union contract canonicalizes to that contract', () => {
+      const written = Union(Number, Number)
+      return written !== Number && canonicalizeDomain(written) === Number
+    }),
+    test('an unmatched Domain node remains itself', () => {
+      const written = Union(Number, Indeterminate)
+      return canonicalizeDomain(written) === written
+    }),
+    test('a primitive remains itself', () => canonicalizeDomain(3) === 3),
   ]),
 
   suite('Pattern matching', [

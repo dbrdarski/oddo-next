@@ -2,7 +2,9 @@
 // Domain Definition
 // ==========================================
 
+import { isContract } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
+import { match } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
 
 // const Union = (conA, conB) => value => value instanceof conA || value instanceof conB
@@ -17,7 +19,7 @@ import { Number, Indeterminate } from './numeric.mjs'
     But this is a problem for non Union members (like Union(Number, Indeterminate))
 */
 
-export const { Add, Sub, Mul, Div, LL, Numeric, Union, Optional, Equals, Range } = createEnums(() => class {
+const Domain = createEnums(() => class {
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
   Union = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2))
@@ -35,3 +37,16 @@ export const { Add, Sub, Mul, Div, LL, Numeric, Union, Optional, Equals, Range }
     (lo, hi) => lo <= hi)
   LL = Enum($ => $(Numeric, Optional(LL))(LL))
 })
+
+const matchDomain = (domain, handler) => candidate =>
+  handler(match(candidate), domain)
+
+export const canonicalizeDomain = matchDomain(Domain, (matches, { Union }) => matches(
+  $ => $(Union.kind)(candidate => {
+    const [left, right] = candidate
+    return isContract(left) && left === right ? left : candidate
+  }),
+  ($, [value]) => $(value)(value => value)
+))
+
+export const { Add, Sub, Mul, Div, LL, Numeric, Union, Optional, Equals, Range } = Domain
