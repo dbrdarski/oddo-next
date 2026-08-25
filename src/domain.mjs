@@ -2,10 +2,18 @@
 // Domain Definition
 // ==========================================
 
-import { isContract } from './contract.mjs'
+import { contractCheck, isContract } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
 import { matchDomain } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
+
+const namedContract = (name, check) => Object.freeze(contractCheck(check, {
+  toString: () => name
+}))
+
+export const Top = namedContract('Top', value => value != null)
+export const Bottom = namedContract('Bottom', () => false)
+export const Null = namedContract('Null', value => value === Null)
 
 // const Union = (conA, conB) => value => value instanceof conA || value instanceof conB
 
@@ -23,8 +31,6 @@ const Domain = createEnums(() => class {
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
   Union = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2))
-  Optional = Enum(($, [T]) =>
-    $(T)(T => value => value == null || value instanceof T))
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
   // Numeric = Enum($ => $(Number)(Union(Number, Indeterminate)))
   Add = Enum($ => $(Numeric, Numeric)(Numeric))
@@ -35,7 +41,7 @@ const Domain = createEnums(() => class {
   Range = Enum($ => $(Number, Number)((lo, hi) => value =>
     value instanceof Number && lo <= value && value <= hi),
     (lo, hi) => lo <= hi)
-  LL = Enum($ => $(Numeric, Optional(LL))(LL))
+  LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
 
 export const canonicalizeDomain = matchDomain(Domain, (matches, { Union }) => matches(
@@ -46,4 +52,4 @@ export const canonicalizeDomain = matchDomain(Domain, (matches, { Union }) => ma
   ($, [value]) => $(value)(value => value)
 ))
 
-export const { Add, Sub, Mul, Div, LL, Numeric, Union, Optional, Equals, Range } = Domain
+export const { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range } = Domain

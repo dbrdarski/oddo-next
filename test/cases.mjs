@@ -12,7 +12,10 @@ import { fact, learn, Resolve, Produces, Transparent } from '../src/facts.mjs'
 import { Enum, createEnums } from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
-import { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range, canonicalizeDomain } from '../src/domain.mjs'
+import {
+  Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range,
+  Top as DomainTop, Bottom, Null, canonicalizeDomain
+} from '../src/domain.mjs'
 import { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda, internFn, expand } from '../src/function.mjs'
 import {
   Expanded,
@@ -190,7 +193,30 @@ export const suites = [
       Add(1, Mul(2, Sub(5, 3))) === Add(1, Mul(2, Sub(5, 3)))),
     test('Union(Numeric(1), Numeric(2)) - generics thread', () =>
       String(Union(Numeric(1), Numeric(2))) === 'Union(Numeric(1), Numeric(2))'),
-    test('LL(Numeric(1)) - result-stage thread', () => String(LL(Numeric(1))) === 'LL(Numeric(1))'),
+    test('LL(Numeric(1), Null) - result-stage thread', () =>
+      String(LL(Numeric(1), Null)) === 'LL(Numeric(1), Null)'),
+  ]),
+
+  suite('Top, Bottom, and Null', [
+    test('Top admits language values', () =>
+      1 instanceof DomainTop && Null instanceof DomainTop),
+    test('Top rejects raw host nullish values', () =>
+      !(null instanceof DomainTop) && !(undefined instanceof DomainTop)),
+    test('Bottom admits no value', () =>
+      !(1 instanceof Bottom) && !(Null instanceof Bottom)),
+    test('Null is its own value and contract', () => Null instanceof Null),
+    test('raw host nullish values are not language Null', () =>
+      !(null instanceof Null) && !(undefined instanceof Null)),
+    test('Union(Null, Number) replaces Optional membership', () =>
+      Null instanceof Union(Null, Number) && 1 instanceof Union(Null, Number)),
+    test('LL uses an explicit Null terminator', () =>
+      LL(1, Null) === LL(1, Null)),
+    test('LL nests through its recursive tail contract', () =>
+      LL(1, LL(2, Null)) === LL(1, LL(2, Null))),
+    test('LL rejects an omitted or raw host-nullish tail', () =>
+      throws(() => LL(1)) &&
+      throws(() => LL(1, null)) &&
+      throws(() => LL(1, undefined))),
   ]),
 
   suite('Domain canonicalization', [
@@ -642,9 +668,9 @@ export const suites = [
     }),
     test('expansion rebuilds arbitrary existing Enum trees', () => {
       const self = OuterRef(0)
-      const form = Lambda(1, 1, LL(CallArgument(0, self)))
+      const form = Lambda(1, 1, LL(CallArgument(0, self), Null))
       const fn = internFn(form, form)
-      return expand(fn) === LL(CallArgument(0, fn))
+      return expand(fn) === LL(CallArgument(0, fn), Null)
     }),
     test('Match uses its ordinary generic binding order', () => {
       const first = MatchArgument(0)
