@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**157 passing, 0 failing**.
+**166 passing, 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -11,12 +11,17 @@ flag, cleanup protocol, or construction residue in the current design.
 ## 1. Canonical values and Enum identity
 
 - `Tuple`/`Record` calls and values produced by Enum factories enter through the
-  shared interner. The factories themselves are lazily memoized, not interned.
+  shared interner. Tuple and Record are nominal peer doors: their values satisfy
+  `instanceof Tuple` and `instanceof Record` directly and are not Enums. The Enum
+  factories themselves are lazily memoized, not interned.
 - `ZeroDivision` and `ZeroMod` are additional canonical front doors keyed by
   their form class and operand.
 - Equal live constructions return the same frozen reference.
 - Enum identity is its hidden node class. Factories expose that class as `.kind`;
   the ordinary JavaScript `.constructor` remains the node's constructor.
+- `value instanceof Enum` recognizes only values whose hidden constructor is in
+  the Enum registry. Tuple and Record therefore cannot be mistaken for structural
+  Enums.
 - `mapEnum(value, map)` rebuilds a registered Enum through its original factory, so
   validation and interning remain the one construction path.
 
@@ -26,8 +31,8 @@ flag, cleanup protocol, or construction residue in the current design.
 
 1. `_` matches anything.
 2. A contract pattern uses ordinary membership: `value instanceof pattern`.
-3. An Enum pattern requires the same node constructor and length, then recursively
-   fits its parts.
+3. A registered Enum pattern and value require the same node constructor and
+   length, then recursively fit their parts.
 4. Every other pattern uses canonical identity: `value === pattern`.
 
 Cases are tried in declaration order and the first fit wins. If no case fits,
@@ -80,7 +85,8 @@ match(Add(1, 2))(
 
 Its current contract is exact and deterministic:
 
-- the candidate pool must be a canonical `Tuple`;
+- the candidate pool must satisfy `instanceof Tuple` directly; there is no
+  separate Tuple-recognition contract;
 - pattern count and occurrence count must be equal;
 - patterns are not tied to corresponding source positions;
 - each candidate occurrence index is used exactly once;
@@ -216,9 +222,11 @@ added by this ruling.
 `Top`, `Bottom`, and the one language `Null` are canonical zero-seat contract Enum
 values; strict binary `Union`, `Intersection`, and relative `Difference` are
 contract Enums. `Optional` is removed in favor of `Union(Null, T)`, and `LL` has an
-explicit `Null` terminator. Only the manually invoked `Union(C, C) → C`
-canonicalization rule is landed; the general region laws remain target work. An
-ordered Match will thread a running
+explicit `Null` terminator. The manually invoked root kernel lands deduplication,
+Union's Bottom identity and Top absorption, Intersection's Top identity and Bottom
+absorption, and the direct Difference laws for equal operands, Bottom, and Top.
+It inspects immediate operands only and never recursively normalizes children.
+An ordered Match will thread a running
 remainder. Selecting an exact arm commits its complete effective region: that
 region is subtracted before the next arm even if its body accepts less. Body
 rejection does not become fallthrough. `Rest` is only the name of this calculation.
@@ -240,11 +248,10 @@ zero is truthy.
   Number polynomial form and Pow; obligations; every other expression/context
   rule; and eventual FunctionBody association. No cache, `S`, or multi-argument
   preparation is currently present.
-- Implement region normalization beyond `Union(C, C) → C`: Top/Bottom laws,
-  flattening/order, containment/disjointness, effective Match remainders and Pure
-  logical regions, region exactness and guard/`~` lowering, Number/Null host ingress,
-  and conformance/property tests. The region constructors and Optional removal are
-  already landed.
+- Extend the landed local region kernel with a separately invoked bottom-up
+  traversal, flattening/order/left-association, containment/disjointness, effective
+  Match remainders and Pure logical regions, region exactness and guard/`~`
+  lowering, Number/Null host ingress, and broader conformance/property tests.
 - Investigate Geo with its actual domain consumer and specify broader
   Indeterminate-consuming algebra separately.
 - The later solve, termination, and call-domain judgments are separate layers.

@@ -9,7 +9,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **157 passing, 0 failing**.
+Current verification: **166 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -31,6 +31,11 @@ recurses, nothing is copied, and no caller's object is ever rewritten.
   results are not memoized by a separate call cache. Canonical function and
   call syntax such as `FunctionRef` and `Apply` are still ordinary Enum
   constructions, so equal nodes deduplicate normally.
+- `Tuple` and `Record` are nominal peer doors, not Enums. Their values answer
+  `instanceof Tuple` and `instanceof Record` directly while retaining Array and
+  Object behavior respectively. A one-element Tuple remains one element even
+  when that element is a Number. Record copies sorted own enumerable entries;
+  an own `__proto__` entry remains an ordinary data property.
 
 Consequence: structurally equal means pointer-equal, so `===` is value
 equality, deep equality is one pointer comparison, and canonical references
@@ -157,6 +162,11 @@ returns `undefined` for values that are not registered Enums. Recursive
 traversal is the caller's job—canonical-function expansion handles Tuples
 separately and otherwise leaves non-Enum values atomic.
 
+That same registry defines the nominal relation `value instanceof Enum`.
+Registered Enum values satisfy it; Tuple and Record values do not. Runtime
+structural matching uses this relation rather than treating every Array subclass
+as an Enum.
+
 `mapEnum` reconstruction validates and structurally interns the rebuilt Enum
 through that same front door. It is phase-blind and does not by itself transform
 expanded `E` into canonical `C`: it has no incoming semantic context. A later
@@ -241,9 +251,10 @@ holes as well as values. No second capture implementation exists.
 
 ## 6. The domain
 
-This listing summarizes the demonstrator landed through `f60df51`. The region
+This listing summarizes the demonstrator landed through `f232b36`. The region
 constructors currently provide strict construction, canonical structural identity,
-and membership. The broader normalization laws immediately below remain a target.
+membership, and a local root-reduction kernel. The broader normalization laws
+immediately below remain a target.
 
 ```js
 export const isRegion = value => isContract(value) && value !== _
@@ -328,7 +339,7 @@ export const {
 - `LL` — a two-seat recursive value with an explicit `Null` terminator. `LL(1)`
   and raw host-nullish tails reject; the empty/terminal tail is written `Null`.
 
-### Canonical contract normalization target (vocabulary landed; laws not landed)
+### Canonical contract normalization target (vocabulary and root laws landed)
 
 - `Top` is the contract fulfilled by every language value; `Bottom` is fulfilled
   by none. They are the algebraic concepts sometimes called Any and Never. `_`
@@ -345,10 +356,26 @@ export const {
   proved-disjointness laws recorded in `decisions.md`. Unknown relations stay as
   residual canonical structure.
 
-Only the manually invoked `canonicalizeDomain(Union(C, C)) → C` rule is currently
-landed. There is no general region normalization caller, flattening/order pass,
-Top/Bottom composition, containment/disjointness solver, effective Match remainder,
-or logical canonicalization yet.
+The manually invoked `canonicalizeDomain` kernel now implements these immediate
+root laws:
+
+```text
+Union(A, A) → A                 Intersection(A, A) → A
+Union(Bottom, A) → A            Intersection(Top, A) → A
+Union(Top, A) → Top             Intersection(Bottom, A) → Bottom
+
+Difference(A, A) → Bottom
+Difference(A, Bottom) → A
+Difference(Bottom, A) → Bottom
+Difference(A, Top) → Bottom
+```
+
+The Union and Intersection rules accept either operand order. Equality is
+canonical pointer equality. Handlers inspect only the immediate operands, preserve
+unknown candidates exactly, and never call `canonicalizeDomain` recursively.
+There is still no general normalization caller, bottom-up traversal,
+flattening/order/left-association pass, containment/disjointness solver, effective
+Match remainder, or logical canonicalization.
 
 ### Traces
 
@@ -375,8 +402,9 @@ case returns its handler result. If no case matches, `match` throws a
 
 1. `_` matches anything and captures nothing.
 2. A contract pattern uses `value instanceof pattern`.
-3. A structural Enum pattern requires the same hidden Enum kind and arity,
-   then recursively fits corresponding seats.
+3. A structural Enum pattern and value must both satisfy the registered nominal
+   `instanceof Enum` relation, then have the same hidden kind and arity; their
+   corresponding seats are fitted recursively.
 4. Everything else matches by canonical identity (`===`).
 
 Pattern construction and pattern mismatch are not the same event. A case
@@ -404,8 +432,9 @@ passes nothing.
 ### Combine
 
 `Combine(...patterns)(handler)` is a separate case combinator for unordered
-occurrence assignment. Its matched value must be an exact canonical `Tuple`,
-and tuple cardinality must equal pattern cardinality. It searches for a
+occurrence assignment. Its matched value must directly satisfy `instanceof Tuple`,
+and tuple cardinality must equal pattern cardinality. Tuple itself is the carrier
+contract; there is no parallel Tuple-recognition wrapper. It searches for a
 one-to-one assignment from pattern positions to tuple occurrence indexes:
 
 - duplicate values remain separate occurrences;
@@ -744,8 +773,9 @@ such as Apply-of-Apply or a Match-produced function and per-form projections of
 heterogeneous reference layouts are not implemented. Lazy mutually recursive forms
 currently share one complete ordered reference ABI.
 
-Recursive rebuilding traverses registered Enum arrays and exact canonical
-Tuples. Pending-call detection scans Array values; both operations leave
+Recursive rebuilding traverses registered Enum values and nominal canonical
+Tuples through their respective doors. Pending-call detection scans Array values;
+both operations leave
 Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
 ordinary ordered Arms only—no function-AST `Combine` or guards.
 `CallArgument`, `Apply`, and `Match` are provisionally Numeric through
@@ -780,10 +810,11 @@ consistent with this demonstrator's non-hardened boundary.
   FunctionBody integration.
 - `Top`, `Bottom`, `Null`, strict binary `Union`/`Intersection`/`Difference`,
   `Optional` removal, and explicit-Null `LL` are landed as membership/structural
-  forms. General region normalization beyond the manually invoked
-  `Union(C, C) → C` rule remains open: flattening and ordering, Top/Bottom laws,
-  containment and disjointness, effective Match remainders, Pure logical region
-  normalization, host ingress for Number/Null, and conformance/property tests.
+  forms. The manually invoked root kernel now lands deduplication and the direct
+  Top/Bottom identity and absorption laws. Bottom-up traversal, flattening,
+  heterogeneous ordering, left-association, containment and disjointness,
+  effective Match remainders, Pure logical region normalization, host ingress for
+  Number/Null, and broader conformance/property tests remain open.
 - Region extraction/exactness, guard lowering, conditional-seat Boolean validation,
   grouped `~` scoping, and obligation inference/discharge are all target work. The
   landed two-seat `Arm(pattern, result)` and ordinary symbolic Match do not yet

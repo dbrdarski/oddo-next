@@ -73,6 +73,23 @@ producing `Numeric`; regression tests directly observe the first two, while the
 for these additional consumers as well as ordinary nested domain nodes. The
 `Numeric(Numeric(1))` ruling remains unresolved.
 
+## 2026-08-25 — nominal Tuple, Record, and Enum recognition landed
+
+**Implementation status through `d10cf15`; no new semantic ruling.** Tuple and
+Record remain peer doors on the shared interner rather than Enums, but their
+demonstrator values are now nominal Array/Object subclasses recognized directly by
+`instanceof Tuple` and `instanceof Record`. Numeric singleton Tuple construction
+preserves the element rather than invoking Array's length overload. Record identity
+uses sorted key/value entries and preserves an own `__proto__` entry as an ordinary
+data property.
+
+The existing Enum registry now defines `value instanceof Enum`; runtime structural
+matching uses that nominal relation, so Tuple and Record values are not mistaken
+for Enums. Enum seats and `Combine` use Tuple itself directly. The parallel
+`CanonicalTuple` contract and reconstructive `isTuple` probe have been removed.
+These changes preserve the three distinct identity namespaces and do not make
+Tuple or Record into Enums.
+
 ## 2026-08-20 — formula canonicalization happens at formation (placement superseded)
 
 **Superseded on 2026-08-25.** This entry remains as decision history. Its Number
@@ -471,17 +488,23 @@ meaning, including De Morgan and DNF-equivalent spellings, while preserving thei
 pre-normalization demands. Effectful code and non-exact ordered matches are not
 reordered under that rule.
 
-**Implementation status through `f60df51`.** `Top`, `Bottom`, and the one language
+**Implementation status through `f232b36`.** `Top`, `Bottom`, and the one language
 `Null` are canonical zero-seat membership-defined Enum values/contracts. Strict
 binary `Union`, `Intersection`, and `Difference` contract Enums are also landed.
 No parallel contract-construction helper remains. `_` is rejected as a stored
 region branch. `Optional` is removed and `LL` uses an explicit `Null` terminator
-through `Union(Null, LL)`. These nodes land membership and structural identity,
-not the general algebra above:
-`canonicalizeDomain` still has only the explicit, manually invoked
-`Union(C, C) → C` rule. Flattening, ordering, Top/Bottom composition, containment,
-disjointness, effective Match remainders, and logical normalization remain
-unimplemented. Host `null`/`undefined` ingress normalization is also not landed.
+through `Union(Null, LL)`.
+
+The manually invoked `canonicalizeDomain` kernel now lands immediate
+deduplication; Bottom identity and Top absorption for Union; Top identity and
+Bottom absorption for Intersection; and `A\\A = Bottom`, `A\\Bottom = A`,
+`Bottom\\A = Bottom`, and `A\\Top = Bottom` for Difference. Commutative laws
+accept either operand order. Equality is canonical pointer equality. Handlers
+inspect only immediate operands, preserve unknown candidates, and never recurse.
+Bottom-up traversal, flattening, heterogeneous ordering, left-association,
+containment, disjointness, effective Match remainders, and logical normalization
+remain unimplemented. Host `null`/`undefined` ingress normalization is also not
+landed.
 The separately pending `Produces` correction still applies to these contract
 atoms: a hypothetical node declared to produce `Bottom` or `Null` would currently
 stand at that atom, although no current domain constructor does so.

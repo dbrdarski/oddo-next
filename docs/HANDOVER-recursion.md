@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **157 passing,
+and `decisions.md` remain the design authority. `npm test` reports **166 passing,
 0 failing**.
 
 ## 1. Canonical function values
@@ -65,7 +65,8 @@ stop one another accidentally.
 `CallArgument(index, fn)` per declared argument.
 
 Evaluation substitutes active call arguments, resolves outer references, evaluates
-helper calls, and rebuilds existing Enum and canonical Tuple trees. When evaluation
+helper calls, and rebuilds registered Enum values and nominal canonical Tuple
+trees through their respective doors. When evaluation
 reaches a function identity already active on the call stack, it returns:
 
 ```js
@@ -145,7 +146,8 @@ Construction and expansion reject malformed forms and calls:
 - reference and argument indices must be non-negative integers;
 - outer references in a Lambda body must fit its declared reference count;
 - `internFn` requires exactly that many applied references;
-- argument and arm collections must be canonical Tuples;
+- argument and arm collections must satisfy `instanceof Tuple` directly; there is
+  no separate Tuple-recognition contract;
 - callee and CallArgument owner expressions must be an `OuterRef`, `Lambda`, or
   canonical `FunctionRef`;
 - `argumentCountOf` reports a known `Lambda`/`FunctionRef` arity and returns
@@ -173,8 +175,10 @@ The committed suite covers:
 - captured and closed-function patterns;
 - residual Match continuations;
 - invalid references, host functions, Tuple shape, and arity;
+- nominal Tuple/Record identity and registered `instanceof Enum` provenance;
 - canonical zero-seat Top/Bottom/Null contract Enum values and strict binary
   region membership Enums;
+- local, nonrecursive region deduplication and Top/Bottom reduction laws;
 - the six-field Preparation value and both zero-multiplication contexts.
 
 ## 7. Current boundaries
@@ -200,12 +204,12 @@ The following are not landed:
    replaces `E` or `C`.
 4. General canonical region/logic normalization. Zero-seat Top, Bottom, and Null
    contract Enum values, strict binary Union/Intersection/Difference membership
-   Enums, Optional removal, and explicit-Null LL are landed. Only manual
-   `Union(C, C) → C` normalization exists.
-   Top/Bottom composition, containment/disjointness, effective Match remainders,
-   Pure exact region-to-result logical normalization, guard/`~` lowering, and host
-   ingress remain open. `Rest` is only the running remainder calculation, not a
-   node.
+   Enums, Optional removal, explicit-Null LL, and the immediate root deduplication
+   and Top/Bottom laws are landed. The kernel does not recurse. Bottom-up traversal,
+   flattening/order/left-association, containment/disjointness, effective Match
+   remainders, Pure exact region-to-result logical normalization, guard/`~`
+   lowering, and host ingress remain open. `Rest` is only the running remainder
+   calculation, not a node.
 5. General retained evidence and obligations. The landed Preparation value already
    retains durable `E` alongside accepted region, result contract, empty
    obligations, and contextual `C` for its supported slice.
