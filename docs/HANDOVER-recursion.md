@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and labels the
 later ruled-but-unimplemented canonicalization target separately. `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **129 passing,
+`decisions.md` remain the design authority. `npm test` reports **132 passing,
 0 failing**.
 
 ## 1. Canonical function values
@@ -160,7 +160,9 @@ The following are not landed:
 1. Replacement of the temporary Numeric/`Produces` treatment of function
    expressions.
 2. Implementation of oddo.next's matcher-driven contextual preparation over
-   durable `E`, including retention of contextual `C`. `Number` has the full
+   durable `E`, including retention of contextual `C`. The shared `matchDomain`
+   binder is landed but deliberately chooses no context/result/storage shape.
+   `Number` has the full
    polynomial form: distribution,
    coefficient collection/cancellation, identities/annihilation, stable ordering,
    left-associated output, retained `Sub`, and `Pow`. `Geo` remains a separate

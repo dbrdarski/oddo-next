@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and labels the
 later ruled-but-unimplemented canonicalization target separately. `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **129 passing,
+`decisions.md` remain the design authority. `npm test` reports **132 passing,
 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
@@ -201,8 +201,9 @@ zero is truthy.
 - Replace the temporary `Produces`/declared-result bridge. Function
   `CallArgument`, `Apply`, and `Match` currently rely on it to stand at Numeric
   seats.
-- Implement durable `E`, the explicit pure contextual transformer, matcher-selected
-  local rules, retained `C`, and later `S` association; Number
+- Implement durable `E`, the production contextual transformer and matcher-selected
+  local rules, retained `C`, and later `S` association; the shared `matchDomain`
+  binder is landed but deliberately retains nothing. Also implement Number
   polynomial form and Pow; Top/Bottom/Null/Intersection/Difference and Optional
   removal; contract theory rules; effective Match remainders and Pure logical
   regions; region exactness and guard/`~` lowering; retained-obligation inference

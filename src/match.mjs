@@ -91,3 +91,6 @@ export const match = (value) => (...cases) => {
 
   throw new TypeError('No pattern matched')
 }
+
+export const matchDomain = (domain, handler) => value =>
+  handler(match(value), domain)

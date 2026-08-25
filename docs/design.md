@@ -9,7 +9,7 @@ canonicalization layer, including the later contextual-preparation amendment of
 surfaces they describe. A subsection explicitly says when it documents current
 code rather than the ruled target.
 
-Current verification: **129 passing, 0 failing**.
+Current verification: **132 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -493,7 +493,10 @@ remains a shallow identity cache and performs no rewriting. `mapEnum` performs
 phase-blind structural rebuilding; without an incoming context it cannot transform
 `E` into `C`.
 
-The existing matcher remains the intended rule engine. Preparation decomposes
+The existing matcher remains the intended rule engine. The landed `matchDomain`
+binds `match(E)` and an Enum domain to a handler; that handler may return a pure
+transformer awaiting explicit context. It does not cache a transformer or choose
+a context, preparation-result, or E/C association shape. Preparation decomposes
 durable Enum structure and selects local canonicalization rules. This is not a
 third `createEnums`/`Enum` callback. If contract-valued Enums require an explicit
 structural-decomposition relation, it belongs to the preparation rule surface;
@@ -683,13 +686,13 @@ consistent with this demonstrator's non-hardened boundary.
 - The `Produces` correction recorded in `decisions.md`. A class-chain
   replacement is proposed but not landed; its exact treatment of node-shaped
   results such as `Numeric(Numeric(1))` remains unresolved.
-- The ruled canonicalization layer is unimplemented: durable `E`, an explicit pure
-  contextual preparation transformer, matcher-selected local rules, retained `C`,
-  and later `S` association; Number polynomial
-  accumulator/emitter and `Pow`; Top, Bottom, Null, Intersection, Difference, and
-  Optional removal; containment and disjointness rules; effective Match
-  remainders; Pure logical region normalization; retained obligations; host ingress
-  for language Number/Null; and conformance/property tests.
+- The ruled canonicalization layer remains unimplemented beyond the shared
+  `matchDomain` binder: durable `E`, the production contextual preparation
+  transformer and local rules, retained `C`, and later `S` association; Number
+  polynomial accumulator/emitter and `Pow`; Top, Bottom, Null, Intersection,
+  Difference, and Optional removal; containment and disjointness rules; effective
+  Match remainders; Pure logical region normalization; retained obligations; host
+  ingress for language Number/Null; and conformance/property tests.
 - Region extraction/exactness, guard lowering, conditional-seat Boolean validation,
   grouped `~` scoping, and obligation inference/discharge are all target work. The
   landed two-seat `Arm(pattern, result)` and ordinary symbolic Match do not yet

@@ -4,7 +4,7 @@
 
 import { isContract } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
-import { match } from './match.mjs'
+import { matchDomain } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
 
 // const Union = (conA, conB) => value => value instanceof conA || value instanceof conB
@@ -37,9 +37,6 @@ const Domain = createEnums(() => class {
     (lo, hi) => lo <= hi)
   LL = Enum($ => $(Numeric, Optional(LL))(LL))
 })
-
-const matchDomain = (domain, handler) => candidate =>
-  handler(match(candidate), domain)
 
 export const canonicalizeDomain = matchDomain(Domain, (matches, { Union }) => matches(
   $ => $(Union.kind)(candidate => {

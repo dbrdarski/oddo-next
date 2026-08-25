@@ -334,12 +334,13 @@ FunctionBody while `E` remains associated, and whether the earlier
 require author judgment. This ruling does not add an accepted-domain seat or a
 `Top` filler to `FunctionRef`.
 
-**Implementation status.** The committed `canonicalizeDomain` is an explicit,
-manually invoked root matcher with one `Union(C, C) → C` rule and no production
-caller. It demonstrates matcher-based dispatch only. The committed contextual
-preparation model is test-only pressure scaffolding. Production context
-representation, region algebra, polynomial preparation, E/C/S association, and the
-later judgment tier are not landed.
+**Implementation status.** The committed `matchDomain` binds a matcher and Enum
+domain to a handler without caching or choosing semantic result shapes. The
+committed `canonicalizeDomain` uses it as an explicit, manually invoked root
+matcher with one `Union(C, C) → C` rule and no production caller. The contextual
+preparation model remains test-only pressure scaffolding. Production context
+representation, region algebra, polynomial preparation, E/C/S association, and
+the later judgment tier are not landed.
 
 ## 2026-08-24 — canonical contracts and logical meaning
 

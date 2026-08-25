@@ -10,7 +10,7 @@ import { Tuple, Record } from '../src/intern.mjs'
 import { producedOf } from '../src/contract.mjs'
 import { fact, learn, Resolve, Produces, Transparent } from '../src/facts.mjs'
 import { Enum, createEnums } from '../src/enum.mjs'
-import { match, Combine, _ } from '../src/match.mjs'
+import { match, matchDomain, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range, canonicalizeDomain } from '../src/domain.mjs'
 import { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda, internFn, expand } from '../src/function.mjs'
@@ -80,6 +80,31 @@ export const suites = [
     test('declared results are stored under the shared Produces key', () => {
       const node = Add(1, 2)
       return fact(node.constructor, Produces) === Numeric
+    }),
+  ]),
+
+  suite('Contextual matcher shell', [
+    test('the matcher-bound transformer receives context explicitly', () => {
+      const prepare = matchDomain({ Add }, (matches, { Add }) => context => matches(
+        ($, [left, right]) => $(Add(left, right))((left, right) =>
+          Tuple(context, left, right)),
+        ($, [value]) => $(value)(value => Tuple(context, value))
+      ))
+      const expanded = Add(41, 42)
+      return prepare(expanded)('context') === Tuple('context', 41, 42)
+    }),
+    test('configured handlers remain independent for the same expanded value', () => {
+      const expanded = Add(43, 44)
+      const first = matchDomain({}, () => context => Tuple('first', context))
+      const second = matchDomain({}, () => context => Tuple('second', context))
+      return first(expanded)('context') === Tuple('first', 'context')
+        && second(expanded)('context') === Tuple('second', 'context')
+    }),
+    test('primitive expanded values use the same matcher path', () => {
+      const prepare = matchDomain({}, matches => context => matches(
+        ($, [value]) => $(value)(value => Tuple(context, value))
+      ))
+      return prepare(7)('context') === Tuple('context', 7)
     }),
   ]),
 
