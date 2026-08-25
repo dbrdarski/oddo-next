@@ -1,8 +1,8 @@
 // Test-only semantic reference model.
 //
 // This deliberately covers only the one-argument Number/Indeterminate slice
-// needed to pressure-test contextual preparation. Its Tuple context, local
-// Top/Bottom values, and emitted row order are test scaffolding, not rulings.
+// needed to pressure-test contextual preparation. Its local Top/Bottom values
+// and emitted row order are test scaffolding, not production implementations.
 // Unsupported region algebra throws instead of pretending to be the future
 // contract engine.
 
@@ -107,15 +107,9 @@ const contractOf = region => {
 }
 
 const incomingOf = context => {
-  if (
-    !Array.isArray(context) ||
-    context.constructor !== Array ||
-    !Object.isFrozen(context) ||
-    context.length !== 1 ||
-    context !== Tuple(...context) ||
-    !isContract(context[0])
-  ) throw new TypeError('Expected one canonical contract context')
-  return context[0]
+  if (!isContract(context) || context === _)
+    throw new TypeError('Expected an incoming region contract')
+  return context
 }
 
 const canonicalOf = (scrutinee, incoming, accepted, rows) => {
@@ -174,7 +168,7 @@ const prepareMatch = (expanded, incoming, dependency) => {
     const [arm, ...rest] = arms
     const selected = intersect(remaining, regionOf(arm[0]))
     if (selected === Bottom) return collect(rest, remaining, rows)
-    const body = prepareExpression(arm[1], expanded[0])(Tuple(selected))
+    const body = prepareExpression(arm[1], expanded[0])(selected)
     return collect(
       rest,
       subtract(remaining, selected),
