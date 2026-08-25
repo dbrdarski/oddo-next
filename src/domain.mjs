@@ -4,7 +4,7 @@
 
 import { contractCheck, isContract } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
-import { matchDomain } from './match.mjs'
+import { matchDomain, _ } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
 
 const namedContract = (name, check) => Object.freeze(contractCheck(check, {
@@ -14,6 +14,13 @@ const namedContract = (name, check) => Object.freeze(contractCheck(check, {
 export const Top = namedContract('Top', value => value != null)
 export const Bottom = namedContract('Bottom', () => false)
 export const Null = namedContract('Null', value => value === Null)
+
+// `_` implements matching through the contract protocol, but remains wildcard
+// syntax; persistent region operands use the named Top contract instead.
+export const isRegion = value => isContract(value) && value !== _
+
+const regionArguments = length => (...regions) =>
+  regions.length === length && regions.every(isRegion)
 
 // const Union = (conA, conB) => value => value instanceof conA || value instanceof conB
 
@@ -30,7 +37,15 @@ export const Null = namedContract('Null', value => value === Null)
 const Domain = createEnums(() => class {
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
   Union = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2))
+    $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2),
+    regionArguments(2))
+  Intersection = Enum(($, [T1, T2]) =>
+    $(T1, T2)((T1, T2) => value => value instanceof T1 && value instanceof T2),
+    regionArguments(2))
+  Difference = Enum(($, [base, excluded]) =>
+    $(base, excluded)((base, excluded) => value =>
+      value instanceof base && !(value instanceof excluded)),
+    regionArguments(2))
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
   // Numeric = Enum($ => $(Number)(Union(Number, Indeterminate)))
   Add = Enum($ => $(Numeric, Numeric)(Numeric))
@@ -52,4 +67,7 @@ export const canonicalizeDomain = matchDomain(Domain, (matches, { Union }) => ma
   ($, [value]) => $(value)(value => value)
 ))
 
-export const { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range } = Domain
+export const {
+  Add, Sub, Mul, Div, LL, Numeric,
+  Union, Intersection, Difference, Equals, Range
+} = Domain

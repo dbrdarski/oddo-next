@@ -13,7 +13,7 @@ import { Enum, createEnums } from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import {
-  Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range,
+  Add, Sub, Mul, Div, LL, Numeric, Union, Intersection, Difference, Equals, Range,
   Top as DomainTop, Bottom, Null, canonicalizeDomain
 } from '../src/domain.mjs'
 import { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda, internFn, expand } from '../src/function.mjs'
@@ -191,8 +191,8 @@ export const suites = [
     test('Add(1, 2) with raw literals', () => String(Add(1, 2)) === 'Add(1, 2)'),
     test('Add(1, Mul(2, Sub(5, 3))) with raw literals', () =>
       Add(1, Mul(2, Sub(5, 3))) === Add(1, Mul(2, Sub(5, 3)))),
-    test('Union(Numeric(1), Numeric(2)) - generics thread', () =>
-      String(Union(Numeric(1), Numeric(2))) === 'Union(Numeric(1), Numeric(2))'),
+    test('Union rejects values where it requires contract branches', () =>
+      throws(() => Union(Numeric(1), Numeric(2)))),
     test('LL(Numeric(1), Null) - result-stage thread', () =>
       String(LL(Numeric(1), Null)) === 'LL(Numeric(1), Null)'),
   ]),
@@ -217,6 +217,33 @@ export const suites = [
       throws(() => LL(1)) &&
       throws(() => LL(1, null)) &&
       throws(() => LL(1, undefined))),
+  ]),
+
+  suite('Region contract Enums', [
+    test('Intersection is an interned contract value', () => {
+      const region = Intersection(Number, Range(0, 10))
+      return region === Intersection(Number, Range(0, 10))
+        && 5 instanceof region
+        && !(20 instanceof region)
+    }),
+    test('Difference is an ordered interned contract value', () => {
+      const region = Difference(Number, Equals(0))
+      return region === Difference(Number, Equals(0))
+        && region !== Difference(Equals(0), Number)
+        && 1 instanceof region
+        && !(0 instanceof region)
+    }),
+    test('binary region Enums require exactly two contracts', () =>
+      [Union, Intersection, Difference].every(factory =>
+        throws(() => factory()) &&
+        throws(() => factory(Number)) &&
+        throws(() => factory(Number, Number, Number)) &&
+        throws(() => factory(1, Number))
+      )),
+    test('wildcard syntax cannot become a stored region branch', () =>
+      [Union, Intersection, Difference].every(factory =>
+        throws(() => factory(_, Number)) && throws(() => factory(Number, _))
+      )),
   ]),
 
   suite('Domain canonicalization', [
