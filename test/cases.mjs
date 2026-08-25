@@ -16,7 +16,10 @@ import {
   Add, Sub, Mul, Div, LL, Numeric, Union, Intersection, Difference, Equals, Range,
   Top as DomainTop, Bottom, Null, canonicalizeDomain
 } from '../src/domain.mjs'
-import { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda, internFn, expand } from '../src/function.mjs'
+import {
+  OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda,
+  argumentCountOf, internFn, expand
+} from '../src/function.mjs'
 import { Preparation } from '../src/prepare.mjs'
 import {
   Expanded,
@@ -640,6 +643,13 @@ export const suites = [
   ]),
 
   suite('Canonical functions & recursive expansion', [
+    test('known function owners expose their argument count', () => {
+      const form = Lambda(0, 2, 0)
+      const fn = internFn(form)
+      return argumentCountOf(form) === 2
+        && argumentCountOf(fn) === 2
+        && argumentCountOf(OuterRef(0)) === undefined
+    }),
     test('function forms are canonical Enum trees', () =>
       countDownForm() === countDownForm()),
     test('a form and its ordered references determine function identity', () => {

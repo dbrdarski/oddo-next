@@ -71,6 +71,11 @@ const {
 const isFunctionOwner = value =>
   value instanceof OuterRef || value instanceof Lambda || value instanceof FunctionRef
 
+export const argumentCountOf = owner => {
+  const form = owner instanceof FunctionRef ? owner[0] : owner
+  return form instanceof Lambda ? form[1] : undefined
+}
+
 const containsHostFunction = (value, seen = new WeakSet()) => {
   if (typeof value === 'function')
     return !Object.hasOwn(value, Symbol.hasInstance)
