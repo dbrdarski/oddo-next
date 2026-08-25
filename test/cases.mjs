@@ -26,9 +26,9 @@ const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
 const throws = (run) => { try { run(); return false } catch { return true } }
 const isUnionOf = (candidate, left, right) =>
-  candidate instanceof Union && (
-    candidate[0] === left && candidate[1] === right ||
-    candidate[0] === right && candidate[1] === left
+  candidate instanceof Union && match(Tuple(...candidate))(
+    $ => Combine(Equals(left), Equals(right))(() => true),
+    $ => $(_)(() => false)
   )
 const armFor = (candidate, region) =>
   candidate[1].find(arm => arm[0] === region)
