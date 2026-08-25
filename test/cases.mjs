@@ -20,7 +20,7 @@ import {
   OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda,
   argumentCountOf, internFn, expand
 } from '../src/function.mjs'
-import { Preparation } from '../src/prepare.mjs'
+import { Preparation, prepare as prepareProduction } from '../src/prepare.mjs'
 import {
   Expanded,
   Accepted,
@@ -57,6 +57,14 @@ const countDownForm = () => {
     Arm(Equals(0), 0),
     Arm(_, Apply(self, Tuple(Sub(argument, 2))))
   )))
+}
+
+const expandedZeroMul = (zeroFirst = true) => {
+  const self = OuterRef(0)
+  const dependency = CallArgument(0, self)
+  const body = zeroFirst ? Mul(0, dependency) : Mul(dependency, 0)
+  const form = Lambda(1, 1, body)
+  return expand(internFn(form, form))
 }
 
 export const suites = [
@@ -187,6 +195,74 @@ export const suites = [
           Object.freeze([]),
           0
         ))
+    }),
+  ]),
+
+  suite('Contextual preparation', [
+    test('Number preparation retains E and collapses C to zero', () => {
+      const expanded = expandedZeroMul()
+      const prepared = prepareProduction(expanded)(Number)
+      return prepared === prepareProduction(expanded)(Number)
+        && prepared[0] === expanded
+        && prepared[1] === Number
+        && prepared[2] === Number
+        && prepared[3] === Equals(0)
+        && prepared[4] === Tuple()
+        && prepared[5] === 0
+    }),
+    test('zero multiplication uses Combine across operand order', () => {
+      const zeroFirst = expandedZeroMul()
+      const zeroLast = expandedZeroMul(false)
+      const first = prepareProduction(zeroFirst)(Number)
+      const last = prepareProduction(zeroLast)(Number)
+      return first[0] === zeroFirst
+        && last[0] === zeroLast
+        && first[5] === 0
+        && last[5] === 0
+        && first !== last
+    }),
+    test('the non-Number remainder preserves the Indeterminate operation', () => {
+      const expanded = expandedZeroMul()
+      const context = Difference(DomainTop, Number)
+      const prepared = prepareProduction(expanded)(context)
+      return prepared[0] === expanded
+        && prepared[1] === context
+        && prepared[2] === Indeterminate
+        && prepared[3] === Indeterminate
+        && prepared[4] === Tuple()
+        && prepared[5] === expanded
+    }),
+    test('the non-Number judgment admits only Indeterminate values', () => {
+      const context = Difference(DomainTop, Number)
+      const accepted = prepareProduction(expandedZeroMul())(context)[2]
+      return new ZeroDivision(1) instanceof accepted
+        && !(Numeric(1) instanceof accepted)
+        && !(Add(1, 2) instanceof accepted)
+    }),
+    test('the first slice rejects contexts it has not ruled', () => {
+      const expanded = expandedZeroMul()
+      return throws(() => prepareProduction(expanded)(Tuple(Number)))
+        && throws(() => prepareProduction(expanded)(_))
+        && throws(() => prepareProduction(expanded)(Indeterminate))
+        && throws(() => prepareProduction(expanded)(DomainTop))
+    }),
+    test('the first slice requires argument zero of a known unary owner', () => {
+      const unary = internFn(Lambda(0, 1, 0))
+      const binary = internFn(Lambda(0, 2, 0))
+      return throws(() => prepareProduction(
+        Mul(0, CallArgument(1, unary))
+      )(Number))
+        && throws(() => prepareProduction(
+          Mul(0, CallArgument(0, binary))
+        )(Number))
+        && throws(() => prepareProduction(
+          Mul(0, CallArgument(0, OuterRef(0)))
+        )(Number))
+    }),
+    test('unsupported expressions do not acquire invented judgments', () => {
+      const dependency = expandedZeroMul()[1]
+      return throws(() => prepareProduction(Mul(0, 0))(Number))
+        && throws(() => prepareProduction(Add(0, dependency))(Number))
     }),
   ]),
 
