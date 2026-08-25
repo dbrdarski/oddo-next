@@ -1,18 +1,21 @@
 // Test-only semantic reference model.
 //
 // This deliberately covers only the one-argument Number/Indeterminate slice
-// needed to pressure-test contextual preparation. Its local Top/Bottom values
-// and emitted row order are test scaffolding, not production implementations.
-// Unsupported region algebra throws instead of pretending to be the future
-// contract engine.
+// needed to pressure-test contextual preparation. Its region algebra and emitted
+// row order are test scaffolding, not production implementations. It reuses the
+// canonical contract vocabulary instead of constructing parallel contract values.
+// Unsupported algebra throws instead of pretending to be the future engine.
 
-import { contractCheck, isContract } from '../src/contract.mjs'
-import { Enum, createEnums } from '../src/enum.mjs'
+import { isContract } from '../src/contract.mjs'
 import { Tuple } from '../src/intern.mjs'
 import { _ } from '../src/match.mjs'
 import { Number, Indeterminate } from '../src/numeric.mjs'
-import { Mul, Numeric, Union, Equals } from '../src/domain.mjs'
+import {
+  Mul, Numeric, Union, Difference, Equals, Top, Bottom
+} from '../src/domain.mjs'
 import { CallArgument, Arm, Match } from '../src/function.mjs'
+
+export { Top, Bottom }
 
 export const Expanded = Symbol('Expanded')
 export const Accepted = Symbol('Accepted')
@@ -20,21 +23,8 @@ export const ResultContract = Symbol('ResultContract')
 export const Canonical = Symbol('Canonical')
 export const Obligations = Symbol('Obligations')
 
-export const Top = Object.freeze(contractCheck(() => true))
-export const Bottom = Object.freeze(contractCheck(() => false))
-
 const Row = Symbol('Row')
 const Rows = Symbol('Rows')
-
-const { Difference } = createEnums(() => class {
-  Difference = Enum(
-    ($, [base, excluded]) => $(base, excluded)(
-      (base, excluded) => value =>
-        value instanceof base && !(value instanceof excluded)
-    ),
-    (...contracts) => contracts.length === 2 && contracts.every(isContract)
-  )
-})
 
 const differenceIs = (region, base, excluded) =>
   region instanceof Difference.kind && region[0] === base && region[1] === excluded

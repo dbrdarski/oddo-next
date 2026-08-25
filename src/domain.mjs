@@ -2,18 +2,10 @@
 // Domain Definition
 // ==========================================
 
-import { contractCheck, isContract } from './contract.mjs'
+import { isContract } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
 import { matchDomain, _ } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
-
-const namedContract = (name, check) => Object.freeze(contractCheck(check, {
-  toString: () => name
-}))
-
-export const Top = namedContract('Top', value => value != null)
-export const Bottom = namedContract('Bottom', () => false)
-export const Null = namedContract('Null', value => value === Null)
 
 // `_` implements matching through the contract protocol, but remains wildcard
 // syntax; persistent region operands use the named Top contract instead.
@@ -35,6 +27,9 @@ const regionArguments = length => (...regions) =>
 */
 
 const Domain = createEnums(() => class {
+  Top = Enum($ => $()(() => value => value != null))
+  Bottom = Enum($ => $()(() => () => false))
+  Null = Enum($ => $()(() => value => value === Null))
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
   Union = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2),
@@ -58,6 +53,10 @@ const Domain = createEnums(() => class {
     (lo, hi) => lo <= hi)
   LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
+
+export const Top = Domain.Top()
+export const Bottom = Domain.Bottom()
+export const Null = Domain.Null()
 
 export const canonicalizeDomain = matchDomain(Domain, (matches, { Union }) => matches(
   $ => $(Union.kind)(candidate => {

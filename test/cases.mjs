@@ -9,7 +9,7 @@
 import { Tuple, Record } from '../src/intern.mjs'
 import { producedOf } from '../src/contract.mjs'
 import { fact, learn, Resolve, Produces, Transparent } from '../src/facts.mjs'
-import { Enum, createEnums } from '../src/enum.mjs'
+import { Enum, createEnums, mapEnum } from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import {
@@ -349,10 +349,22 @@ export const suites = [
     test('Union rejects values where it requires contract branches', () =>
       throws(() => Union(Numeric(1), Numeric(2)))),
     test('LL(Numeric(1), Null) - result-stage thread', () =>
-      String(LL(Numeric(1), Null)) === 'LL(Numeric(1), Null)'),
+      String(LL(Numeric(1), Null)) === 'LL(Numeric(1), Null())'),
   ]),
 
   suite('Top, Bottom, and Null', [
+    test('Top Bottom and Null are canonical Enum values', () =>
+      [DomainTop, Bottom, Null].every(value =>
+        Array.isArray(value)
+          && value.constructor !== Array
+          && Object.isFrozen(value)
+          && mapEnum(value, part => part) === value
+      )
+        && DomainTop.constructor !== Bottom.constructor
+        && Bottom.constructor !== Null.constructor
+        && String(DomainTop) === 'Top()'
+        && String(Bottom) === 'Bottom()'
+        && String(Null) === 'Null()'),
     test('Top admits language values', () =>
       1 instanceof DomainTop && Null instanceof DomainTop),
     test('Top rejects raw host nullish values', () =>
