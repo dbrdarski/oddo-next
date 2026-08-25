@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and labels the
 later ruled-but-unimplemented canonicalization target separately. `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **109 passing,
+`decisions.md` remain the design authority. `npm test` reports **126 passing,
 0 failing**.
 
 ## 1. Canonical function values
@@ -72,26 +72,28 @@ reaches a function identity already active on the call stack, it returns:
 Apply(fn, Tuple(...evaluatedArguments))
 ```
 
-At the current commit the residual call stays in the pre-normalization result.
+At the current commit the residual call stays in durable expanded form `E`.
 Every recursive call reached through the supported Enum/Tuple traversal is
 preserved there; a body with two such calls yields a tree containing both.
 Completed helper calls leave the stack, so later independent calls are not mistaken
-for recursion. This is not a permanent canonical-form rule: with the formation hook
-present, that same factory transaction may combine or erase an admitted pure call
-while retaining the demands and admission obligations derived from its candidate.
+for recursion. This is not a permanent canonical-form rule: later contextual
+preparation may combine or erase an admitted pure call from `C` while retaining
+`E` and the demands/admission obligations derived from it.
 
-`expand` extracts the resulting structural formula along the evaluated symbolic
+`expand` extracts the resulting structural formula `E` along the evaluated symbolic
 path. It does not execute recursion to completion, prove termination, derive an
 input domain, or currently simplify arithmetic. At `cf99272`, for example, it
 preserves `Sub(Sub(n, 1), 1)` rather than rewriting it to `Sub(n, 2)`. Implementing
-canonical construction at the relevant formula factory doors is the next step, not
-a placement decision.
+the explicit contextual preparation stage is the next semantic step.
 
-Canonicalization of the resulting Enum formulas belongs to their factory doors.
-Each door will validate, construct its actual Array-subclass candidate, use the
-existing matcher to select the canonical replacement, and only then intern or
-return that result. Because `mapEnum` rebuilds through those public factories,
-`expand` does not own a second normalization representation or pass.
+Factories continue to validate, construct, and structurally intern their nodes;
+the complete expansion result is durable `E`. Pure preparation takes `E` plus
+explicit context, derives accepted/result regions and obligations, and retains
+canonical `C`. This is semantic notation rather than a pinned JavaScript API. The
+same `E` can produce different local `C` under different Match regions. `mapEnum`
+is phase-blind structural rebuilding and has no incoming context, so it cannot by
+itself transform `E` into `C`. `expand` does not own a special normalizer, but an
+explicit caller must invoke the general preparation stage.
 
 ## 4. Function-level Match
 
@@ -157,24 +159,28 @@ The following are not landed:
 
 1. Replacement of the temporary Numeric/`produces` treatment of function
    expressions.
-2. Implementation of oddo.next's matcher-driven, full-polynomial factory-door
-   canonicalization. `Number` has the full polynomial form: distribution,
+2. Implementation of oddo.next's matcher-driven contextual preparation over
+   durable `E`, including retention of contextual `C`. `Number` has the full
+   polynomial form: distribution,
    coefficient collection/cancellation, identities/annihilation, stable ordering,
    left-associated output, retained `Sub`, and `Pow`. `Geo` remains a separate
    important contract/domain feature. There is no `DeterminateNumber`; a `Numeric`
    expression also has an Indeterminate region, and zero multiplication of the
    ruled DivideByZero-style specimen remains Indeterminate.
-3. Any demonstrator-specific `solve` or call-domain judgment, as a separate layer
-   which does not define formula identity.
+3. The separate solve and call-domain judgment layers. Their exact input/API and
+   association mechanism remain unpinned; retained `S` never merges with or
+   replaces `E` or `C`.
 4. The canonical contract/logic layer: Top, Bottom, one Null, Intersection,
    Difference, Optional removal, effective Match remainders, and Pure exact
    region-to-result logical normalization, including guard/`~` lowering and host
    ingress. `Rest` is only the running remainder calculation, not a node.
-5. Retained pre-normalization obligations. They live in branch-local canonical
-   Match regions rather than an always-present function-domain field. The Number
-   algebra may erase a call from its polynomial projection while retaining those
-   obligations; applied outer references later discharge or reject them and never
-   select a different normal form.
+5. Retained expanded evidence and obligations. Durable `E` remains alongside the
+   distinct accepted region, result contract, obligations, and canonical `C`.
+   Branch-local Match regions can encode the correlated partial mapping without an
+   always-present function-domain field. The Number algebra may erase a call from
+   `C`; known calls may discharge during preparation, while unresolved outer
+   references retain obligations for a later boundary. Failure never selects a
+   different canonical form.
 6. Source-to-form lowering above the canonical `Lambda` API.
 7. Recursive environments whose members require different reference layouts or
    projections.
@@ -186,10 +192,10 @@ Do not infer the probe's `Term`/`Poly` representation, `Landing` node, two-form
 older probe documents. The probe's particular node representation is not part of
 the landed design.
 
-The existing matcher is the settled rule engine. Canonicalizer rules use an
-explicit structural route on their transient candidates; runtime bare contract
-patterns retain fulfilment semantics. Runtime matching sees only canonical values
-and never recovers erased source operands. Closed patterns canonicalize like closed
-data; open patterns match only surviving canonical structure.
+The existing matcher is the settled rule engine. Preparation rules structurally
+inspect durable `E`; runtime bare contract patterns retain fulfilment semantics. A
+runtime match given `C` never recovers erased source operands from retained `E`.
+The precise source data/pattern preparation boundary remains to be pinned with
+lowering.
 
 *End of handover.*

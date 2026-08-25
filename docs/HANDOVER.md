@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and labels the
 later ruled-but-unimplemented canonicalization target separately. `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **109 passing,
+`decisions.md` remain the design authority. `npm test` reports **126 passing,
 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
@@ -42,9 +42,9 @@ is decided by the Enum being constructed:
 - A bare membership-defined Enum pattern is interpreted as a contract and tested
   by fulfilment before structural Enum matching. For example, `Range(1, 2)` is a
   membership pattern, while `Range(Equals(1), Equals(2))` is rejected by Range's
-  endpoint seats. The ruled canonicalizer therefore needs an explicit internal
-  structural-decomposition route for contract-valued Enum candidates; that route
-  does not change runtime contract-pattern meaning.
+  endpoint seats. Contextual preparation may therefore need an explicit internal
+  structural-decomposition route for contract-valued Enum values; that route does
+  not change runtime contract-pattern meaning.
 - Generic seats keep their identity-binding semantics; the structural contract
   admission rule does not bypass them.
 
@@ -129,86 +129,88 @@ but no Combine arm exists in the function Enum vocabulary.
 
 See `docs/HANDOVER-recursion.md` for canonical function identity and expansion.
 
-## 7. Formula formation ruling
+## 7. Contextual formula preparation ruling
 
-Formula canonicalization is a factory-formation operation implemented with the
-existing matcher:
+Enum factories validate, construct, and structurally intern their nodes. Once
+writing, lowering, or expansion has produced a complete pre-normal expression,
+that durable form is `E`. Canonicalization is a later pure contextual stage:
 
 ```text
-validate arguments
-→ construct the actual Array-subclass Enum candidate
-→ match that candidate to select its canonical replacement
-→ intern the surviving node, or return the canonical replacement
+retain complete expanded/pre-normal E
++ explicit semantic context
+→ derive accepted region, result contract, obligations, and canonical C
+→ retain E, C, and their preparation evidence
+→ a later separate judgment may derive retained S
 ```
 
-The candidate gives the matcher ordinary Enum structure before publication. It is
-not a second AST or a separate solve-time identity. Rebuilding through `mapEnum`
-continues to use the same public factory, so expanded formulas will receive the same
-formation rules without an `expand`-specific normalizer.
+This is semantic notation, not a ruled JavaScript API or return-object shape.
+The same `(E, context)` has one result, while the same `E` may canonicalize
+differently under different effective Match regions. Context is an explicit
+semantic input, never ambient state. General correlated multi-argument context
+representation and storage remain unpinned. `mapEnum` is phase-blind structural
+rebuilding; it lacks the context required to transform `E` into `C`. `expand`
+produces `E` and does not own a special normalizer.
 
-Full polynomial normal form is the canonical algebra for `Number`: distribution,
-coefficient collection and cancellation, identities and zero annihilation,
-coefficient-first ordered factors/terms, a last constant, left-associated products
-and sums, `Pow` for repeated factors, and retained `Sub` for negative later terms
-(a leading negative term uses a signed coefficient such as `Mul(-1, x)`). Geo is a
-separate important contract/domain feature; it does not replace Pow.
+Pattern matching remains the implementation mechanism for local rules, now inside
+contextual preparation rather than an Enum/createEnums formation hook. `E`, `C`,
+and `S` remain in one ordinary value universe. Retaining `E`
+does not give runtime matching an inverse route from `C` to erased operands.
 
-There is no `DeterminateNumber`. `Numeric = Union(Number, Indeterminate)`, and the
-Number laws apply on its Number region. The ruled specimen
-`0 * Indeterminate(DivideByZero(...))` remains Indeterminate; its exact cause/Kind
-and broader consuming algebra are deferred. Host JavaScript NaN/infinity/signed-zero
-cases are ingress concerns, not additions to the language Number theory.
+Full polynomial normal form remains the canonical algebra for an admitted `Number`
+region: distribution, coefficient collection and cancellation, identities and
+zero annihilation, coefficient-first ordered factors/terms, a last constant,
+left-associated products and sums, `Pow` for repeated factors, and retained `Sub`
+for negative later terms. Geo remains separate from Pow.
 
-Demands and call-admission obligations come from the validated pre-normalization
-candidate. Canonical Match regions retain them only where they apply; no
-always-present accepted-contract field, Top filler, or separate Demand node is
-required. An admitted Pure, safe, completing Number call may disappear from the
-polynomial immediately while its obligations remain accounted for. A later outer
-reference decides whether those obligations discharge, not which canonical body is
-chosen; failure rejects rather than selecting a fallback body.
+There is no `DeterminateNumber`. `Numeric = Union(Number, Indeterminate)`. The
+Number rules apply only on its Number region; zero multiplication of the ruled
+DivideByZero-style specimen remains Indeterminate, with exact cause/Kind and
+broader consuming algebra deferred. Consequently unguarded `n => 0 * n` derives
+a Numeric accepted region, not a Number-only arm. An explicit Number guard prepares
+its body under Number and may project it to zero while retaining that demand.
 
-Canonical function identity remains `(canonical FunctionBody, ...orderedRefs)`.
-The body is canonicalized positionally, references are applied, and retained
-obligations are discharged. There is no application-dependent second normalizer.
+Demands and call-admission obligations are derived from durable `E` before algebra
+erases syntax from `C`. Accepted region, result contract, obligations, and `C` are
+distinct outputs. Canonical Match rows may encode their correlated partial mapping,
+but do not replace `E`. An admitted Pure, safe, completing call may disappear from
+`C`. A known call can discharge during preparation; unresolved references retain
+obligations for a later boundary. Failure never selects a fallback canonical body.
 
-The contract target adds `Top`, `Bottom`, one language `Null`, `Intersection`, and
-relative `Difference`, and removes `Optional` in favor of `Union(Null, T)`. Explicit
-host null/undefined normalize at host ingress; omission and missing structure do
-not.
+The landed `FunctionRef(form, orderedReferences)` identity is unchanged. Precisely
+where prepared `C` becomes the target canonical FunctionBody while retaining its
+associated `E`, and whether the existing identity account needs extension, remain
+unpinned and require author judgment. No accepted-domain field or Top filler is
+added by this ruling.
 
-An ordered Match threads a conceptual remainder. Each effective arm is its own
-region intersected with the remaining input region; every exact arm is subtracted
-from that remainder with Difference before the next arm. Thus in
-`Equals(0) => a; Number => b`, the Number arm means
-`Difference(Number, Equals(0))`. `Rest` is only the name of this calculation, not a
-new Enum or pattern. A wildcard at any position receives the current remainder.
+The contract target still adds `Top`, `Bottom`, one language `Null`,
+`Intersection`, and relative `Difference`, and removes `Optional` in favor of
+`Union(Null, T)`. An ordered Match threads a running remainder. Selecting an exact
+arm commits its complete effective region: that region is subtracted before the
+next arm even if its body accepts less. Body rejection does not become fallthrough.
+`Rest` is only the name of this calculation.
 
-Pure exact logical code canonicalizes to region-to-result Match/Arm rows. De Morgan
-and DNF-style splitting are internal techniques, not public nodes. Strict
+Pure exact logical code still canonicalizes to region-to-result Match/Arm rows. De
+Morgan and DNF-style splitting are internal techniques, not public nodes. Strict
 conditional seats require Boolean; `~` is legal only there and loosens the seat
 without Booleanizing it. Grouped `~(...)` scopes through nested conditional seats,
 stopping at Lambda and explicit arm boundaries. Loose falsity is `{false, Null}`;
 zero is truthy.
-
-Internal rules may structurally bind operands on a transient candidate before a
-rewrite erases them. Runtime/user matching sees only the canonical value: it never
-recovers source order or erased operands. Closed patterns canonicalize like closed
-data; open patterns describe only surviving canonical structure.
 
 ## 8. Implementation backlog
 
 - Replace the temporary `produces`/declared-result bridge. Function
   `CallArgument`, `Apply`, and `Match` currently rely on it to stand at Numeric
   seats.
-- Implement the ruled formation hook and internal structural match route; Number
+- Implement durable `E`, the explicit pure contextual transformer, matcher-selected
+  local rules, retained `C`, and later `S` association; Number
   polynomial form and Pow; Top/Bottom/Null/Intersection/Difference and Optional
   removal; contract theory rules; effective Match remainders and Pure logical
   regions; region exactness and guard/`~` lowering; retained-obligation inference
   and discharge; Number/Null host ingress; and conformance/property tests.
 - Investigate Geo with its actual domain consumer and specify broader
   Indeterminate-consuming algebra separately.
-- Any demonstrator-specific `solve` API, termination judgment, or call-domain
-  judgment is a separate layer and does not define formula identity.
+- The later solve, termination, and call-domain judgments are separate layers.
+  Their exact input/API is unpinned; retained `S` never replaces `E` or `C`.
 
 ## 9. Document map
 

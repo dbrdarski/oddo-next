@@ -4,7 +4,14 @@ This file records the useful direction changes from the 2026-08-20/21
 investigation. It is **not** the current API or design authority.
 
 The committed implementation is described in `docs/HANDOVER-recursion.md` and
-`src/function.mjs`. The current test suite reports **109 passing, 0 failing**.
+`src/function.mjs`. The current test suite reports **126 passing, 0 failing**.
+
+**Later supersession (2026-08-25).** This history originally concluded that
+canonicalization belonged inside factory formation and that the expanded candidate
+was transient. That placement did not survive. The current ruling retains expanded
+`E`, derives contextual canonical `C` from explicit semantic context, and keeps
+later solved `S` separate. Polynomial, region, recursion, and matcher-reuse conclusions
+remain valid unless explicitly tied below to the old factory placement.
 
 ## 1. Durable conclusions from the investigation
 
@@ -23,10 +30,9 @@ The following ideas survived into the implementation:
    Expansion must not collapse an evaluated body to a scalar “drift” or keep only
    one recursive call. Every residual `Apply` encountered through supported
    Enum/Tuple traversal remains in that current pre-normalization structural result;
-   a pending Match preserves its complete continuation. With the factory hook
-   present, that same formation transaction may combine or erase an admitted pure
-   call while preserving the demands and admission obligations derived from its
-   candidate.
+   a pending Match preserves its complete continuation. That result is durable `E`.
+   Later contextual preparation may combine or erase an admitted pure call from
+   `C` while preserving `E` and its derived demands/admission obligations.
 6. **Recursion requires a call stack.** Re-entry is detected by exact canonical
    FunctionRef identity, not by function form, a root-only sentinel, a depth cap,
    or a fuel counter.
@@ -74,10 +80,9 @@ Add(
 )
 ```
 
-therefore retains both calls in the expanded formula. A pending call in a Match
-scrutinee retains the complete Match continuation. These are facts about the
-current expansion result, before the ruled formula canonicalizer exists; they do
-not require every call occurrence to survive the final polynomial normal form.
+therefore retains both calls in expanded `E`. A pending call in a Match scrutinee
+retains the complete Match continuation. These facts do not require every call
+occurrence to survive contextual canonical `C`.
 
 ## 3. Probe machinery that did not land
 
@@ -108,22 +113,27 @@ Add(1, 2) !== Add(2, 1)
 Sub(Sub(n, 1), 1) !== Sub(n, 2)
 ```
 
-The placement and mechanism are ruled: an oddo.next formula factory validates its
-arguments, constructs the actual Array-subclass Enum candidate, uses structural
-matching to select the canonical replacement, and then interns or returns that
-result. The target is full polynomial normal form for `Number`, including stable
-ordering, distribution, collection/cancellation, identities/annihilation, retained
-`Sub`, and `Pow`. There is no `DeterminateNumber`; `Numeric` also contains
-Indeterminate, whose separately ruled zero-multiplication specimen remains
-Indeterminate. Geo remains a separate contract/domain feature rather than a Pow
-replacement.
+The later placement is contextual preparation. Factories validate, construct, and
+structurally intern their nodes; the complete pre-normal expression is durable
+`E`. Pure preparation takes `E` plus explicit semantic context, derives
+demands/regions/obligations, and retains canonical `C`. A later separate judgment
+may derive retained `S`; its input/API remains unpinned. Structural matching still
+selects local rules, but there is no Enum/createEnums formation hook and phase-blind
+`mapEnum` cannot by itself transform `E` into `C`.
 
-Demands and call-admission obligations are derived from the pre-normalization
-candidate and retained in canonical branch-local Match regions. This allows an
-admitted call or Number operation to disappear without broadening the accepted
-inputs, and requires rejection when its obligations do not discharge. It does not
-add a function-domain seat or application-dependent second normalizer. The probe's
-specific `Term`/`Poly` representation is not required.
+The target remains full polynomial normal form for the admitted `Number` region,
+including stable ordering, distribution, collection/cancellation,
+identities/annihilation, retained `Sub`, and `Pow`. There is no
+`DeterminateNumber`; `Numeric` also contains Indeterminate, whose separately ruled
+zero-multiplication specimen remains Indeterminate. Geo remains a separate
+contract/domain feature rather than a Pow replacement.
+
+Demands and call-admission obligations are derived from durable `E` and retained
+as distinct preparation outputs and correlated canonical Match regions. This
+allows an admitted call or Number operation to disappear from `C` without
+broadening accepted inputs, and requires rejection when its obligations do not
+discharge. It does not add a function-domain seat. The probe's specific
+`Term`/`Poly` representation is not required.
 
 The later logical ruling uses the same ordinary Match/Arm and contract values:
 Top, Bottom, Null, Union, Intersection, and relative Difference. Every ordered arm
@@ -136,14 +146,16 @@ and DNF are internal techniques, not public logical nodes.
 
 - Replace the temporary `produces` bridge currently used by `CallArgument`,
   `Apply`, and `Match` at Numeric seats.
-- Implement the ruled matcher-driven factory canonicalizer, Number polynomial
-  form/Pow, canonical contract regions, effective Match remainders, Pure logical
-  normalization, and retained pre-normalization obligations.
+- Implement the ruled matcher-driven contextual preparation of durable `E`,
+  contextual `C` retention, later `S` association, Number polynomial form/Pow,
+  canonical contract regions, effective Match remainders, Pure logical
+  normalization, and retained expanded-form obligations.
 - Add Top, Bottom, one Null, Intersection, and Difference; remove Optional in
   favor of `Union(Null, T)`.
 - Investigate Geo with its actual domain consumer and specify broader
   Indeterminate-consuming algebra separately.
-- Define a demonstrator-specific `solve` API separately only if one is needed.
+- Define the later judgment tier separately; its input/API remains unpinned and
+  retained `S` never replaces `E` or `C`.
 - Add source-to-Lambda lowering only if a surface above the current lowered Enum API
   is required.
 - Generalize recursive environments only when a concrete case requires different
