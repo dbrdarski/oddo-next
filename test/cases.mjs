@@ -17,6 +17,7 @@ import {
   Top as DomainTop, Bottom, Null, canonicalizeDomain
 } from '../src/domain.mjs'
 import { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda, internFn, expand } from '../src/function.mjs'
+import { Preparation } from '../src/prepare.mjs'
 import {
   Expanded,
   Accepted,
@@ -108,6 +109,81 @@ export const suites = [
         ($, [value]) => $(value)(value => Tuple(context, value))
       ))
       return prepare(7)('context') === Tuple('context', 7)
+    }),
+  ]),
+
+  suite('Preparation judgments', [
+    test('Preparation retains its six ruled fields canonically', () => {
+      const self = OuterRef(0)
+      const expanded = Mul(0, CallArgument(0, self))
+      const obligations = Tuple()
+      const prepared = Preparation(
+        expanded,
+        Number,
+        Number,
+        Equals(0),
+        obligations,
+        0
+      )
+      return prepared === Preparation(
+        expanded,
+        Number,
+        Number,
+        Equals(0),
+        obligations,
+        0
+      )
+        && prepared instanceof Preparation
+        && prepared[0] === expanded
+        && prepared[1] === Number
+        && prepared[2] === Number
+        && prepared[3] === Equals(0)
+        && prepared[4] === obligations
+        && prepared[5] === 0
+    }),
+    test('Preparation uses the ordinary structural matcher', () => {
+      const expanded = Mul(0, CallArgument(0, OuterRef(0)))
+      const prepared = Preparation(
+        expanded,
+        Number,
+        Number,
+        Equals(0),
+        Tuple(),
+        0
+      )
+      return match(prepared)(
+        ($, [E, context, accepted, result, obligations, C]) =>
+          $(Preparation(E, context, accepted, result, obligations, C))(
+            (matchedE, matchedContext, matchedAccepted, matchedResult, matchedObligations, matchedC) =>
+              matchedE === expanded
+                && matchedContext === Number
+                && matchedAccepted === Number
+                && matchedResult === Equals(0)
+                && matchedObligations === Tuple()
+                && matchedC === 0
+          )
+      )
+    }),
+    test('Preparation enforces its concrete field contracts and arity', () => {
+      const expanded = Mul(0, CallArgument(0, OuterRef(0)))
+      const valid = [expanded, Number, Number, Equals(0), Tuple(), 0]
+      return throws(() => Preparation(...valid.slice(0, 5)))
+        && throws(() => Preparation(...valid, 1))
+        && throws(() => Preparation(expanded, 1, Number, Equals(0), Tuple(), 0))
+        && throws(() => Preparation(expanded, Number, 1, Equals(0), Tuple(), 0))
+        && throws(() => Preparation(expanded, Number, Number, 1, Tuple(), 0))
+        && throws(() => Preparation(expanded, _, Number, Equals(0), Tuple(), 0))
+        && throws(() => Preparation(expanded, Number, _, Equals(0), Tuple(), 0))
+        && throws(() => Preparation(expanded, Number, Number, _, Tuple(), 0))
+        && throws(() => Preparation(expanded, Number, Number, Equals(0), [], 0))
+        && throws(() => Preparation(
+          expanded,
+          Number,
+          Number,
+          Equals(0),
+          Object.freeze([]),
+          0
+        ))
     }),
   ]),
 
