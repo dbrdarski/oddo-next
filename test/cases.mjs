@@ -13,10 +13,25 @@ import { match, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import { Add, Sub, Mul, Div, LL, Numeric, Union, Equals, Range, canonicalizeDomain } from '../src/domain.mjs'
 import { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda, internFn, expand } from '../src/function.mjs'
+import {
+  Expanded,
+  Accepted,
+  ResultContract,
+  Canonical,
+  Top,
+  prepare,
+} from './contextual-prepare.model.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
 const throws = (run) => { try { run(); return false } catch { return true } }
+const isUnionOf = (candidate, left, right) =>
+  candidate instanceof Union && (
+    candidate[0] === left && candidate[1] === right ||
+    candidate[0] === right && candidate[1] === left
+  )
+const armFor = (candidate, region) =>
+  candidate[1].find(arm => arm[0] === region)
 
 const { Twin } = createEnums(() => class {
   Twin = Enum(($, [E]) => $(E, E)(E))
@@ -144,6 +159,153 @@ export const suites = [
       return canonicalizeDomain(written) === written
     }),
     test('a primitive remains itself', () => canonicalizeDomain(3) === 3),
+  ]),
+
+  suite('Contextual preparation reference model', [
+    test('one expanded expression can occupy two arm contexts', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const expanded = Mul(0, argument)
+      const written = Match(argument, Tuple(
+        Arm(Number, expanded),
+        Arm(_, expanded)
+      ))
+      return written[1][0][1] === expanded && written[1][1][1] === expanded
+    }),
+    test('Number context produces zero without replacing the expanded form', () => {
+      const self = OuterRef(0)
+      const expanded = Mul(0, CallArgument(0, self))
+      const analysis = prepare(expanded)(Tuple(Number))
+      return analysis[Expanded] === expanded
+        && analysis[Accepted] === Number
+        && analysis[ResultContract] === Equals(0)
+        && analysis[Canonical] === 0
+    }),
+    test('Indeterminate context preserves the unresolved expanded operation', () => {
+      const self = OuterRef(0)
+      const expanded = Mul(0, CallArgument(0, self))
+      const analysis = prepare(expanded)(Tuple(Indeterminate))
+      return analysis[Expanded] === expanded
+        && analysis[Accepted] === Indeterminate
+        && analysis[ResultContract] === Indeterminate
+        && analysis[Canonical] === expanded
+    }),
+    test('a guarded arm retains Number while its body becomes zero', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const expanded = Mul(0, argument)
+      const written = Match(argument, Tuple(Arm(Number, expanded)))
+      const analysis = prepare(written)(Tuple(Top))
+      return analysis[Accepted] === Number
+        && analysis[ResultContract] === Equals(0)
+        && analysis[Canonical] instanceof Match
+        && analysis[Canonical][1].length === 1
+        && analysis[Canonical][1][0][0] === Number
+        && analysis[Canonical][1][0][1] === 0
+    }),
+    test('an unguarded arm derives Numeric from its body', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const expanded = Mul(0, argument)
+      const written = Match(argument, Tuple(Arm(_, expanded)))
+      const analysis = prepare(written)(Tuple(Top))
+      const numberArm = armFor(analysis[Canonical], Number)
+      const indeterminateArm = armFor(analysis[Canonical], Indeterminate)
+      return analysis[Accepted] === Numeric
+        && isUnionOf(analysis[ResultContract], Equals(0), Indeterminate)
+        && analysis[Canonical] instanceof Match
+        && analysis[Canonical][1].length === 2
+        && numberArm?.[1] === 0
+        && indeterminateArm?.[1] === expanded
+    }),
+    test('Match passes its exact remainder to the later arm', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const expanded = Mul(0, argument)
+      const written = Match(argument, Tuple(
+        Arm(Number, expanded),
+        Arm(_, expanded)
+      ))
+      const analysis = prepare(written)(Tuple(Top))
+      const numberArm = armFor(analysis[Canonical], Number)
+      const indeterminateArm = armFor(analysis[Canonical], Indeterminate)
+      return analysis[Accepted] === Numeric
+        && numberArm?.[1] === 0
+        && indeterminateArm?.[1] === expanded
+    }),
+    test('a selected wildcard arm does not fall through when its body rejects', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const expanded = Mul(0, argument)
+      const written = Match(argument, Tuple(
+        Arm(_, expanded),
+        Arm(_, 7)
+      ))
+      const analysis = prepare(written)(Tuple(Top))
+      return analysis[Accepted] === Numeric
+        && analysis[Canonical][1].length === 2
+        && analysis[Canonical][1].every(arm => arm[1] !== 7)
+    }),
+    test('a body-derived Numeric function remains distinct from constant zero', () => {
+      const self = OuterRef(0)
+      const expanded = Mul(0, CallArgument(0, self))
+      const multiplied = prepare(expanded)(Tuple(Top))
+      const constant = prepare(0)(Tuple(Top))
+      return multiplied[Accepted] === Numeric
+        && constant[Accepted] === Top
+        && constant[ResultContract] === Equals(0)
+        && multiplied[Canonical] !== constant[Canonical]
+    }),
+    test('call erasure is rejected until obligations are represented', () => {
+      const self = OuterRef(0)
+      const form = Lambda(1, 1, CallArgument(0, self))
+      const fn = internFn(form, form)
+      const call = Apply(fn, Tuple(CallArgument(0, fn)))
+      return throws(() => prepare(Mul(0, call))(Tuple(Number)))
+    }),
+    test('a call cannot disappear as an unanalyzed Match scrutinee', () => {
+      const self = OuterRef(0)
+      const form = Lambda(1, 1, CallArgument(0, self))
+      const fn = internFn(form, form)
+      const call = Apply(fn, Tuple(CallArgument(0, fn)))
+      const written = Match(call, Tuple(Arm(_, 0)))
+      return throws(() => prepare(written)(Tuple(Top)))
+    }),
+    test('a Match region cannot leak into a different argument dependency', () => {
+      const self = OuterRef(0)
+      const matched = CallArgument(0, self)
+      const other = CallArgument(1, self)
+      const written = Match(matched, Tuple(Arm(Number, Mul(0, other))))
+      return throws(() => prepare(written)(Tuple(Top)))
+    }),
+    test('the one-argument scaffold rejects wider and noncanonical contexts', () => {
+      const self = OuterRef(0)
+      const expanded = Mul(0, CallArgument(0, self))
+      return throws(() => prepare(expanded)(Tuple(Top, Number)))
+        && throws(() => prepare(expanded)([Top]))
+    }),
+    test('explicit disjoint arms and the direct expression reach one mapping', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const expanded = Mul(0, argument)
+      const written = Match(argument, Tuple(
+        Arm(Number, expanded),
+        Arm(_, expanded)
+      ))
+      return prepare(written)(Tuple(Top))[Canonical]
+        === prepare(expanded)(Tuple(Top))[Canonical]
+    }),
+    test('restricting the same expression agrees with its complete mapping', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const expanded = Mul(0, argument)
+      const complete = prepare(expanded)(Tuple(Top))
+      const restricted = prepare(expanded)(Tuple(Number))
+      const numberArm = armFor(complete[Canonical], Number)
+      return numberArm?.[1] === restricted[Canonical]
+        && numberArm?.[0] === restricted[Accepted]
+        && restricted[ResultContract] === Equals(0)
+    }),
   ]),
 
   suite('Pattern matching', [
