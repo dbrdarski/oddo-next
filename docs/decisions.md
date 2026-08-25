@@ -334,13 +334,53 @@ FunctionBody while `E` remains associated, and whether the earlier
 require author judgment. This ruling does not add an accepted-domain seat or a
 `Top` filler to `FunctionRef`.
 
-**Implementation status.** The committed `matchDomain` binds a matcher and Enum
-domain to a handler without caching or choosing semantic result shapes. The
-committed `canonicalizeDomain` uses it as an explicit, manually invoked root
-matcher with one `Union(C, C) → C` rule and no production caller. The contextual
-preparation model remains test-only pressure scaffolding. Production context
-representation, region algebra, polynomial preparation, E/C/S association, and
-the later judgment tier are not landed.
+**Historical implementation status before the later 2026-08-25 amendment.** The
+committed `matchDomain` bound a matcher and Enum domain to a handler without
+caching or choosing semantic result shapes. `canonicalizeDomain` was an explicit,
+manually invoked root matcher with one `Union(C, C) → C` rule and no production
+caller. Contextual preparation existed only as test pressure scaffolding.
+
+**Later implementation ruling and status (2026-08-25, through `fce81ac`; overrides
+the representation-open language above).** Preparation is invoked as
+`prepare(E)(incomingContract)`. `incomingContract` is the direct canonical region
+contract—not a `Context` Enum and not a one-element `Tuple` wrapper. The canonical
+structural result is, in this exact field order:
+
+```text
+Preparation(E, context, accepted, resultContract, obligations, C)
+```
+
+`context` retains the same direct contract supplied to `prepare`; `obligations` is
+a canonical `Tuple`. `E` remains the complete expanded/pre-normal value and `C`
+is its result under that context. The `Preparation` Enum itself retains this
+association; there is no ambient context, side-store association, or integration
+with later solved `S`. Ordinary Enum interning still canonicalizes equal
+`Preparation` values; there is no dedicated `(E, context)` lookup cache. Correlated
+multi-argument contexts and FunctionBody identity integration remain unimplemented.
+
+The only production preparation rule currently recognizes zero multiplied, in
+either operand order, by argument zero of a known unary function. Its two admitted
+contexts and exact results are:
+
+```text
+prepare(E)(Number)
+→ Preparation(E, Number, Number, Equals(0), Tuple(), 0)
+
+prepare(E)(Difference(Top, Number))
+→ Preparation(E, Difference(Top, Number),
+              Indeterminate, Indeterminate, Tuple(), E)
+```
+
+Unsupported expressions, dependencies, arities, and contexts throw instead of
+acquiring an invented judgment. In particular, production does not accept `Top`
+and does not compose those two rows into an unconstrained result. That composition
+remains blocked by the already-recorded temporary `Produces`/`Numeric`
+overmembership. Current `Numeric` is wider than exact Number-or-Indeterminate: it
+includes its own wrapper nodes and symbolic Numeric nodes admitted through
+`Produces`; even its `Union(Number, Indeterminate)` result admits wrapper nodes via
+the same result fallback. This slice does not implement general region
+normalization, full polynomial normal form, obligations, a dedicated preparation
+cache, `S`, or multi-argument preparation.
 
 ## 2026-08-24 — canonical contracts and logical meaning
 
@@ -431,11 +471,17 @@ meaning, including De Morgan and DNF-equivalent spellings, while preserving thei
 pre-normalization demands. Effectful code and non-exact ordered matches are not
 reordered under that rule.
 
-**Implementation status.** None of `Top`, `Bottom`, `Null`, `Intersection`, or
-`Difference` is landed. `Optional` still exists in current source. The current
-matcher also chooses contract fulfilment before Enum decomposition, so any
-explicit structural route needed by contextual contract-canonicalization rules is
-not landed.
+**Implementation status through `fce81ac`.** `Top`, `Bottom`, the one language
+`Null`, and strict binary `Union`, `Intersection`, and `Difference` contract Enums
+are landed. `_` is rejected as a stored region branch. `Optional` is removed and
+`LL` uses an explicit `Null` terminator through `Union(Null, LL)`. These nodes land
+membership and structural identity, not the general algebra above:
+`canonicalizeDomain` still has only the explicit, manually invoked
+`Union(C, C) → C` rule. Flattening, ordering, Top/Bottom composition, containment,
+disjointness, effective Match remainders, and logical normalization remain
+unimplemented. Host `null`/`undefined` ingress normalization is also not landed.
+The temporary `Produces`/`Numeric` overmembership described above still blocks
+sound production preparation from an unconstrained `Top` context.
 
 ## 2026-08-22 — pattern construction failure propagates (current behavior)
 

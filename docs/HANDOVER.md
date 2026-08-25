@@ -1,9 +1,9 @@
 # Handover — current matching and canonical-value surface
 
-This document describes committed behavior beginning with `cf99272` and labels the
-later ruled-but-unimplemented canonicalization target separately. `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **132 passing,
-0 failing**.
+This document describes committed behavior beginning with `cf99272` and separates
+the first landed preparation slice from the broader canonicalization target.
+`design.md` and `decisions.md` remain the design authority. `npm test` reports
+**156 passing, 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -129,7 +129,7 @@ but no Combine arm exists in the function Enum vocabulary.
 
 See `docs/HANDOVER-recursion.md` for canonical function identity and expansion.
 
-## 7. Contextual formula preparation ruling
+## 7. Contextual formula preparation
 
 Enum factories validate, construct, and structurally intern their nodes. Once
 writing, lowering, or expansion has produced a complete pre-normal expression,
@@ -143,22 +143,53 @@ retain complete expanded/pre-normal E
 → a later separate judgment may derive retained S
 ```
 
-This is semantic notation, not a ruled JavaScript API or return-object shape.
-The same `(E, context)` has one result, while the same `E` may canonicalize
-differently under different effective Match regions. Context is an explicit
-semantic input, never ambient state. General correlated multi-argument context
-representation and storage remain unpinned. `mapEnum` is phase-blind structural
-rebuilding; it lacks the context required to transform `E` into `C`. `expand`
-produces `E` and does not own a special normalizer.
+The landed API is `prepare(E)(incomingContract)`. The incoming context is that
+direct canonical region contract—not a context Enum or a Tuple wrapper. The result
+is an ordinary canonical Enum with exactly this field order:
 
-Pattern matching remains the implementation mechanism for local rules, now inside
-contextual preparation rather than an Enum/createEnums formation hook. `E`, `C`,
-and `S` remain in one ordinary value universe. Retaining `E`
-does not give runtime matching an inverse route from `C` to erased operands.
+```text
+Preparation(E, context, accepted, resultContract, obligations, C)
+```
 
-Full polynomial normal form remains the canonical algebra for an admitted `Number`
-region: distribution, coefficient collection and cancellation, identities and
-zero annihilation, coefficient-first ordered factors/terms, a last constant,
+The context field retains the supplied contract and obligations is a canonical
+Tuple. The same `(E, context)` has one result, while the same `E` may canonicalize
+differently under different incoming regions. Context is explicit, never ambient
+state. The Preparation value itself retains `E` beside contextual `C`; there is no
+dedicated `(E, context)` lookup cache or facts-side association, while ordinary
+Enum interning still canonicalizes equal Preparation values. Correlated
+multi-argument contexts are unsupported and remain unpinned. `mapEnum` is
+phase-blind structural rebuilding; it lacks the context required to transform `E`
+into `C`. `expand` produces `E` and does not own a special normalizer.
+
+Pattern matching is the implementation mechanism for local rules inside contextual
+preparation rather than an Enum/createEnums formation hook. `E`, `C`, and a future
+`S` remain in one ordinary value universe. No `S` integration is landed. Retaining
+`E` does not give runtime matching an inverse route from `C` to erased operands.
+
+The production rule through `fce81ac` recognizes only literal zero multiplied, in
+either operand order, by argument zero of a known unary function:
+
+```text
+prepare(E)(Number)
+→ Preparation(E, Number, Number, Equals(0), Tuple(), 0)
+
+prepare(E)(Difference(Top, Number))
+→ Preparation(E, Difference(Top, Number),
+              Indeterminate, Indeterminate, Tuple(), E)
+```
+
+Unsupported expressions, dependencies, arities, wrapped contexts, `_`, `Top`, and
+all other contexts throw. The two rows are not composed under `Top`: the temporary
+`Produces` treatment and `Numeric`'s own wrapper membership make current `Numeric`
+wider than exact Number-or-Indeterminate. Even the current
+`Union(Number, Indeterminate)` result admits wrapper nodes through the result
+fallback. The production slice does not implement general region canonicalization,
+full polynomial normalization, obligation analysis, a dedicated preparation cache,
+FunctionBody integration, `S`, or multi-argument preparation.
+
+Full polynomial normal form remains the target canonical algebra for an admitted
+`Number` region: distribution, coefficient collection and cancellation, identities
+and zero annihilation, coefficient-first ordered factors/terms, a last constant,
 left-associated products and sums, `Pow` for repeated factors, and retained `Sub`
 for negative later terms. Geo remains separate from Pow.
 
@@ -182,12 +213,14 @@ associated `E`, and whether the existing identity account needs extension, remai
 unpinned and require author judgment. No accepted-domain field or Top filler is
 added by this ruling.
 
-The contract target still adds `Top`, `Bottom`, one language `Null`,
-`Intersection`, and relative `Difference`, and removes `Optional` in favor of
-`Union(Null, T)`. An ordered Match threads a running remainder. Selecting an exact
-arm commits its complete effective region: that region is subtracted before the
-next arm even if its body accepts less. Body rejection does not become fallthrough.
-`Rest` is only the name of this calculation.
+`Top`, `Bottom`, one language `Null`, and strict binary `Union`, `Intersection`,
+and relative `Difference` are landed as structural membership forms. `Optional`
+is removed in favor of `Union(Null, T)`, and `LL` has an explicit `Null` terminator.
+Only the manually invoked `Union(C, C) → C` canonicalization rule is landed; the
+general region laws remain target work. An ordered Match will thread a running
+remainder. Selecting an exact arm commits its complete effective region: that
+region is subtracted before the next arm even if its body accepts less. Body
+rejection does not become fallthrough. `Rest` is only the name of this calculation.
 
 Pure exact logical code still canonicalizes to region-to-result Match/Arm rows. De
 Morgan and DNF-style splitting are internal techniques, not public nodes. Strict
@@ -201,13 +234,16 @@ zero is truthy.
 - Replace the temporary `Produces`/declared-result bridge. Function
   `CallArgument`, `Apply`, and `Match` currently rely on it to stand at Numeric
   seats.
-- Implement durable `E`, the production contextual transformer and matcher-selected
-  local rules, retained `C`, and later `S` association; the shared `matchDomain`
-  binder is landed but deliberately retains nothing. Also implement Number
-  polynomial form and Pow; Top/Bottom/Null/Intersection/Difference and Optional
-  removal; contract theory rules; effective Match remainders and Pure logical
-  regions; region exactness and guard/`~` lowering; retained-obligation inference
-  and discharge; Number/Null host ingress; and conformance/property tests.
+- Extend the landed direct-context Preparation beyond its two zero-multiplication
+  judgments: compose incoming `Top` after correcting `Produces`/`Numeric`; implement
+  Number polynomial form and Pow; obligations; every other expression/context
+  rule; and eventual FunctionBody association. No cache, `S`, or multi-argument
+  preparation is currently present.
+- Implement region normalization beyond `Union(C, C) → C`: Top/Bottom laws,
+  flattening/order, containment/disjointness, effective Match remainders and Pure
+  logical regions, region exactness and guard/`~` lowering, Number/Null host ingress,
+  and conformance/property tests. The region constructors and Optional removal are
+  already landed.
 - Investigate Geo with its actual domain consumer and specify broader
   Indeterminate-consuming algebra separately.
 - The later solve, termination, and call-domain judgments are separate layers.

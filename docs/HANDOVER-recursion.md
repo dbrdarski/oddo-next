@@ -1,8 +1,8 @@
 # Handover — canonical functions and recursive expansion
 
-This document describes committed behavior beginning with `cf99272` and labels the
-later ruled-but-unimplemented canonicalization target separately. `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **132 passing,
+This document describes committed behavior beginning with `cf99272` and separates
+the first landed contextual-preparation slice from its broader target. `design.md`
+and `decisions.md` remain the design authority. `npm test` reports **156 passing,
 0 failing**.
 
 ## 1. Canonical function values
@@ -82,18 +82,36 @@ preparation may combine or erase an admitted pure call from `C` while retaining
 
 `expand` extracts the resulting structural formula `E` along the evaluated symbolic
 path. It does not execute recursion to completion, prove termination, derive an
-input domain, or currently simplify arithmetic. At `cf99272`, for example, it
-preserves `Sub(Sub(n, 1), 1)` rather than rewriting it to `Sub(n, 2)`. Implementing
-the explicit contextual preparation stage is the next semantic step.
+input domain, or simplify arithmetic itself. It still preserves a value such as
+`Sub(Sub(n, 1), 1)` rather than rewriting it to `Sub(n, 2)`. The separate explicit
+preparation stage has one production zero-multiplication rule; it is not integrated
+into `expand`.
 
 Factories continue to validate, construct, and structurally intern their nodes;
-the complete expansion result is durable `E`. Pure preparation takes `E` plus
-explicit context, derives accepted/result regions and obligations, and retains
-canonical `C`. This is semantic notation rather than a pinned JavaScript API. The
-same `E` can produce different local `C` under different Match regions. `mapEnum`
-is phase-blind structural rebuilding and has no incoming context, so it cannot by
-itself transform `E` into `C`. `expand` does not own a special normalizer, but an
-explicit caller must invoke the general preparation stage.
+the complete expansion result is durable `E`. The landed call is
+`prepare(E)(incomingContract)`, where the context is the direct region contract—not
+a context Enum or Tuple wrapper. It returns the canonical structural value
+`Preparation(E, context, accepted, resultContract, obligations, C)` in exactly that
+field order. The same `E` can produce different local `C` under different incoming
+regions. `mapEnum` is phase-blind structural rebuilding and has no incoming context,
+so it cannot by itself transform `E` into `C`. `expand` does not own a special
+normalizer; an explicit caller invokes preparation.
+
+The Preparation value retains `E` beside contextual `C`; there is no dedicated
+`(E, context)` lookup cache, facts-side association, solved-`S` integration,
+FunctionBody integration, or multi-argument support. Ordinary Enum interning still
+canonicalizes equal Preparation values. Production currently recognizes only
+literal zero multiplied, in either order, by argument zero of a known unary
+function. `Number` context emits accepted `Number`, result contract `Equals(0)`,
+empty obligations, and `C = 0`. `Difference(Top, Number)` emits accepted/result
+`Indeterminate`, empty obligations, and `C = E`. Every other expression or context
+throws.
+
+Incoming `Top` is deliberately unsupported. The temporary `Produces`/`Numeric`
+bridge and `Numeric`'s own wrapper membership make current `Numeric` wider than the
+exact Number-or-Indeterminate value region. Even the current
+`Union(Number, Indeterminate)` result admits wrapper nodes through the same result
+fallback, so the two landed rows cannot yet be composed into a general result.
 
 ## 4. Function-level Match
 
@@ -130,6 +148,9 @@ Construction and expansion reject malformed forms and calls:
 - argument and arm collections must be canonical Tuples;
 - callee and CallArgument owner expressions must be an `OuterRef`, `Lambda`, or
   canonical `FunctionRef`;
+- `argumentCountOf` reports a known `Lambda`/`FunctionRef` arity and returns
+  `undefined` for an unresolved owner; the first preparation rule uses it to require
+  argument zero of a known unary function;
 - call arity is checked before a call can become residual;
 - ordinary host functions without an own `Symbol.hasInstance` marker are rejected;
   the marker is a presence-only demonstrator guard, not provenance validation.
@@ -151,7 +172,9 @@ The committed suite covers:
 - ordered, contract-only, and nested Match bindings;
 - captured and closed-function patterns;
 - residual Match continuations;
-- invalid references, host functions, Tuple shape, and arity.
+- invalid references, host functions, Tuple shape, and arity;
+- Top/Bottom/Null and strict binary region membership forms;
+- the six-field Preparation value and both zero-multiplication contexts.
 
 ## 7. Current boundaries
 
@@ -159,11 +182,13 @@ The following are not landed:
 
 1. Replacement of the temporary Numeric/`Produces` treatment of function
    expressions.
-2. Implementation of oddo.next's matcher-driven contextual preparation over
-   durable `E`, including retention of contextual `C`. The shared `matchDomain`
-   binder is landed but deliberately chooses no context/result/storage shape.
-   `Number` has the full
-   polynomial form: distribution,
+2. Generalization of the landed matcher-driven, direct-context Preparation beyond
+   its two zero-multiplication judgments. `Preparation` already retains durable `E`
+   and contextual `C` in its ruled six-field shape; no dedicated lookup cache or
+   separate storage exists beyond ordinary Enum interning. Incoming `Top`, every
+   other expression/context rule, and correlated multi-argument contexts are
+   unsupported. The target `Number` polynomial form
+   still requires distribution,
    coefficient collection/cancellation, identities/annihilation, stable ordering,
    left-associated output, retained `Sub`, and `Pow`. `Geo` remains a separate
    important contract/domain feature. There is no `DeterminateNumber`; a `Numeric`
@@ -172,17 +197,22 @@ The following are not landed:
 3. The separate solve and call-domain judgment layers. Their exact input/API and
    association mechanism remain unpinned; retained `S` never merges with or
    replaces `E` or `C`.
-4. The canonical contract/logic layer: Top, Bottom, one Null, Intersection,
-   Difference, Optional removal, effective Match remainders, and Pure exact
-   region-to-result logical normalization, including guard/`~` lowering and host
-   ingress. `Rest` is only the running remainder calculation, not a node.
-5. Retained expanded evidence and obligations. Durable `E` remains alongside the
-   distinct accepted region, result contract, obligations, and canonical `C`.
+4. General canonical region/logic normalization. Top, Bottom, one Null, strict
+   binary Union/Intersection/Difference membership forms, Optional removal, and
+   explicit-Null LL are landed. Only manual `Union(C, C) → C` normalization exists.
+   Top/Bottom composition, containment/disjointness, effective Match remainders,
+   Pure exact region-to-result logical normalization, guard/`~` lowering, and host
+   ingress remain open. `Rest` is only the running remainder calculation, not a
+   node.
+5. General retained evidence and obligations. The landed Preparation value already
+   retains durable `E` alongside accepted region, result contract, empty
+   obligations, and contextual `C` for its supported slice.
    Branch-local Match regions can encode the correlated partial mapping without an
    always-present function-domain field. The Number algebra may erase a call from
    `C`; known calls may discharge during preparation, while unresolved outer
    references retain obligations for a later boundary. Failure never selects a
-   different canonical form.
+   different canonical form. FunctionBody association and later solved `S` remain
+   unimplemented.
 6. Source-to-form lowering above the canonical `Lambda` API.
 7. Recursive environments whose members require different reference layouts or
    projections.

@@ -3,13 +3,13 @@
 Agreed 2026-08-19, before the enum/contract implementation (revised the same
 day: the result slot merges C2 and V2), and updated through the author rulings of
 2026-08-25. Sections 1–6 preserve the core enum/contract implementation; sections
-7–8 describe matching, canonical functions, and the ruled-but-unimplemented
-canonicalization layer, including the later contextual-preparation amendment of
-2026-08-25. This file and `decisions.md` remain the authority for the
-surfaces they describe. A subsection explicitly says when it documents current
-code rather than the ruled target.
+7–8 describe matching, canonical functions, and the ruled canonicalization layer,
+including the first contextual-preparation slice landed on 2026-08-25. This file
+and `decisions.md` remain the authority for the surfaces they describe. A
+subsection explicitly says when it documents current code rather than the ruled
+target.
 
-Current verification: **132 passing, 0 failing**.
+Current verification: **156 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -78,11 +78,13 @@ input/result signature, and it is not the final account of symbolic result
 shape. The pending correction in `decisions.md` must now account for these
 consumers too.
 
-Future metadata may retain preparation/judgment associations and subcontract
-verdicts on pairs. The storage mechanism and key shape are not yet pinned.
-Complete expanded `E` exists before contextual normalization; derived canonical
-`C` is retained separately. A later judgment may retain `S` and never replaces
-either value.
+The landed `Preparation` Enum now retains one preparation judgment structurally;
+it is not stored as a fact or cache entry. Future metadata may retain additional
+judgment associations and subcontract verdicts on pairs, but that storage mechanism
+and key shape remain unpinned. Complete expanded `E` exists before contextual
+normalization; the supported production slice retains contextual canonical `C`
+beside it. A later judgment may retain `S` and never replaces either value; no
+`S` integration is landed.
 
 ## 3. Enums: the three elements
 
@@ -239,20 +241,34 @@ holes as well as values. No second capture implementation exists.
 
 ## 6. The domain
 
-This first listing is the currently landed demonstrator, retained so its traces
-remain checkable. The canonical contract target immediately below supersedes its
-`Optional`/host-null shape; it is not yet implemented.
+This listing summarizes the demonstrator landed through `fce81ac`. The region
+constructors currently provide strict construction, canonical structural identity,
+and membership. The broader normalization laws immediately below remain a target.
 
 ```js
-export const {
-  Add, Sub, Mul, Div, LL, Numeric, Union, Optional, Equals, Range
-} = createEnums(() => class {
+export const Top = namedContract('Top', value => value != null)
+export const Bottom = namedContract('Bottom', () => false)
+export const Null = namedContract('Null', value => value === Null)
+
+export const isRegion = value => isContract(value) && value !== _
+
+const regionArguments = length => (...regions) =>
+  regions.length === length && regions.every(isRegion)
+
+const Domain = createEnums(() => class {
 
   Union = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2))
+    $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2),
+    regionArguments(2))
 
-  Optional = Enum(($, [T]) =>
-    $(T)(T => value => value == null || value instanceof T))
+  Intersection = Enum(($, [T1, T2]) =>
+    $(T1, T2)((T1, T2) => value => value instanceof T1 && value instanceof T2),
+    regionArguments(2))
+
+  Difference = Enum(($, [base, excluded]) =>
+    $(base, excluded)((base, excluded) => value =>
+      value instanceof base && !(value instanceof excluded)),
+    regionArguments(2))
 
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
 
@@ -269,14 +285,21 @@ export const {
     (lo, hi) => lo <= hi
   )
 
-  LL = Enum($ => $(Numeric, Optional(LL))(LL))
+  LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
+
+export const {
+  Add, Sub, Mul, Div, LL, Numeric,
+  Union, Intersection, Difference, Equals, Range
+} = Domain
 ```
 
-- `Union` — the one genuinely custom membership: the disjunction over its
-  branches, received as parameters.
-- `Optional` — the current host-nullish-or-member node. It is superseded by the
-  one-`Null` target below and will be removed.
+- `Top` and `Bottom` — the named all-language-values and no-values contracts.
+- `Null` — the one self-matching language value and contract. Raw host `null` and
+  `undefined` are not `Null`; host ingress normalization is not yet implemented.
+- `Union`, `Intersection`, and `Difference` — binary membership-defined Enums.
+  They require exactly two contract branches and reject `_`, which remains wildcard
+  syntax rather than a stored region value. `Difference` is ordered.
 - `Numeric` — the transparency rule at work: contract-form result identical
   to its one seat; membership reaches `typeof` through declared structure
   only, nothing repeated anywhere.
@@ -294,9 +317,10 @@ export const {
   contracts check each endpoint; the input validator enforces `lo <= hi`;
   membership checks the closed interval. Contract objects are not admitted as
   its endpoint values.
-- `LL` — result stage applied explicitly (`(LL)`).
+- `LL` — a two-seat recursive value with an explicit `Null` terminator. `LL(1)`
+  and raw host-nullish tails reject; the empty/terminal tail is written `Null`.
 
-### Canonical contract target (ruled; not landed)
+### Canonical contract normalization target (vocabulary landed; laws not landed)
 
 - `Top` is the contract fulfilled by every language value; `Bottom` is fulfilled
   by none. They are the algebraic concepts sometimes called Any and Never. `_`
@@ -305,12 +329,18 @@ export const {
 - There is one language `Null` value and contract. Explicit host `null` and
   `undefined` normalize to that value only at a host-value ingress. Missing
   arguments, absent fields, and JavaScript control-flow `undefined` do not.
-- `Optional` is removed. Its former denotation is written `Union(Null, T)`.
+- `Optional` is removed in current code. Its former denotation is written
+  `Union(Null, T)`.
 - `Union`, `Intersection`, and relative `Difference` form canonical regions.
   Union and Intersection flatten, order, deduplicate, and emit one left-associated
   binary shape. They apply the Top/Bottom, proved-containment, and
   proved-disjointness laws recorded in `decisions.md`. Unknown relations stay as
   residual canonical structure.
+
+Only the manually invoked `canonicalizeDomain(Union(C, C)) → C` rule is currently
+landed. There is no general region normalization caller, flattening/order pass,
+Top/Bottom composition, containment/disjointness solver, effective Match remainder,
+or logical canonicalization yet.
 
 ### Traces
 
@@ -351,10 +381,11 @@ Structural Enums may contain contracts in ordinary non-generic seats, so a
 partial tree such as `Add(Number, 2)` is both a legal structural value and a
 pattern. Declared value seats still validate normally: `Range(1, 2)` is valid
 while `Range(Equals(1), Equals(2))` is not. Generic seats retain their generic
-binding behavior; in current code that means `Union`/`Optional` do not yet enforce
-that their supplied branch is itself a contract. Closing too-few-argument and
-non-contract-branch admission is ordinary construction validation required by the
-target, not a new canonicalization relation.
+binding behavior. The landed binary region Enums add ordinary input validation on
+top: `Union`, `Intersection`, and `Difference` require exactly two contract
+branches and reject wildcard `_` as a persistent region operand. This strict
+construction boundary is separate from the still-unimplemented algebraic
+normalization relation.
 
 An ordinary successful case calls its handler with generic bindings in generic
 declaration order, not pattern traversal order. Non-generic pattern parts do
@@ -455,7 +486,7 @@ tree is durable expanded form `E`. A later contextual preparation may combine or
 erase an admitted pure call from canonical `C`, after deriving and retaining the
 call's demands and admission obligations from `E`.
 
-### Contextual formula preparation (ruled; not landed here)
+### Contextual formula preparation (ruled; first production slice landed)
 
 Ordinary factories validate, construct, and structurally intern their Enum nodes;
 they do not run algebraic canonicalization. Once writing, lowering, or expansion
@@ -470,22 +501,30 @@ retain complete expanded/pre-normal E
 → a later separate judgment may derive retained S
 ```
 
-The preparation is pure and may be represented lazily as a transformer awaiting
-context; that is semantic notation, not a ruled JavaScript function name or result
-object. Its context explicitly carries the incoming/effective region and any
-semantic seat or dependency information needed by that expression. It is not
-ambient state or a contract variable. The same `(E, context)` has one result; the
-same interned `E` may produce different local canonical results under different
-Match regions. If contextual results are cached, the key must distinguish the
-complete context rather than use `E` alone. General correlated multi-argument
-context representation and storage remain unpinned.
+The production surface is the curried call `prepare(E)(incomingContract)`.
+`incomingContract` is the direct canonical region contract: there is no `Context`
+Enum and no one-element `Tuple` wrapper. The result is the ordinary canonical Enum
+value, with this exact field order:
+
+```text
+Preparation(E, context, accepted, resultContract, obligations, C)
+```
+
+The `context` field is the same direct contract passed to `prepare`; `obligations`
+is a canonical `Tuple`. The same `(E, context)` has one structural result, while
+the same interned `E` may produce different `C` under different incoming regions.
+Context is explicit, never ambient state or a contract variable. There is no
+dedicated `(E, context)` lookup cache or facts-side association; ordinary Enum
+interning still canonicalizes equal `Preparation` values. General correlated
+multi-argument contexts are not supported, and their eventual representation
+remains unpinned.
 
 Accepted region, result contract, obligations, and canonical `C` are distinct
-derived outputs. Algebra may erase syntax from `C` only after its demands have
-been derived from durable `E`. `E` is never overwritten. `C` is the canonical
-form under that context; the complete preparation judgment also retains the other
-outputs. A later judgment may derive `S`, which never merges with or replaces `E`
-or `C`; its exact input and association mechanism remain unpinned.
+fields. Algebra may erase syntax from `C` only after its demands have been derived
+from durable `E`. `E` is never overwritten; the landed `Preparation` value retains
+both it and contextual `C`. A later judgment may derive `S`, which never merges
+with or replaces `E` or `C`; its exact input, API, and association mechanism remain
+unpinned, and no `S` integration is landed.
 
 All structural forms remain ordinary values and Enums in one universe. Deriving
 and retaining three stages does not introduce shadow formula ASTs. The interner
@@ -493,23 +532,53 @@ remains a shallow identity cache and performs no rewriting. `mapEnum` performs
 phase-blind structural rebuilding; without an incoming context it cannot transform
 `E` into `C`.
 
-The existing matcher remains the intended rule engine. The landed `matchDomain`
-binds `match(E)` and an Enum domain to a handler; that handler may return a pure
-transformer awaiting explicit context. It does not cache a transformer or choose
-a context, preparation-result, or E/C association shape. Preparation decomposes
+The existing matcher is the rule engine. `matchDomain` binds `match(E)` and an Enum
+domain to a handler; production `prepare` uses that binder, then awaits the direct
+incoming contract. It does not cache results or mutate `E`. Preparation decomposes
 durable Enum structure and selects local canonicalization rules. This is not a
 third `createEnums`/`Enum` callback. If contract-valued Enums require an explicit
 structural-decomposition relation, it belongs to the preparation rule surface;
 runtime/user bare contract patterns retain fulfilment semantics.
 
-#### Number polynomial normal form
+#### Landed preparation slice through `fce81ac`
+
+Production currently recognizes only a `Mul` whose operands are literal zero and
+`CallArgument(0, owner)`, in either order, where `owner` is a known unary `Lambda`
+or `FunctionRef`. `argumentCountOf` exposes that known arity for this guard. The two
+supported direct contexts produce:
+
+```text
+prepare(E)(Number)
+→ Preparation(E, Number, Number, Equals(0), Tuple(), 0)
+
+prepare(E)(Difference(Top, Number))
+→ Preparation(E, Difference(Top, Number),
+              Indeterminate, Indeterminate, Tuple(), E)
+```
+
+The Number row retains expanded `E` while contextual `C` collapses to zero. The
+non-Number row retains the Indeterminate judgment and leaves `C` equal to `E` until
+the broader consuming algebra is ruled. Unsupported expressions, dependencies,
+arities, wrapped contexts, `_`, `Top`, and every other context throw; production
+does not invent a default judgment.
+
+The two rows are not yet composed into a result for incoming `Top`. That work is
+blocked by the already-known temporary `Produces`/`Numeric` overmembership:
+current `Numeric` membership is wider than exact Number-or-Indeterminate. It
+includes its own wrapper nodes and, through `Produces`, symbolic Numeric nodes;
+even its `Union(Number, Indeterminate)` result currently admits wrapper nodes
+through the same result fallback. The landed rule is therefore neither general
+region canonicalization nor full polynomial normalization.
+
+#### Target Number polynomial normal form (not landed)
 
 `Number` is the polynomial domain. There is no `DeterminateNumber`:
 `Numeric = Union(Number, Indeterminate)`, and an Indeterminate is not a Number.
 
-Contextual preparation computes full polynomial normal form for the admitted
-`Number` region: canonical children and positional references; associative
-flattening and stable commutative ordering; literal and coefficient folding;
+The target contextual preparation computes full polynomial normal form for an
+admitted `Number` region: canonical children and positional references;
+associative flattening and stable commutative ordering; literal and coefficient
+folding;
 distribution into a sum of monomials; coefficient collection, including
 cancellation; identities and zero annihilation; `Pow` for repeated
 factors/non-negative integer powers; and division by a known nonzero literal
@@ -541,11 +610,13 @@ Where consuming behavior is deferred, no Number-only rule decides that region.
 
 #### Retained demands and calls
 
-Preparation derives input, safety, purity, result, and completion obligations from
-durable expanded `E` under the supplied context. Algebra may erase syntax from `C`
-but not from `E`, and not from the prepared meaning. Canonical `Match` regions can
-retain requirements only where they apply, while the distinct accepted-region,
-result-contract, and obligation outputs remain available to the judgment.
+The landed zero-multiplication slice emits the empty obligation `Tuple()` and does
+not analyze calls. The broader target derives input, safety, purity, result, and
+completion obligations from durable expanded `E` under the supplied context.
+Algebra may erase syntax from `C` but not from `E`, and not from the prepared
+meaning. Canonical `Match` regions can retain requirements only where they apply,
+while the distinct accepted-region, result-contract, and obligation outputs remain
+available to the judgment.
 
 For Oddo/Next source:
 
@@ -561,21 +632,23 @@ f = n => n :: {
 }
 ```
 
-The guarded body is prepared under Number and has polynomial projection `0`. The
-wildcard body derives its own `Numeric` demand from `E`: its Number region maps to
-`0`, while its Indeterminate region remains Indeterminate and its exact consuming
-canonical form is deferred. Therefore unguarded `0 * n` is not represented by a
-Number-only arm.
+The landed direct Number preparation has projection `0`. The target wildcard-body
+judgment derives its own `Numeric` demand from `E`: its Number region maps to `0`,
+while its Indeterminate region remains Indeterminate and its exact consuming
+canonical form is deferred. Production cannot yet prepare the encompassing `Top`
+context or emit that combined mapping. Therefore the target unguarded `0 * n` is
+not represented by a Number-only arm.
 
 This avoids an always-present accepted-contract parameter, a Top filler, and a
 separate Demand node. Conditional requirements remain correlated with their arm,
 without making the expanded evidence disposable.
 
-An admitted Pure, safe, completing Number call may likewise be combined or erased
-from `C` by the algebra. Its `Apply` in durable `E` supplies the obligations. The
-concrete function later bound to an outer reference determines whether those
-obligations discharge, not which polynomial body is selected. Failure rejects the
-program; it never picks a noncanonical fallback or triggers another normalization.
+In the broader target, an admitted Pure, safe, completing Number call may likewise
+be combined or erased from `C` by the algebra. Its `Apply` in durable `E` supplies
+the obligations. The concrete function later bound to an outer reference
+determines whether those obligations discharge, not which polynomial body is
+selected. Failure rejects the program; it never picks a noncanonical fallback or
+triggers another normalization.
 A known call may discharge during preparation and disappear from `C` immediately;
 only unresolved evidence must survive to a later boundary.
 
@@ -669,12 +742,17 @@ Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
 ordinary ordered Arms only—no function-AST `Combine` or guards.
 `CallArgument`, `Apply`, and `Match` are provisionally Numeric through
 `Produces`; replacing that temporary seat-admission plumbing remains open. This
-does not add an accepted-domain field to functions. Branch-local Match regions
-remain part of prepared meaning, alongside durable `E` and the distinct derived
-accepted-region/result-contract/obligation outputs.
-Expansion is synchronous recursive descent and has no contextual preparation or
-fixed-point engine yet. The missing pure contextual transformer, its explicit
-context, and durable E/C association are implementation gaps. The host-function
+does not add an accepted-domain field to functions. Together with `Numeric`'s own
+wrapper membership, it also prevents sound composition of the two landed
+zero-multiplication rows under `Top`: current `Numeric` is wider than the exact
+Number-or-Indeterminate value region.
+
+Expansion is synchronous recursive descent and has no fixed-point engine. The
+explicit production `prepare(E)(incomingContract)` stage and structural
+`Preparation(E, context, accepted, resultContract, obligations, C)` value are
+landed for the two zero-multiplication contexts described above. They retain `E`
+and contextual `C` without a wrapper context, dedicated lookup cache, facts-side
+association, FunctionBody integration, `S`, or multi-argument support. The host-function
 guard rejects an ordinary function but
 admits any function
 carrying an own `Symbol.hasInstance` property. It checks presence only—not
@@ -686,13 +764,18 @@ consistent with this demonstrator's non-hardened boundary.
 - The `Produces` correction recorded in `decisions.md`. A class-chain
   replacement is proposed but not landed; its exact treatment of node-shaped
   results such as `Numeric(Numeric(1))` remains unresolved.
-- The ruled canonicalization layer remains unimplemented beyond the shared
-  `matchDomain` binder: durable `E`, the production contextual preparation
-  transformer and local rules, retained `C`, and later `S` association; Number
-  polynomial accumulator/emitter and `Pow`; Top, Bottom, Null, Intersection,
-  Difference, and Optional removal; containment and disjointness rules; effective
-  Match remainders; Pure logical region normalization; retained obligations; host
-  ingress for language Number/Null; and conformance/property tests.
+- Direct contextual preparation, the six-field `Preparation` Enum, and the two
+  zero-multiplication judgments are landed. Remaining work includes composition
+  under `Top`; the Number polynomial accumulator/emitter and `Pow`; every other
+  expression/context rule; retained-obligation inference and discharge; caching or
+  later association beyond ordinary Enum interning only if separately ruled; and
+  FunctionBody integration.
+- `Top`, `Bottom`, `Null`, strict binary `Union`/`Intersection`/`Difference`,
+  `Optional` removal, and explicit-Null `LL` are landed as membership/structural
+  forms. General region normalization beyond the manually invoked
+  `Union(C, C) → C` rule remains open: flattening and ordering, Top/Bottom laws,
+  containment and disjointness, effective Match remainders, Pure logical region
+  normalization, host ingress for Number/Null, and conformance/property tests.
 - Region extraction/exactness, guard lowering, conditional-seat Boolean validation,
   grouped `~` scoping, and obligation inference/discharge are all target work. The
   landed two-seat `Arm(pattern, result)` and ordinary symbolic Match do not yet
