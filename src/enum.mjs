@@ -79,6 +79,10 @@ export const Enum = (build, input) => {
   return (learn(validator, Resolve, resolve), validator)
 }
 
+Object.defineProperty(Enum, Symbol.hasInstance, {
+  value: value => enumFactories.has(value?.constructor)
+})
+
 const lazyEnumFactory = (name, fn) => {
   const constructor = class extends Array { }
   Object.defineProperty(constructor.prototype, Symbol.toStringTag, { value: name })

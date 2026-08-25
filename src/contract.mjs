@@ -3,7 +3,6 @@
 // ==========================================
 
 import { fact, Produces } from './facts.mjs'
-import { isTuple } from './intern.mjs'
 
 // What a value stands for: the declared result of the constructor that made
 // it. A stored generic is a thunk - it answers for the node it is asked about.
@@ -28,11 +27,3 @@ export const contractCheck = (validatorFn, contract = {}, extend = {}) => Object
     }
   }
 )
-
-export const CanonicalTuple = Object.freeze(contractCheck(isTuple))
-
-// export function extendFn(fn, parent) {
-//     fn.prototype = Object.create(parent.prototype);
-//     fn.prototype.constructor = fn;
-//     Object.setPrototypeOf(fn, parent);
-// }

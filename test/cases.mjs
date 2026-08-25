@@ -71,8 +71,28 @@ export const suites = [
 
   suite('Interning engine', [
     test('Tuple(1, 2) === Tuple(1, 2)', () => Tuple(1, 2) === Tuple(1, 2)),
-    test('tuples are frozen plain arrays', () => Object.isFrozen(Tuple(1, 2)) && Tuple(1, 2).constructor === Array),
+    test('tuples are frozen Tuple arrays', () => {
+      const tuple = Tuple(1, 2)
+      return Object.isFrozen(tuple)
+        && tuple instanceof Tuple
+        && tuple instanceof Array
+        && tuple.constructor === Tuple
+    }),
+    test('a single Number remains a Tuple element', () =>
+      Tuple(0).length === 1
+        && Tuple(0)[0] === 0
+        && Tuple(0) !== Tuple()
+        && Tuple(2) !== Tuple(undefined, undefined)),
     test('Record key-order independence', () => Record({ a: 1, b: 2 }) === Record({ b: 2, a: 1 })),
+    test('Record copies __proto__ as an own data property', () => {
+      const props = Object.create(null)
+      props.__proto__ = 1
+      const record = Record(props)
+      return record instanceof Record
+        && Object.getPrototypeOf(record) === Record.prototype
+        && Object.hasOwn(record, '__proto__')
+        && record.__proto__ === 1
+    }),
     test('empty record is canonical', () => Record({}) === Record({})),
     test('children pass through untouched', () => { const t = Tuple(1, 2); return Record({ x: t }).x === t }),
     test('deep nesting is canonical', () => Record({ x: Tuple(1, Tuple(2, 3)) }) === Record({ x: Tuple(1, Tuple(2, 3)) })),
@@ -267,6 +287,10 @@ export const suites = [
   ]),
 
   suite('Enum nodes', [
+    test('Enum membership uses registered constructors', () =>
+      Add(1, 2) instanceof Enum
+        && Null instanceof Enum
+        && !(Tuple(1, 2) instanceof Enum)),
     test('Numeric(1) === Numeric(1)', () => Numeric(1) === Numeric(1)),
     test('String(Numeric(1)) is "Numeric(1)"', () => String(Numeric(1)) === 'Numeric(1)'),
     test('Numeric(1) instanceof Numeric', () => Numeric(1) instanceof Numeric),

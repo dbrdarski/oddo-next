@@ -1,5 +1,6 @@
-import { CanonicalTuple, contractCheck, isContract } from './contract.mjs'
-import { generic, generics } from './enum.mjs'
+import { contractCheck, isContract } from './contract.mjs'
+import { Enum, generic, generics } from './enum.mjs'
+import { Tuple } from './intern.mjs'
 
 export const _ = Object.freeze(contractCheck(() => true))
 
@@ -9,9 +10,6 @@ const combined = Symbol()
 export const Combine = (...patterns) => (handler) =>
   [patterns, handler, combined]
 
-const isEnum = (value) =>
-  Array.isArray(value) && value.constructor !== Array
-
 const fits = (pattern, value) => {
   if (pattern === _)
     return true
@@ -19,9 +17,9 @@ const fits = (pattern, value) => {
   if (isContract(pattern))
     return value instanceof pattern
 
-  if (isEnum(pattern))
+  if (pattern instanceof Enum)
     return (
-      isEnum(value) &&
+      value instanceof Enum &&
       pattern.constructor === value.constructor &&
       pattern.length === value.length &&
       pattern.every((part, i) => fits(part, value[i]))
@@ -32,7 +30,7 @@ const fits = (pattern, value) => {
 
 const combineFits = (patterns, values, genericState) => {
   if (
-    !(values instanceof CanonicalTuple) ||
+    !(values instanceof Tuple) ||
     patterns.length !== values.length
   ) return
 

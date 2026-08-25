@@ -2,7 +2,7 @@
 // Contextual Preparation
 // ==========================================
 
-import { CanonicalTuple, contractCheck } from './contract.mjs'
+import { contractCheck } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { match, matchDomain, Combine } from './match.mjs'
@@ -16,7 +16,7 @@ const Region = Object.freeze(contractCheck(isRegion))
 
 const { Preparation } = createEnums(() => class {
   Preparation = Enum(
-    $ => $(Top, Region, Region, Region, CanonicalTuple, Top)(),
+    $ => $(Top, Region, Region, Region, Tuple, Top)(),
     (...values) => values.length === 6 && values.slice(1, 4).every(isRegion)
   )
 })

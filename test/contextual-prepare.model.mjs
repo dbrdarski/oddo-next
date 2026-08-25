@@ -105,7 +105,7 @@ const incomingOf = context => {
 const canonicalOf = (scrutinee, incoming, accepted, rows) => {
   if (rows.length === 1 && accepted === incoming)
     return rows[0][Canonical]
-  return Match(scrutinee, Tuple(...rows.map(item =>
+  return Match(scrutinee, Tuple(...Array.from(rows, item =>
     Arm(contractOf(item[Accepted]), item[Canonical])
   )))
 }

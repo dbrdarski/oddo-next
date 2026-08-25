@@ -8,6 +8,13 @@
 // one level at a time - children must already be interned (or primitive)
 // before their container is constructed, so no walk ever recurses.
 
+export function extendFn(fn, parent) {
+  fn.prototype = Object.create(parent.prototype);
+  fn.prototype.constructor = fn;
+  Object.setPrototypeOf(fn, parent);
+  return fn
+}
+
 const isReferential = (value) => value !== null && (typeof value === 'object' || typeof value === 'function');
 
 const createNode = () => ({
@@ -57,20 +64,37 @@ export const canonical = (tag, parts, value) => {
   return value;
 };
 
-export const Tuple = (...elements) => canonical(Tuple, elements, elements);
+export const Tuple = extendFn(function Tuple(...args) {
+  const tuple = args.length === 1
+    ? Reflect.construct(Array, [], Tuple)
+    : Reflect.construct(Array, args, Tuple)
 
-export const isTuple = value => {
-  if (
-    !Array.isArray(value) ||
-    value.constructor !== Array ||
-    !Object.isFrozen(value)
-  ) return false
+  if (args.length === 1) tuple[0] = args[0]
 
-  try { return value === Tuple(...value) }
-  catch { return false }
-}
+  return canonical(Tuple, args, tuple)
+}, Array)
 
-export const Record = (obj, parts = []) => {
-  for (const key of Object.keys(obj).sort()) parts.push(key, obj[key]);
-  return canonical(Record, parts, obj);
-};
+export const Record = extendFn(function Record(props) {
+  const record = Object.create(Record.prototype);
+  const parts = [];
+
+  if (props != null) {
+    const keys = Object.keys(props).sort();
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i]
+      const val = props[key]
+      parts.push(key, val)
+      if (key === '__proto__')
+        Object.defineProperty(record, key, {
+          value: val,
+          enumerable: true,
+          configurable: true,
+          writable: true,
+        })
+      else
+        record[key] = val
+    }
+  }
+
+  return canonical(Record, parts, record);
+}, Object)

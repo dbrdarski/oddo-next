@@ -26,6 +26,11 @@ const api = {
   ...intern, ...contract, ...facts, ...enums, ...numeric,
   ...domain, ...matching, ...functions, ...preparation,
 }
+
+// Keep the complete language API available to the browser console without
+// overwriting window globals such as Number.
+window.oddo = api
+
 const names = Object.keys(api)
 const values = Object.values(api)
 
@@ -306,7 +311,7 @@ const output = document.getElementById('output')
 const picker = document.getElementById('examples')
 
 document.getElementById('scope').textContent =
-  `⌘/Ctrl+Enter runs · Esc then Tab leaves the editor · in scope: ${names.join(', ')}`
+  `⌘/Ctrl+Enter runs · Esc then Tab leaves the editor · console: window.oddo · in scope: ${names.join(', ')}`
 
 for (const { name } of examples) picker.append(new Option(name))
 
@@ -321,7 +326,7 @@ const show = (v) => {
   if (typeof v === 'function') return v.name ? `ƒ ${v.name}` : 'ƒ'
   if (v === null || typeof v !== 'object') return typeof v === 'string' ? JSON.stringify(v) : String(v)
   if (Symbol.toStringTag in v) return String(v)
-  if (Array.isArray(v)) return `[${v.map(show).join(', ')}]`
+  if (Array.isArray(v)) return `[${Array.from(v, show).join(', ')}]`
   return `{ ${Object.entries(v).map(([k, x]) => `${k}: ${show(x)}`).join(', ')} }`
 }
 

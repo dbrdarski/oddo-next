@@ -2,9 +2,9 @@
 // Canonical Functions
 // ==========================================
 
-import { CanonicalTuple, isContract } from './contract.mjs'
+import { isContract } from './contract.mjs'
 import { Enum, createEnums, mapEnum } from './enum.mjs'
-import { Tuple, isTuple } from './intern.mjs'
+import { Tuple } from './intern.mjs'
 import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import { Numeric } from './domain.mjs'
@@ -36,11 +36,11 @@ const {
     index => whole(index)
   )
   Apply = Enum(
-    $ => $(_, CanonicalTuple)(Numeric),
+    $ => $(_, Tuple)(Numeric),
     (...values) => (
       values.length === 2 &&
       isFunctionOwner(values[0]) &&
-      values[1] instanceof CanonicalTuple
+      values[1] instanceof Tuple
     )
   )
   Arm = Enum(
@@ -48,10 +48,10 @@ const {
     (...values) => values.length === 2
   )
   Match = Enum(
-    $ => $(_, CanonicalTuple)(Numeric),
+    $ => $(_, Tuple)(Numeric),
     (...values) => (
       values.length === 2 &&
-      values[1] instanceof CanonicalTuple &&
+      values[1] instanceof Tuple &&
       values[1].every(arm => arm instanceof Arm)
     )
   )
@@ -65,7 +65,7 @@ const {
       outerReferencesWithin(values[2], values[0])
     )
   )
-  FunctionRef = Enum($ => $(Lambda, CanonicalTuple)())
+  FunctionRef = Enum($ => $(Lambda, Tuple)())
 })
 
 const isFunctionOwner = value =>
@@ -132,7 +132,7 @@ const callArgument = (tree, frame, context) => {
 }
 
 const rebuild = (tree, visit, mapped = mapEnum(tree, visit)) =>
-  mapped ?? (isTuple(tree) ? Tuple(...tree.map(visit)) : tree)
+  mapped ?? (tree instanceof Tuple ? Tuple(...Array.from(tree, visit)) : tree)
 
 const instantiatePattern = (tree, frame, genericAt) => {
   if (tree instanceof MatchArgument) return genericAt(tree[0])
@@ -160,7 +160,10 @@ const evaluate = (tree, frame, context, execute = true) => {
 
   if (tree instanceof Apply) {
     const target = materialize(tree[0], frame)
-    const arguments_ = tree[1].map(value => evaluate(value, frame, context, execute))
+    const arguments_ = Array.from(
+      tree[1],
+      value => evaluate(value, frame, context, execute)
+    )
     return execute
       ? invoke(target, arguments_, context)
       : Apply(target, Tuple(...arguments_))
@@ -170,13 +173,13 @@ const evaluate = (tree, frame, context, execute = true) => {
     const value = evaluate(tree[0], frame, context, execute)
     if (!execute || containsCall(value)) return Match(
       value,
-      Tuple(...tree[1].map(arm => Arm(
+      Tuple(...Array.from(tree[1], arm => Arm(
         evaluate(arm[0], frame, context, false),
         evaluate(arm[1], frame, context, false)
       )))
     )
 
-    return match(value)(...tree[1].map(arm => ($, generics) => {
+    return match(value)(...Array.from(tree[1], arm => ($, generics) => {
       const created = []
       const requested = new Set()
       const genericAt = index => {
