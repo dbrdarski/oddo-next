@@ -442,8 +442,48 @@ export const suites = [
       const written = Union(Number, Number)
       return written !== Number && canonicalizeDomain(written) === Number
     }),
+    test('Union uses Bottom identity and Top absorption', () =>
+      canonicalizeDomain(Union(Bottom, Number)) === Number
+        && canonicalizeDomain(Union(Number, Bottom)) === Number
+        && canonicalizeDomain(Union(DomainTop, Number)) === DomainTop
+        && canonicalizeDomain(Union(Number, DomainTop)) === DomainTop),
+    test('Intersection deduplicates and uses Top and Bottom', () =>
+      canonicalizeDomain(Intersection(Number, Number)) === Number
+        && canonicalizeDomain(Intersection(DomainTop, Number)) === Number
+        && canonicalizeDomain(Intersection(Number, DomainTop)) === Number
+        && canonicalizeDomain(Intersection(Bottom, Number)) === Bottom
+        && canonicalizeDomain(Intersection(Number, Bottom)) === Bottom),
+    test('Difference applies its ordered identity laws', () =>
+      canonicalizeDomain(Difference(Number, Number)) === Bottom
+        && canonicalizeDomain(Difference(Number, Bottom)) === Number
+        && canonicalizeDomain(Difference(Bottom, Number)) === Bottom
+        && canonicalizeDomain(Difference(Number, DomainTop)) === Bottom),
+    test('unknown region relations remain residual', () => {
+      const union = Union(Number, Indeterminate)
+      const intersection = Intersection(Number, Range(0, 10))
+      const difference = Difference(Number, Equals(0))
+      return canonicalizeDomain(union) === union
+        && canonicalizeDomain(intersection) === intersection
+        && canonicalizeDomain(difference) === difference
+    }),
+    test('the local kernel does not recursively normalize children', () => {
+      const child = Union(Bottom, Number)
+      return canonicalizeDomain(Intersection(DomainTop, child)) === child
+        && canonicalizeDomain(child) === Number
+    }),
+    test('reduced regions are idempotent', () => [
+      Union(Bottom, Number),
+      Union(DomainTop, Number),
+      Intersection(DomainTop, Number),
+      Intersection(Bottom, Number),
+      Difference(Number, Number),
+      Difference(Number, Bottom),
+    ].every(region => {
+      const canonical = canonicalizeDomain(region)
+      return canonicalizeDomain(canonical) === canonical
+    })),
     test('an unmatched Domain node remains itself', () => {
-      const written = Union(Number, Indeterminate)
+      const written = Add(1, 2)
       return canonicalizeDomain(written) === written
     }),
     test('a primitive remains itself', () => canonicalizeDomain(3) === 3),

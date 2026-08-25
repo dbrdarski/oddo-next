@@ -4,7 +4,8 @@
 
 import { isContract } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
-import { matchDomain, _ } from './match.mjs'
+import { Tuple } from './intern.mjs'
+import { match, matchDomain, Combine, _ } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
 
 // `_` implements matching through the contract protocol, but remains wildcard
@@ -58,15 +59,40 @@ export const Top = Domain.Top()
 export const Bottom = Domain.Bottom()
 export const Null = Domain.Null()
 
-export const canonicalizeDomain = matchDomain(Domain, (matches, { Union }) => matches(
-  $ => $(Union.kind)(candidate => {
-    const [left, right] = candidate
-    return isContract(left) && left === right ? left : candidate
-  }),
-  ($, [value]) => $(value)(value => value)
-))
-
 export const {
   Add, Sub, Mul, Div, LL, Numeric,
   Union, Intersection, Difference, Equals, Range
 } = Domain
+
+const canonicalCommutative = (candidate, absorbing, identity) =>
+  match(Tuple(...candidate))(
+    $ => Combine(Equals(absorbing), _)(() => absorbing),
+    ($, [value]) => Combine(Equals(identity), value)((_identity, value) => value),
+    ($, [value]) => Combine(value, value)(value => value),
+    $ => $(_)(() => candidate)
+  )
+
+const canonicalDifference = candidate => {
+  const [base, excluded] = candidate
+  return match(base)(
+    $ => $(Equals(Bottom))(() => Bottom),
+    $ => $(_)(() => match(excluded)(
+      $ => $(Equals(base))(() => Bottom),
+      $ => $(Equals(Bottom))(() => base),
+      $ => $(Equals(Top))(() => Bottom),
+      $ => $(_)(() => candidate)
+    ))
+  )
+}
+
+export const canonicalizeDomain = matchDomain(
+  Domain,
+  (matches, { Union, Intersection, Difference }) => matches(
+    $ => $(Union.kind)(candidate =>
+      canonicalCommutative(candidate, Top, Bottom)),
+    $ => $(Intersection.kind)(candidate =>
+      canonicalCommutative(candidate, Bottom, Top)),
+    $ => $(Difference.kind)(canonicalDifference),
+    ($, [value]) => $(value)(value => value)
+  )
+)
