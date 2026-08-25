@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and labels the
 later ruled-but-unimplemented canonicalization target separately. `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **126 passing,
+`decisions.md` remain the design authority. `npm test` reports **129 passing,
 0 failing**.
 
 ## 1. Canonical function values
@@ -136,7 +136,7 @@ Construction and expansion reject malformed forms and calls:
 
 `CallArgument`, `Apply`, and `Match` currently declare `Numeric` as a temporary
 result so they can occupy existing Numeric seats. This relies on the repository's
-current `produces` machinery and is not a final account of function result shape.
+current `Produces` machinery and is not a final account of function result shape.
 
 ## 6. Current test surface
 
@@ -157,7 +157,7 @@ The committed suite covers:
 
 The following are not landed:
 
-1. Replacement of the temporary Numeric/`produces` treatment of function
+1. Replacement of the temporary Numeric/`Produces` treatment of function
    expressions.
 2. Implementation of oddo.next's matcher-driven contextual preparation over
    durable `E`, including retention of contextual `C`. `Number` has the full

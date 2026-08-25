@@ -4,7 +4,7 @@
 
 import { canonical } from './intern.mjs'
 import { contractCheck, isContract, producedOf, sub } from './contract.mjs'
-import { fact, learn } from './facts.mjs'
+import { fact, learn, Resolve, Produces, Transparent } from './facts.mjs'
 
 const once = (fn, cached = false, cache) => (...args) => (
   cached || (cache = fn(...args), cached = true), cache
@@ -31,9 +31,9 @@ export const argContracts = (constructor) => (...argContracts) => (result) => (
   argContracts.forEach((c, i) => c?.generic && (c.seat ??= i)),
   isCheck(result)
     ? Object.defineProperty(constructor.prototype, Symbol.hasInstance, { value: membership(result) })
-    : (learn(constructor, 'produces', result),
+    : (learn(constructor, Produces, result),
        argContracts.length === 1 && argContracts[0] === result
-         && learn(constructor, 'transparent', result)),
+         && learn(constructor, Transparent, result)),
   argContracts
 )
 
@@ -76,7 +76,7 @@ export const Enum = (build, input) => {
       throw TypeError(`Input validation failed for values: ${args}`)
     return args
   }
-  return (learn(validator, 'resolve', resolve), validator)
+  return (learn(validator, Resolve, resolve), validator)
 }
 
 const lazyEnumFactory = (name, fn) => {
@@ -99,7 +99,7 @@ const lazyEnumFactory = (name, fn) => {
   // Numeric before Numeric ever ran), so the check resolves the
   // declaration on demand - first need, not first construction.
   const factory = contractCheck(
-    (v, transparent = (fact(fn, 'resolve')(constructor), fact(constructor, 'transparent'))) =>
+    (v, transparent = (fact(fn, Resolve)(constructor), fact(constructor, Transparent))) =>
       v instanceof constructor || transparent != null && v instanceof transparent,
     (...args) => {
       // The gate constructs; the interner only caches. A duplicate

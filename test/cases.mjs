@@ -8,6 +8,7 @@
 
 import { Tuple, Record } from '../src/intern.mjs'
 import { producedOf } from '../src/contract.mjs'
+import { fact, learn, Resolve, Produces, Transparent } from '../src/facts.mjs'
 import { Enum, createEnums } from '../src/enum.mjs'
 import { match, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
@@ -62,6 +63,24 @@ export const suites = [
     test('deep nesting is canonical', () => Record({ x: Tuple(1, Tuple(2, 3)) }) === Record({ x: Tuple(1, Tuple(2, 3)) })),
     test('raw object child is rejected at the door', () => throws(() => Record({ x: { raw: 1 } }))),
     test('raw array child is rejected at the door', () => throws(() => Tuple([1, 2]))),
+  ]),
+
+  suite('Facts store', [
+    test('built-in fact keys are shared Symbols', () =>
+      [Resolve, Produces, Transparent].every(key => typeof key === 'symbol')),
+    test('equal Symbol descriptions remain distinct fact keys', () => {
+      const subject = Tuple('fact subject')
+      const first = Symbol('Fact')
+      const second = Symbol('Fact')
+      learn(subject, first, 1)
+      learn(subject, second, 2)
+      learn(subject, first, 3)
+      return fact(subject, first) === 1 && fact(subject, second) === 2
+    }),
+    test('declared results are stored under the shared Produces key', () => {
+      const node = Add(1, 2)
+      return fact(node.constructor, Produces) === Numeric
+    }),
   ]),
 
   suite('Enum nodes', [

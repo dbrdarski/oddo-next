@@ -275,9 +275,10 @@ log('a box at a strict Number seat:', Numeric(1) instanceof Number)`,
     code: `// the facts store is keyed by canonical references - and since
 // structurally equal means pointer-equal, a fact written against
 // Tuple(1, 2) is readable from ANY Tuple(1, 2)
-learn(Tuple(1, 2), 'label', "origin pair")
-log('read back:', fact(Tuple(1, 2), 'label'))
-log('other tuples unaffected:', fact(Tuple(1, 3), 'label') === undefined)`,
+const Label = Symbol('Label')
+learn(Tuple(1, 2), Label, "origin pair")
+log('read back:', fact(Tuple(1, 2), Label))
+log('other tuples unaffected:', fact(Tuple(1, 3), Label) === undefined)`,
   },
 ]
 

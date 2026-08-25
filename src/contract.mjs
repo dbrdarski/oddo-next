@@ -2,11 +2,11 @@
 // Contract Primitives
 // ==========================================
 
-import { fact } from './facts.mjs'
+import { fact, Produces } from './facts.mjs'
 
 // What a value stands for: the declared result of the constructor that made
 // it. A stored generic is a thunk - it answers for the node it is asked about.
-export const producedOf = (v, p = fact(v?.constructor, 'produces')) =>
+export const producedOf = (v, p = fact(v?.constructor, Produces)) =>
   p?.generic ? p(v) : p
 
 // Subcontract, degenerate: interned identity. This is the seam where the

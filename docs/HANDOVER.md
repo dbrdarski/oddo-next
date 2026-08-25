@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and labels the
 later ruled-but-unimplemented canonicalization target separately. `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **126 passing,
+`decisions.md` remain the design authority. `npm test` reports **129 passing,
 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
@@ -198,7 +198,7 @@ zero is truthy.
 
 ## 8. Implementation backlog
 
-- Replace the temporary `produces`/declared-result bridge. Function
+- Replace the temporary `Produces`/declared-result bridge. Function
   `CallArgument`, `Apply`, and `Match` currently rely on it to stand at Numeric
   seats.
 - Implement durable `E`, the explicit pure contextual transformer, matcher-selected

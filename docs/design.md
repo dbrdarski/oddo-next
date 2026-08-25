@@ -9,7 +9,7 @@ canonicalization layer, including the later contextual-preparation amendment of
 surfaces they describe. A subsection explicitly says when it documents current
 code rather than the ruled target.
 
-Current verification: **126 passing, 0 failing**.
+Current verification: **129 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -52,8 +52,8 @@ model has no signed zero.
 
 ## 2. Facts (landed)
 
-System-side metadata lives in one store (`fact(key, name)` /
-`learn(key, name, value)`, first-write-wins), keyed by the relevant reference:
+System-side metadata lives in one store (`fact(subject, key)` /
+`learn(subject, key, value)`, first-write-wins), keyed by the relevant reference:
 Enum validators and hidden classes today, nodes and contract pairs later.
 Nothing is attached as a property of a value or class—a value remains pure
 structure, indistinguishable fresh or analyzed, and facts never participate in
@@ -61,14 +61,17 @@ identity.
 
 Current entries are:
 
-- `enum validator → 'resolve'` — the declaration's once-cached resolver;
-- `constructor → 'produces'` — the declared result, recorded at first
+- `enum validator → Resolve` — the declaration's once-cached resolver;
+- `constructor → Produces` — the declared result, recorded at first
   resolution: a contract, or the declaration's own generic, stored as itself
   and answering per node (§5);
-- `constructor → 'transparent'` — the identical one-seat/result contract for a
+- `constructor → Transparent` — the identical one-seat/result contract for a
   transparent Enum.
 
-The canonical-function layer currently uses `produces` as temporary
+`Resolve`, `Produces`, and `Transparent` are shared module-exported Symbols. Fact
+identity never depends on repeating a string spelling.
+
+The canonical-function layer currently uses the `Produces` fact as temporary
 scaffolding: `CallArgument`, `Apply`, and `Match` declare `Numeric` so their
 symbolic nodes can occupy existing Numeric seats. That is not a per-function
 input/result signature, and it is not the final account of symbolic result
@@ -99,7 +102,7 @@ Name = Enum(
 - **The result application** (the second application) — has three current
   uses:
   - **a contract** — `(Numeric)` — the declarative return: recorded once as
-    the `produces` fact. Never "run"; consumed later by *other* seats when
+    the `Produces` fact. Never "run"; consumed later by *other* seats when
     the node sits in them (`Add(Add(1,2), 3)` works because the inner
     node's recorded fact satisfies the outer seat).
   - **a function** — `((T1, T2) => value => ...)` — the membership
@@ -109,7 +112,7 @@ Name = Enum(
   - **empty** — `()` — no meaningful declared result. Canonical function
     syntax uses this for structural nodes such as `Arm`, `Lambda`, and
     `FunctionRef`; the current machinery receives `undefined`, which provides
-    no usable `produces` fact.
+    no usable `Produces` fact.
   A multi-entry result cannot exist. "Produces A or B" is written explicitly:
   `(Union(A, B))`.
 - **Input validation** (Enum's optional second argument) — runs at
@@ -166,7 +169,7 @@ pass.
 1. **Ground contracts** (a `contractCheck` predicate like `Number`, or a
    plain class like `Indeterminate`) answer directly. Every chain ends here.
 2. **Enum factory** `F`: true if `v` is an `F`-node; or `v`'s recorded
-   `produces` fact satisfies `F` (stands-at, via `sub`); or `F` is
+   `Produces` fact satisfies `F` (stands-at, via `sub`); or `F` is
    *transparent* — then `v instanceof C2`.
 3. **Enum node** `n` of enum `E`: if `E`'s result is the function form,
    apply it to `n`'s own elements and then to `v` (plus the stands-at
@@ -662,7 +665,7 @@ Tuples. Pending-call detection scans Array values; both operations leave
 Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
 ordinary ordered Arms only—no function-AST `Combine` or guards.
 `CallArgument`, `Apply`, and `Match` are provisionally Numeric through
-`produces`; replacing that temporary seat-admission plumbing remains open. This
+`Produces`; replacing that temporary seat-admission plumbing remains open. This
 does not add an accepted-domain field to functions. Branch-local Match regions
 remain part of prepared meaning, alongside durable `E` and the distinct derived
 accepted-region/result-contract/obligation outputs.
@@ -677,7 +680,7 @@ consistent with this demonstrator's non-hardened boundary.
 
 ## 9. Implementation backlog and separate future work
 
-- The `produces` correction recorded in `decisions.md`. A class-chain
+- The `Produces` correction recorded in `decisions.md`. A class-chain
   replacement is proposed but not landed; its exact treatment of node-shaped
   results such as `Numeric(Numeric(1))` remains unresolved.
 - The ruled canonicalization layer is unimplemented: durable `E`, an explicit pure
@@ -716,7 +719,7 @@ consistent with this demonstrator's non-hardened boundary.
   state with a second reader — staleness and nested-check interference by
   construction. Parameters, which the language makes fresh per call, do the
   job with nothing to guard.
-- A produces thunk reading the per-call registers (answering with whatever
+- A `Produces` thunk reading the per-call registers (answering with whatever
   the last call bound): the same second-reader disease one level down —
   demonstrated poisonable, one unrelated `Twin(Numeric, Numeric)` flipped
   an unrelated `Add(t, 2)` from rejected to constructed. A stored generic
@@ -745,7 +748,7 @@ consistent with this demonstrator's non-hardened boundary.
 - Keeping `Optional` as a second nullish contract constructor. The canonical
   language has one Null and writes the former meaning as `Union(Null, T)`.
   This is independent of the smaller class-chain replacement proposed for
-  `produces`, which remains in §9.
+  `Produces`, which remains in §9.
 - Per-node storage of class-level facts; per-node membership closures
   (derivable data is not stored — a node's elements are its storage).
 - `instanceof` behavior on opaque value nodes (silent false) — misuse stays
