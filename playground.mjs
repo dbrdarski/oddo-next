@@ -20,8 +20,12 @@ import * as numeric from './src/numeric.mjs'
 import * as domain from './src/domain.mjs'
 import * as matching from './src/match.mjs'
 import * as functions from './src/function.mjs'
+import * as preparation from './src/prepare.mjs'
 
-const api = { ...intern, ...contract, ...facts, ...enums, ...numeric, ...domain, ...matching, ...functions }
+const api = {
+  ...intern, ...contract, ...facts, ...enums, ...numeric,
+  ...domain, ...matching, ...functions, ...preparation,
+}
 const names = Object.keys(api)
 const values = Object.values(api)
 
@@ -79,6 +83,21 @@ log('exact call:', formula === Apply(
   Tuple(Sub(CallArgument(0, countDown), 2))
 ))
 log('both recursive calls survive:', forkFormula)`,
+  },
+  {
+    name: 'Contextual preparation',
+    code: `const self = OuterRef(0)
+const n = CallArgument(0, self)
+const form = Lambda(1, 1, Mul(0, n))
+const fn = internFn(form, form)
+const E = expand(fn)
+
+const overNumber = prepare(E)(Number)
+const overNonNumber = prepare(E)(Difference(Top, Number))
+
+log('expanded E:', E)
+log('Number judgment:', overNumber)
+log('non-Number judgment:', overNonNumber)`,
   },
   {
     name: 'Match structural Enums',
