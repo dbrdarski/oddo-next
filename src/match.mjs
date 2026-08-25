@@ -1,6 +1,5 @@
-import { contractCheck, isContract } from './contract.mjs'
+import { CanonicalTuple, contractCheck, isContract } from './contract.mjs'
 import { generic, generics } from './enum.mjs'
-import { Tuple } from './intern.mjs'
 
 export const _ = Object.freeze(contractCheck(() => true))
 
@@ -33,17 +32,9 @@ const fits = (pattern, value) => {
 
 const combineFits = (patterns, values, genericState) => {
   if (
-    !Array.isArray(values) ||
-    values.constructor !== Array ||
-    !Object.isFrozen(values) ||
+    !(values instanceof CanonicalTuple) ||
     patterns.length !== values.length
   ) return
-
-  try {
-    if (values !== Tuple(...values)) return
-  } catch {
-    return
-  }
 
   const assigned = Array(patterns.length)
   const used = Array(patterns.length)

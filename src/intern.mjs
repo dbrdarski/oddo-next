@@ -59,6 +59,17 @@ export const canonical = (tag, parts, value) => {
 
 export const Tuple = (...elements) => canonical(Tuple, elements, elements);
 
+export const isTuple = value => {
+  if (
+    !Array.isArray(value) ||
+    value.constructor !== Array ||
+    !Object.isFrozen(value)
+  ) return false
+
+  try { return value === Tuple(...value) }
+  catch { return false }
+}
+
 export const Record = (obj, parts = []) => {
   for (const key of Object.keys(obj).sort()) parts.push(key, obj[key]);
   return canonical(Record, parts, obj);

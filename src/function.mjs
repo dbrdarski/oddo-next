@@ -2,27 +2,14 @@
 // Canonical Functions
 // ==========================================
 
-import { contractCheck, isContract } from './contract.mjs'
+import { CanonicalTuple, isContract } from './contract.mjs'
 import { Enum, createEnums, mapEnum } from './enum.mjs'
-import { Tuple } from './intern.mjs'
+import { Tuple, isTuple } from './intern.mjs'
 import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import { Numeric } from './domain.mjs'
 
 const whole = value => globalThis.Number.isInteger(value) && value >= 0
-
-const isTuple = value => {
-  if (
-    !Array.isArray(value) ||
-    value.constructor !== Array ||
-    !Object.isFrozen(value)
-  ) return false
-
-  try { return value === Tuple(...value) }
-  catch { return false }
-}
-
-const CanonicalTuple = Object.freeze(contractCheck(isTuple))
 
 const {
   OuterRef,
