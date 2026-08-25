@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **156 passing,
+and `decisions.md` remain the design authority. `npm test` reports **157 passing,
 0 failing**.
 
 ## 1. Canonical function values
@@ -173,7 +173,8 @@ The committed suite covers:
 - captured and closed-function patterns;
 - residual Match continuations;
 - invalid references, host functions, Tuple shape, and arity;
-- Top/Bottom/Null and strict binary region membership forms;
+- canonical zero-seat Top/Bottom/Null contract Enum values and strict binary
+  region membership Enums;
 - the six-field Preparation value and both zero-multiplication contexts.
 
 ## 7. Current boundaries
@@ -197,9 +198,10 @@ The following are not landed:
 3. The separate solve and call-domain judgment layers. Their exact input/API and
    association mechanism remain unpinned; retained `S` never merges with or
    replaces `E` or `C`.
-4. General canonical region/logic normalization. Top, Bottom, one Null, strict
-   binary Union/Intersection/Difference membership forms, Optional removal, and
-   explicit-Null LL are landed. Only manual `Union(C, C) → C` normalization exists.
+4. General canonical region/logic normalization. Zero-seat Top, Bottom, and Null
+   contract Enum values, strict binary Union/Intersection/Difference membership
+   Enums, Optional removal, and explicit-Null LL are landed. Only manual
+   `Union(C, C) → C` normalization exists.
    Top/Bottom composition, containment/disjointness, effective Match remainders,
    Pure exact region-to-result logical normalization, guard/`~` lowering, and host
    ingress remain open. `Rest` is only the running remainder calculation, not a

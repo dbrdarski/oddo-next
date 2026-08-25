@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**156 passing, 0 failing**.
+**157 passing, 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -213,11 +213,12 @@ associated `E`, and whether the existing identity account needs extension, remai
 unpinned and require author judgment. No accepted-domain field or Top filler is
 added by this ruling.
 
-`Top`, `Bottom`, one language `Null`, and strict binary `Union`, `Intersection`,
-and relative `Difference` are landed as structural membership forms. `Optional`
-is removed in favor of `Union(Null, T)`, and `LL` has an explicit `Null` terminator.
-Only the manually invoked `Union(C, C) → C` canonicalization rule is landed; the
-general region laws remain target work. An ordered Match will thread a running
+`Top`, `Bottom`, and the one language `Null` are canonical zero-seat contract Enum
+values; strict binary `Union`, `Intersection`, and relative `Difference` are
+contract Enums. `Optional` is removed in favor of `Union(Null, T)`, and `LL` has an
+explicit `Null` terminator. Only the manually invoked `Union(C, C) → C`
+canonicalization rule is landed; the general region laws remain target work. An
+ordered Match will thread a running
 remainder. Selecting an exact arm commits its complete effective region: that
 region is subtracted before the next arm even if its body accepts less. Body
 rejection does not become fallthrough. `Rest` is only the name of this calculation.

@@ -9,7 +9,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **156 passing, 0 failing**.
+Current verification: **157 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -241,21 +241,21 @@ holes as well as values. No second capture implementation exists.
 
 ## 6. The domain
 
-This listing summarizes the demonstrator landed through `fce81ac`. The region
+This listing summarizes the demonstrator landed through `f60df51`. The region
 constructors currently provide strict construction, canonical structural identity,
 and membership. The broader normalization laws immediately below remain a target.
 
 ```js
-export const Top = namedContract('Top', value => value != null)
-export const Bottom = namedContract('Bottom', () => false)
-export const Null = namedContract('Null', value => value === Null)
-
 export const isRegion = value => isContract(value) && value !== _
 
 const regionArguments = length => (...regions) =>
   regions.length === length && regions.every(isRegion)
 
 const Domain = createEnums(() => class {
+
+  Top = Enum($ => $()(() => value => value != null))
+  Bottom = Enum($ => $()(() => () => false))
+  Null = Enum($ => $()(() => value => value === Null))
 
   Union = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2),
@@ -288,15 +288,23 @@ const Domain = createEnums(() => class {
   LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
 
+export const Top = Domain.Top()
+export const Bottom = Domain.Bottom()
+export const Null = Domain.Null()
+
 export const {
   Add, Sub, Mul, Div, LL, Numeric,
   Union, Intersection, Difference, Equals, Range
 } = Domain
 ```
 
-- `Top` and `Bottom` — the named all-language-values and no-values contracts.
-- `Null` — the one self-matching language value and contract. Raw host `null` and
-  `undefined` are not `Null`; host ingress normalization is not yet implemented.
+- `Top`, `Bottom`, and `Null` — canonical zero-seat membership-defined Enum
+  values/contracts. `Top` admits every language value, `Bottom` admits none, and
+  `Null` admits only itself. Raw host `null` and `undefined` are not `Null`; host
+  ingress normalization is not yet implemented. Like every current contract,
+  these atoms still inherit the separately ruled-for-removal `Produces` fallback:
+  a hypothetical node declared to produce an atom would temporarily stand at it.
+  No current domain constructor produces `Bottom` or `Null`.
 - `Union`, `Intersection`, and `Difference` — binary membership-defined Enums.
   They require exactly two contract branches and reject `_`, which remains wildcard
   syntax rather than a stored region value. `Difference` is ordered.

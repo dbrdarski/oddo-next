@@ -471,15 +471,20 @@ meaning, including De Morgan and DNF-equivalent spellings, while preserving thei
 pre-normalization demands. Effectful code and non-exact ordered matches are not
 reordered under that rule.
 
-**Implementation status through `fce81ac`.** `Top`, `Bottom`, the one language
-`Null`, and strict binary `Union`, `Intersection`, and `Difference` contract Enums
-are landed. `_` is rejected as a stored region branch. `Optional` is removed and
-`LL` uses an explicit `Null` terminator through `Union(Null, LL)`. These nodes land
-membership and structural identity, not the general algebra above:
+**Implementation status through `f60df51`.** `Top`, `Bottom`, and the one language
+`Null` are canonical zero-seat membership-defined Enum values/contracts. Strict
+binary `Union`, `Intersection`, and `Difference` contract Enums are also landed.
+No parallel contract-construction helper remains. `_` is rejected as a stored
+region branch. `Optional` is removed and `LL` uses an explicit `Null` terminator
+through `Union(Null, LL)`. These nodes land membership and structural identity,
+not the general algebra above:
 `canonicalizeDomain` still has only the explicit, manually invoked
 `Union(C, C) → C` rule. Flattening, ordering, Top/Bottom composition, containment,
 disjointness, effective Match remainders, and logical normalization remain
 unimplemented. Host `null`/`undefined` ingress normalization is also not landed.
+The separately pending `Produces` correction still applies to these contract
+atoms: a hypothetical node declared to produce `Bottom` or `Null` would currently
+stand at that atom, although no current domain constructor does so.
 The temporary `Produces`/`Numeric` overmembership described above still blocks
 sound production preparation from an unconstrained `Top` context.
 
