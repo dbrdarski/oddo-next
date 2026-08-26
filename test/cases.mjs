@@ -230,6 +230,30 @@ export const suites = [
         && prepared[4] === Tuple()
         && prepared[5] === 0
     }),
+    test('a nonrecursive call expands into retained E before C is derived', () => {
+      const helperSelf = OuterRef(0)
+      const helperForm = Lambda(1, 1, CallArgument(0, helperSelf))
+      const helper = internFn(helperForm, helperForm)
+
+      const rootSelf = OuterRef(0)
+      const rootForm = Lambda(1, 1, Mul(
+        0,
+        Apply(helper, Tuple(CallArgument(0, rootSelf)))
+      ))
+      const root = internFn(rootForm, rootForm)
+      const E = expand(root)
+      const prepared = prepareProduction(E)(Number)
+
+      return E === Mul(0, CallArgument(0, root))
+        && prepared === Preparation(
+          E,
+          Number,
+          Number,
+          Equals(0),
+          Tuple(),
+          0
+        )
+    }),
     test('zero multiplication uses Combine across operand order', () => {
       const zeroFirst = expandedZeroMul()
       const zeroLast = expandedZeroMul(false)
