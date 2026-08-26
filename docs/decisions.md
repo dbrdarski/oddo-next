@@ -35,21 +35,18 @@ machinery and promoted prototype chaining into a semantic alternative. That
 diagnosis is superseded. The actual function-layer defect is narrower:
 `CallArgument`, `Apply`, and `Match` currently use blanket `Numeric` bounds.
 Those declarations are temporary formation scaffolding, not inferred function
-return contracts. `CallArgument` demand follows from its consuming expression; a
-known nonrecursive `Apply` is actually invoked during expansion, after which its
-instantiated body is durable `E` and Preparation derives contextual `C`; a
-resolved `Match` supplies its selected body. Residual recursive calls and pending
-Matches require later obligation machinery. No result theorem is inferred from or
-stored on `FunctionRef`. Correcting these declarations does not remove `Produces`
-from ordinary result-bearing forms.
+return contracts. In the target function-formation pipeline, input demands are
+inferred from the complete pre-normal candidate before canonicalization and the
+result contract is derived rather than stored as an independent identity field.
+Residual recursive calls and pending Matches require later obligation machinery.
+Correcting these declarations does not remove `Produces` from ordinary
+result-bearing forms.
 
-**Implementation status.** Static `Produces` and node-anchored generic results
-are landed. Contextual refinements are currently retained in `Preparation` rather
-than replacing the declared bound or durable `E`. General refinement,
-containment, and replacement of the temporary function-form declarations remain
-future work. Commit `ffb474f` pins the supported nonrecursive path end to end:
-the invoked helper's instantiated expansion becomes root `E`, and the existing
-Number preparation retains that `E` beside `C = 0`.
+**Legacy implementation status.** Static `Produces` and node-anchored generic
+results are landed. Commit `ffb474f` retained contextual refinements in
+`Preparation`; the callable-function ruling below supersedes that as the target
+formation boundary. General refinement, containment, and replacement of the
+temporary function-form declarations remain future work.
 
 ## 2026-08-25 — nominal Tuple, Record, and Enum recognition landed
 
@@ -92,13 +89,13 @@ it does not replace a captured `Equals(...)` contract with its forwarded payload
 
 ## 2026-08-20 — formula canonicalization happens at formation (placement superseded)
 
-**Superseded on 2026-08-25.** This entry remains as decision history. Its Number
-polynomial form, canonical ordering, retained-demand principle, Numeric split,
-and Indeterminate boundary remain in force. Its placement, transient-form,
-positional function-integration, and source-pattern-boundary claims do not:
-canonicalization is no longer performed inside an Enum factory, the expanded
-form is retained, and `mapEnum` does not automatically normalize. The replacement
-pipeline is recorded in the next entry.
+**Superseded on 2026-08-25 and amended again on 2026-08-26.** This entry remains
+as decision history. Its Number polynomial form, canonical ordering,
+pre-normalization-demand principle, Numeric split, and Indeterminate boundary
+remain in force. Canonicalization is not performed inside an Enum factory and
+`mapEnum` does not automatically normalize. The 2026-08-25 replacement retained
+the expanded form; the latest callable-function ruling below makes it temporary
+formation input instead.
 
 **Ruling (Dane), amended through 2026-08-24.** A formula factory produces its
 canonical result before publishing it to the interner. Canonicalization is part
@@ -170,21 +167,24 @@ neither the language definition nor a prerequisite for closing this specificatio
 
 The accepted-input, safety, purity, result, and completion requirements are
 derived from the validated expression before algebra erases syntax. They remain
-in the canonical meaning. They are represented locally by canonical `Match`/arm
-regions where needed; there is no mandatory always-present accepted-contract seat,
-no `Any` filler, and no separate `Demand` node in the current design.
+in the canonical meaning. For functions, the ordered input-demand contracts are
+explicit components of identity; `Top` fills an unconstrained parameter seat.
+There is no separate `Demand` node.
 
-For example, over `Number`:
+For example:
 
 ```text
-x => 0 * x   → Match(x, Number => 0)
-x => 0       → 0
+x => 0 * x   → contract Tuple(Numeric), canonical body x => Mul(0, x)
+x => x * 0   → contract Tuple(Numeric), canonical body x => Mul(0, x)
+x => 0       → contract Tuple(Top),     canonical body x => 0
 ```
 
-The notation shows a partial region-to-result meaning: the first form still
-demands a Number even though its polynomial result is zero. Branch-dependent
-requirements stay in their corresponding Match regions rather than being flattened
-into one global parameter contract.
+The first two spellings have the same identity after Mul ordering. They remain
+different from the constant function because multiplication demands `Numeric`.
+Under an actual enclosing `Number` restriction, zero annihilation may produce
+body `x => 0` while `Tuple(Number)` preserves that restriction. Canonicalization
+does not invent Match arms merely to record these demands; source-written Match
+arms remain ordinary program structure.
 
 Calls follow the same rule. A pre-normalization `Apply` exposes its obligations.
 An admitted Pure, safe, completing Number call may be combined or erased by the
@@ -197,14 +197,16 @@ noncanonical function body and no second application-dependent normalization.
 The function sequence therefore remains:
 
 ```text
-canonicalize the positional FunctionBody
-→ apply its complete ordered outer references
-→ discharge the retained obligations
+construct the callable from its complete ordered outer references
+→ build the complete pre-normal candidate
+→ infer the ordered input-demand contracts
+→ canonicalize under those contracts and discharge obligations
 → intern the function value
 ```
 
-Function identity remains the canonical FunctionBody plus its complete ordered
-outer references. No accepted-domain field is added to `FunctionRef`.
+Function identity is the canonical body form, its complete ordered outer
+references, and its ordered input-demand contract Tuple. The result contract is
+derived and does not add a fourth identity component.
 
 ### Numeric and Indeterminate
 
@@ -247,9 +249,14 @@ judgment, and termination are separate judgment layers.
 Formula normalization is not: `Add(1, 2) !== Add(2, 1)`,
 `Mul(2, 3) !== Mul(3, 2)`, and literal arithmetic is not folded. The required work
 was then described as a structural formation hook. That placement is superseded;
-the still-missing work belongs to contextual preparation as described below.
+the still-missing work belongs to callable function formation as described below.
 
-## 2026-08-25 — retain expanded, canonical, and solved forms
+## 2026-08-25 — retain expanded, canonical, and solved forms (superseded for function formation)
+
+**Historical ruling.** The 2026-08-26 callable-function section below reverses
+durable `E` retention and replaces this section's proposed function-identity
+integration. The landed `Preparation` code described here remains legacy
+implementation evidence, not the target representation.
 
 **Ruling (Dane).** Canonicalization is not immediate Enum formation. Ordinary
 factories validate, construct, and structurally intern their nodes. Once writing,
@@ -522,7 +529,7 @@ The matcher does not catch constructor refusals and reinterpret malformed patter
 as ordinary non-matches. This is an existing phase boundary, not a pending
 skip-versus-abort design fork; the previously documented question was spurious.
 
-## 2026-08-22 — canonical functions and raw recursive formulas landed
+## 2026-08-22 — canonical functions and raw recursive formulas landed (representation superseded)
 
 Functions in the demonstrator are canonical Enum values, not native JavaScript
 closures. A lowered `Lambda` form is applied to its ordered references by:
@@ -546,3 +553,94 @@ preserving durable `E` and the demands/admission obligations derived from it.
 `expand` does not itself perform termination judgment, demand inference, or
 solving. Source-to-Lambda lowering and richer recursive-reference layouts are not
 landed.
+
+## 2026-08-26 — callable function formation and contract-retaining identity
+
+**Ruling (Dane; overrides the function-formation parts of the two sections marked
+superseded above).** A function is an actual callable. Its reusable written form is
+a callable body factory:
+
+```js
+FunctionBody(...outerRefs) // returns the callable function
+```
+
+For example:
+
+```js
+const incrementBody = () => x => Add(x, 1)
+```
+
+`Lambda`, `OuterRef`, and `FunctionRef` are not the target function
+representation. Recursive calls remain explicit `Apply` values, but recursion is
+a later implementation slice.
+
+Canonical function identity has exactly these semantic components:
+
+```text
+bodyForm:  canonical function body
+outerRefs: Tuple(...complete ordered outer references)
+contract:  Tuple(...ordered input-demand contracts)
+```
+
+The contract Tuple has one entry per call parameter. An unconstrained parameter
+uses `Top`. It contains input demands only; the result contract is derived and is
+not another function-identity field.
+
+Function formation proceeds in this order:
+
+```text
+complete expanded/pre-normal body E
+→ infer the ordered input-demand contract Tuple from E
+→ canonicalize E under that complete contract
+→ intern by (canonical bodyForm, outerRefs, contract)
+```
+
+`E` is an input to this formation transaction, not retained function provenance.
+Once it has supplied the demands and canonical key, it may be discarded. In
+particular, source operand order is not retained: the arithmetic canonicalizer
+decides it. The earlier `Preparation(E, ...)` implementation remains historical
+scaffolding until function formation replaces that boundary; it does not prescribe
+the final function representation.
+
+Canonicalization does not manufacture `Match` arms for an unbranched function.
+It canonicalizes the body over the function's complete admitted input contract.
+Therefore the unguarded function:
+
+```text
+f = x => 0 * x
+```
+
+derives `Tuple(Numeric)`. Zero annihilation is valid on its `Number` region but
+not on its admitted `Indeterminate` region, so its complete canonical body remains
+`x => Mul(0, x)`. Commutative ordering makes the reversed spelling identical:
+
+```text
+x => Mul(0, x)  ≡  x => Mul(x, 0)
+```
+
+Both have the same identity:
+
+```text
+bodyForm:  () => x => Mul(0, x)
+outerRefs: Tuple()
+contract:  Tuple(Numeric)
+```
+
+The constant function is different:
+
+```text
+x => 0
+
+bodyForm:  () => x => 0
+outerRefs: Tuple()
+contract:  Tuple(Top)
+```
+
+If an actual enclosing contract restricts the parameter to `Number`, then
+`Mul(0, x)` may canonicalize to `0` while `Tuple(Number)` preserves the input
+demand. No generated branch is needed.
+
+In this JavaScript demonstrator, when separately written candidates reach the
+same canonical identity, the first callable placed in the intern table is the
+one returned thereafter. This does not change their semantic equality. A future
+parser/compiler can emit the canonical callable body directly.
