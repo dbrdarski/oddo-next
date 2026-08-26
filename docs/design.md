@@ -2,14 +2,15 @@
 
 Agreed 2026-08-19, before the enum/contract implementation (revised the same
 day: the result slot merges C2 and V2), and updated through the author rulings of
-2026-08-25. Sections 1–6 preserve the core enum/contract implementation; sections
+2026-08-26 and implementation `e6e09a0`. Sections 1–6 preserve the core
+enum/contract implementation; sections
 7–8 describe matching, canonical functions, and the ruled canonicalization layer,
 including the first contextual-preparation slice landed on 2026-08-25. This file
 and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **166 passing, 0 failing**.
+Current verification: **167 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -76,12 +77,12 @@ Current entries are:
 `Resolve`, `Produces`, and `Transparent` are shared module-exported Symbols. Fact
 identity never depends on repeating a string spelling.
 
-The canonical-function layer currently uses the `Produces` fact as temporary
-scaffolding: `CallArgument`, `Apply`, and `Match` declare `Numeric` so their
-symbolic nodes can occupy existing Numeric seats. That is not a per-function
-input/result signature, and it is not the final account of symbolic result
-shape. The pending correction in `decisions.md` must now account for these
-consumers too.
+`Produces` is the retained upper result bound. The canonical-function layer's
+current blanket bounds are temporary: `CallArgument`, `Apply`, and `Match`
+declare `Numeric` so their symbolic nodes can occupy existing Numeric seats.
+Those particular declarations are not a per-function input/result signature and
+must be replaced by bounds derived from argument demand, callee, and effective
+arm results. This corrects the declarations, not the `Produces` relation.
 
 The landed `Preparation` Enum now retains one preparation judgment structurally;
 it is not stored as a fact or cache entry. Future metadata may retain additional
@@ -108,10 +109,11 @@ Name = Enum(
   every construction. Positional, always.
 - **The result application** (the second application) — has three current
   uses:
-  - **a contract** — `(Numeric)` — the declarative return: recorded once as
-    the `Produces` fact. Never "run"; consumed later by *other* seats when
-    the node sits in them (`Add(Add(1,2), 3)` works because the inner
-    node's recorded fact satisfies the outer seat).
+  - **a contract** — `(Numeric)` — the widest possible result contract,
+    recorded once as the `Produces` fact. Never "run"; consumed later by
+    *other* seats when the node sits in them (`Add(Add(1,2), 3)` works because
+    the inner node's recorded fact satisfies the outer seat). Facts and
+    Preparation may derive a narrower result within this bound.
   - **a function** — `((T1, T2) => value => ...)` — the membership
     definition: how a value is checked against nodes of this enum. Called
     by the machinery **with the node's elements as arguments**, it returns
@@ -144,8 +146,8 @@ included:
 const inner = Union(Number, Indeterminate)
 const outer = Union(inner, String)
 
-5 instanceof outer
-// call check(inner, String)   → its own T1, T2 → 5 instanceof inner …
+instanceOf(5, outer)
+// call check(inner, String)   → its own T1, T2 → instanceOf(5, inner) …
 //    call check(Number, Indeterminate) → its OWN T1, T2 → true
 // … back outside: T2 still holds String. Nothing shared, nothing to restore.
 ```
@@ -176,13 +178,23 @@ pass.
 
 ## 4. Membership
 
-`v instanceof K` means "v can stand where K is demanded":
+`instanceOf(v, K)` means "v can stand where K is demanded" and is implemented
+by the single semantic wrapper:
+
+```js
+const instanceOf = (value, Contract) =>
+  value?.valueOf() instanceof Contract
+```
+
+The underlying JavaScript `instanceof` remains the nominal protocol. The wrapper
+lets a transient contract forward its represented value before that protocol is
+asked:
 
 1. **Ground contracts** (a `contractCheck` predicate like `Number`, or a
    plain class like `Indeterminate`) answer directly. Every chain ends here.
 2. **Enum factory** `F`: true if `v` is an `F`-node; or `v`'s recorded
    `Produces` fact satisfies `F` (stands-at, via `sub`); or `F` is
-   *transparent* — then `v instanceof C2`.
+   *transparent* — then `instanceOf(v, C2)`.
 3. **Enum node** `n` of enum `E`: if `E`'s result is the function form,
    apply it to `n`'s own elements and then to `v` (plus the stands-at
    clause). A node of an enum whose result is an opaque contract is not itself
@@ -207,6 +219,10 @@ algebra (§9), not current behavior. That future algebra is restricted to
 contracts that expose their structure; opaque `contractCheck` predicates keep
 identity-only treatment.
 
+Transient forwarding already makes
+`instanceOf(Equals(1), Range(0, 100))` true; it does not install or cache the
+separate general `sub` verdict.
+
 A factory's membership resolves the declaration on demand — first need,
 not first construction: `Add(1, 1)` asks `Numeric` before `Numeric` ever
 ran, so the check itself triggers the (once-cached) resolve.
@@ -214,6 +230,12 @@ ran, so the check itself triggers the (once-cached) resolve.
 Termination is structural, not assumed: membership descends through frozen,
 acyclic contract nodes to ground checks; finite declarations, finite
 descent.
+
+`Equals(E).valueOf()` returns `E`, so exact transient contracts fulfil every
+contract their nested value fulfils. `Indeterminate.valueOf()` returns the
+complete Indeterminate instance, preventing its internal Number-box operand from
+crossing the Number boundary. Generic pattern capture and nominal Tuple, Record,
+Enum, and exact-kind recognition do not use semantic forwarding.
 
 ## 5. Generics
 
@@ -251,7 +273,7 @@ holes as well as values. No second capture implementation exists.
 
 ## 6. The domain
 
-This listing summarizes the demonstrator landed through `f232b36`. The region
+This listing summarizes the demonstrator landed through `e6e09a0`. The region
 constructors currently provide strict construction, canonical structural identity,
 membership, and a local root-reduction kernel. The broader normalization laws
 immediately below remain a target.
@@ -269,16 +291,18 @@ const Domain = createEnums(() => class {
   Null = Enum($ => $()(() => value => value === Null))
 
   Union = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2),
+    $(T1, T2)((T1, T2) => value =>
+      instanceOf(value, T1) || instanceOf(value, T2)),
     regionArguments(2))
 
   Intersection = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => value instanceof T1 && value instanceof T2),
+    $(T1, T2)((T1, T2) => value =>
+      instanceOf(value, T1) && instanceOf(value, T2)),
     regionArguments(2))
 
   Difference = Enum(($, [base, excluded]) =>
     $(base, excluded)((base, excluded) => value =>
-      value instanceof base && !(value instanceof excluded)),
+      instanceOf(value, base) && !instanceOf(value, excluded)),
     regionArguments(2))
 
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
@@ -292,7 +316,7 @@ const Domain = createEnums(() => class {
 
   Range = Enum(
     $ => $(Number, Number)((lo, hi) => value =>
-      value instanceof Number && lo <= value && value <= hi),
+      instanceOf(value, Number) && lo <= value && value <= hi),
     (lo, hi) => lo <= hi
   )
 
@@ -307,15 +331,21 @@ export const {
   Add, Sub, Mul, Div, LL, Numeric,
   Union, Intersection, Difference, Equals, Range
 } = Domain
+
+Object.defineProperty(Equals.kind.prototype, 'valueOf', {
+  value() { return this[0] }
+})
 ```
 
 - `Top`, `Bottom`, and `Null` — canonical zero-seat membership-defined Enum
   values/contracts. `Top` admits every language value, `Bottom` admits none, and
   `Null` admits only itself. Raw host `null` and `undefined` are not `Null`; host
   ingress normalization is not yet implemented. Like every current contract,
-  these atoms still inherit the separately ruled-for-removal `Produces` fallback:
-  a hypothetical node declared to produce an atom would temporarily stand at it.
+  these atoms also participate in ordinary `Produces` stands-at admission: a
+  hypothetical node whose widest declared result is an atom stands at that atom.
   No current domain constructor produces `Bottom` or `Null`.
+  Here Bottom admits no realized value; a form declared to produce Bottom is a
+  result-bound statement about that form, not a realized member of Bottom.
 - `Union`, `Intersection`, and `Difference` — binary membership-defined Enums.
   They require exactly two contract branches and reject `_`, which remains wildcard
   syntax rather than a stored region value. `Difference` is ordered.
@@ -325,17 +355,21 @@ export const {
 - `Indeterminate` — a structured exceptional numeric outcome. It is a branch of
   `Numeric`, not a `Number`. The ruled specimen does not turn schematic
   `Indeterminate(DivideByZero(...))` into Number zero under multiplication by
-  zero; it remains in `Indeterminate`. The current code defines peer
+  zero; it remains in `Indeterminate`. Its `valueOf()` retains the complete
+  Indeterminate instance rather than exposing the internal Number-box operand.
+  The current code defines peer
   `ZeroDivision` and `ZeroMod` forms; the exact future
   cause/Kind and broader consuming algebra are deferred.
 - `Add`/`Sub`/`Mul`/`Div` — opaque; stand at `Numeric` seats through the
   recorded fact.
 - `Equals` — the singleton: `value === E`, exact because of interning; an
-  exact-value contract for matching and later judgments.
+  exact-value contract for matching and later judgments. It is transient for
+  semantic admission: `Equals(E).valueOf()` forwards `E` through `instanceOf`.
 - `Range` — a membership-defined two-seat Enum whose nodes are contracts. Seat
   contracts check each endpoint; the input validator enforces `lo <= hi`;
-  membership checks the closed interval. Contract objects are not admitted as
-  its endpoint values.
+  membership checks the closed interval. A transient exact contract can occupy
+  an endpoint seat through its value, so `Range(Equals(1), Equals(2))` is valid
+  and retains those written contract operands.
 - `LL` — a two-seat recursive value with an explicit `Null` terminator. `LL(1)`
   and raw host-nullish tails reject; the empty/terminal tail is written `Null`.
 
@@ -380,9 +414,9 @@ Match remainder, or logical canonicalization.
 ### Traces
 
 `Add(1, 1)`:
-seat asks `1 instanceof Numeric` → transparent → `1 instanceof
-Union(Number, Indeterminate)` → apply Union's check to that node's elements
-→ `1 instanceof Number` → typeof → true. Every step is either a declared
+seat asks `instanceOf(1, Numeric)` → transparent →
+`instanceOf(1, Union(Number, Indeterminate))` → apply Union's check to that
+node's elements → `instanceOf(1, Number)` → typeof → true. Every step is either a declared
 check applied to a node's own elements, or ground.
 
 `Add(1, Mul(2, 3))`:
@@ -401,7 +435,9 @@ case returns its handler result. If no case matches, `match` throws a
 `fits(pattern, value)` has one small decision chain:
 
 1. `_` matches anything and captures nothing.
-2. A contract pattern uses `value instanceof pattern`.
+2. A contract pattern uses `instanceOf(value, pattern)`. A generic capture keeps
+   the original value instead, because capture is structural rather than a
+   fulfilment check.
 3. A structural Enum pattern and value must both satisfy the registered nominal
    `instanceof Enum` relation, then have the same hidden kind and arity; their
    corresponding seats are fitted recursively.
@@ -415,9 +451,10 @@ to the next case. There is no catch-and-skip arm behavior.
 
 Structural Enums may contain contracts in ordinary non-generic seats, so a
 partial tree such as `Add(Number, 2)` is both a legal structural value and a
-pattern. Declared value seats still validate normally: `Range(1, 2)` is valid
-while `Range(Equals(1), Equals(2))` is not. Generic seats retain their generic
-binding behavior. The landed binary region Enums add ordinary input validation on
+pattern. Declared value seats still validate normally through `instanceOf`:
+`Range(1, 2)` and `Range(Equals(1), Equals(2))` are both valid because the exact
+contracts forward `1` and `2`. Generic seats retain and capture their original
+values. The landed binary region Enums add ordinary input validation on
 top: `Union`, `Intersection`, and `Difference` require exactly two contract
 branches and reject wildcard `_` as a persistent region operand. This strict
 construction boundary is separate from the still-unimplemented algebraic
@@ -600,11 +637,9 @@ arities, wrapped contexts, `_`, `Top`, and every other context throw; production
 does not invent a default judgment.
 
 The two rows are not yet composed into a result for incoming `Top`. That work is
-blocked by the already-known temporary `Produces`/`Numeric` overmembership:
-current `Numeric` membership is wider than exact Number-or-Indeterminate. It
-includes its own wrapper nodes and, through `Produces`, symbolic Numeric nodes;
-even its `Union(Number, Indeterminate)` result currently admits wrapper nodes
-through the same result fallback. The landed rule is therefore neither general
+blocked by inaccurate blanket `Numeric` bounds on symbolic function forms and
+`Numeric`'s own wrapper membership: current `Numeric` is wider than the exact
+Number-or-Indeterminate result region. The landed rule is therefore neither general
 region canonicalization nor full polynomial normalization.
 
 #### Target Number polynomial normal form (not landed)
@@ -778,8 +813,8 @@ Tuples through their respective doors. Pending-call detection scans Array values
 both operations leave
 Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
 ordinary ordered Arms only—no function-AST `Combine` or guards.
-`CallArgument`, `Apply`, and `Match` are provisionally Numeric through
-`Produces`; replacing that temporary seat-admission plumbing remains open. This
+`CallArgument`, `Apply`, and `Match` are provisionally Numeric through inaccurate
+blanket `Produces` bounds; deriving their real widest bounds remains open. This
 does not add an accepted-domain field to functions. Together with `Numeric`'s own
 wrapper membership, it also prevents sound composition of the two landed
 zero-multiplication rows under `Top`: current `Numeric` is wider than the exact
@@ -799,9 +834,10 @@ consistent with this demonstrator's non-hardened boundary.
 
 ## 9. Implementation backlog and separate future work
 
-- The `Produces` correction recorded in `decisions.md`. A class-chain
-  replacement is proposed but not landed; its exact treatment of node-shaped
-  results such as `Numeric(Numeric(1))` remains unresolved.
+- Derive accurate widest `Produces` bounds for `CallArgument`, `Apply`, and
+  `Match`, then retain narrower per-value/context results through facts and
+  Preparation. Prototype inheritance is only an optional implementation refactor
+  for static factory-shaped bounds; it is not separate language work.
 - Direct contextual preparation, the six-field `Preparation` Enum, and the two
   zero-multiplication judgments are landed. Remaining work includes composition
   under `Top`; the Number polynomial accumulator/emitter and `Pow`; every other
@@ -872,8 +908,7 @@ consistent with this demonstrator's non-hardened boundary.
   carried via `contractCheck` wrappers around validators.
 - Keeping `Optional` as a second nullish contract constructor. The canonical
   language has one Null and writes the former meaning as `Union(Null, T)`.
-  This is independent of the smaller class-chain replacement proposed for
-  `Produces`, which remains in §9.
+  This is independent of the `Produces` result-bound relation.
 - Per-node storage of class-level facts; per-node membership closures
   (derivable data is not stored — a node's elements are its storage).
 - `instanceof` behavior on opaque value nodes (silent false) — misuse stays

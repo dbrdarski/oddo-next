@@ -5,73 +5,42 @@ therefore postdate a following topic's original entry. `design.md` stays the
 settled specification; entries here capture what was decided, on what grounds,
 and what remains open before the specification absorbs it.
 
-## 2026-08-20 — `produces` is imported machinery (diagnosis; correction pending)
+## 2026-08-20 — declared result bounds (corrected 2026-08-26)
 
-**Ruling (Dane).** The `'produces'` fact, `producedOf`, and the made-by
-fallback are imported declared-return-type machinery. They record a promise
-about future evaluation ("Add nodes will yield Numerics") and answer a
-present-tense membership question with it — classifying the expanded form
-by the solved form's type before any solving exists. That is the
-expanded-vs-solved tension, and it does not fit the philosophy: one
-universe (the node IS the value), and facts record what is or what
-happened, never what would happen.
+**Final ruling (Dane).** `Produces` is retained. A contract in an Enum's result
+slot is the widest possible result contract for that form. Facts and contextual
+Preparation may prove a narrower result for a particular value and context, but
+that refinement must remain within the declared bound. For example:
 
-**Evidence.**
+```text
+E = Mul(2, 3)
+Produces(E)          = Numeric
+refined result       = Equals(6)
+C                    = 6
+```
 
-- Removing the fallback from both membership paths kills exactly 4 of 53
-  board rows — all one thing, node-inside-node nesting (`Add(1, Mul(2,
-  3))`, `Add(Add(...))`, `Div` nesting, the nested raw-literal row).
-  Everything else stands.
-- The nested-Twin bugs un-cause themselves. `Twin(1, Twin(2, 2))` and
-  `Twin(Twin(1,1), Twin(2,2))` constructed only because the circular
-  `'produces'` entry fed the fallback; without the import both reject on
-  seat logic alone, which was always correct. The entire generic-thunk arc
-  (node-anchored thunks, seat claiming, the register-poisoning fix) was
-  repair work on damage the import itself caused.
-- The board was green (53/0) through the whole arc. Green does not detect
-  imports — the Rust postmortem's lesson, replayed at demonstrator scale.
-  The instrument that caught it was the author's felt-sense that the
-  machinery was being patched rather than belonging.
+The declared bound is what permits ordinary expression nesting before the
+narrower facts exist. `producedOf`, the `Produces` fact, and stands-at admission
+therefore remain part of the design.
 
-**Replacement (proposed, not landed).** Node-inside-node membership via the
-class chain — the author's original extends-the-return-contract idea (the
-`extendFn` sketch): at first resolve, an enum whose result is a factory has
-its hidden class placed under the result's hidden class, so
-`mulNode instanceof Numeric` is structurally true. No fact, no fallback,
-no reader.
+Prototype inheritance under a factory-shaped result contract is only a possible
+implementation refactor of the same static membership. It adds no language
+meaning and is not a replacement for `Produces`; node-shaped, generic, per-value,
+and contextual results still require the explicit result relation. The earlier
+source sketch saying that an Enum could extend its return contract belongs at
+that implementation level.
 
-**Breakage inventory if the correction lands.**
+The previous diagnosis in this entry incorrectly called `Produces` imported
+machinery and promoted prototype chaining into a semantic alternative. That
+diagnosis is superseded. The actual function-layer defect is narrower:
+`CallArgument`, `Apply`, and `Match` currently use blanket `Numeric` bounds.
+Their bounds must instead follow the argument demand, callee, and effective arm
+results respectively. That correction does not remove `Produces`.
 
-1. The 4 nesting rows — broken by deletion, restored by the chain
-   (their results are factories; factories have classes to sit under).
-2. One behavioral flip the chain cannot restore: `Numeric(Numeric(1))` —
-   constructed today via the fallback, rejected without it. `Numeric`'s
-   declared result is the union *node* — an instance, not a class — and a
-   class cannot extend an instance. Only live case of a node-shaped
-   result. Open ruling: can a box box a box?
-3. Observation surface deleted with its subject: `producedOf` as an API,
-   the four board rows that watch it, one playground line.
-4. `$(E, E)(E)`'s result slot reverts to unruled. Twin's construction and
-   rejection behavior is unaffected (seat logic), but the `(E)` states
-   nothing again.
-
-Untouched by that diagnosis: construction, seats, identity and interning,
-transparency, unions, `Equals`, `Range`, Indeterminate forms, and `LL`
-(self-result needs no chain — its own class already answers). `Optional` was
-also untouched at the time; the later one-`Null` ruling below supersedes it.
-
-**Doc surgery due when the correction lands:** every current-behavior account of
-`produces` in `design.md`—the facts/result/membership sections, the generic thunk
-account, domain traces, provisional function typing, and the parked/ruled-out
-lists.
-
-**Status (updated 2026-08-22).** Diagnosis ruled; replacement still not landed.
-The historical “4 of 53” inventory predates canonical functions. The current
-function layer also temporarily declares `CallArgument`, `Apply`, and `Match` as
-producing `Numeric`; regression tests directly observe the first two, while the
-`Match` declaration is visible in source. Removing `produces` now has to account
-for these additional consumers as well as ordinary nested domain nodes. The
-`Numeric(Numeric(1))` ruling remains unresolved.
+**Implementation status.** Static `Produces` and node-anchored generic results
+are landed. Contextual refinements are currently retained in `Preparation` rather
+than replacing the declared bound or durable `E`. General refinement,
+containment, and accurate function-form bounds remain future work.
 
 ## 2026-08-25 — nominal Tuple, Record, and Enum recognition landed
 
@@ -89,6 +58,28 @@ for Enums. Enum seats and `Combine` use Tuple itself directly. The parallel
 `CanonicalTuple` contract and reconstructive `isTuple` probe have been removed.
 These changes preserve the three distinct identity namespaces and do not make
 Tuple or Record into Enums.
+
+## 2026-08-26 — transient contract values forward through `valueOf`
+
+**Ruling (Dane), implemented in `e6e09a0`.** Oddo's semantic contract check is
+one wrapper over JavaScript's protocol:
+
+```js
+instanceOf(value, Contract) = value?.valueOf() instanceof Contract
+```
+
+`Equals(value)` is a transient exact contract whose `valueOf()` returns its
+nested value. `Indeterminate.valueOf()` returns the complete current instance;
+ordinary Tuple, Record, Enum, and `Numeric(...)` values already retain themselves.
+Consequently `instanceOf(Equals(6), Number)` and
+`instanceOf(Equals(6), Range(0, 10))` are true, while an Indeterminate remains
+outside `Number` and inside `Numeric`.
+
+Use this wrapper for semantic contract fulfilment: Enum seats, transparent
+delegation, contract patterns, and consuming contract definitions. Native
+`instanceof` remains the nominal representation test for Tuple, Record, Enum,
+and exact syntax kinds. Generic pattern capture also retains the original value;
+it does not replace a captured `Equals(...)` contract with its forwarded payload.
 
 ## 2026-08-20 — formula canonicalization happens at formation (placement superseded)
 
@@ -391,11 +382,9 @@ prepare(E)(Difference(Top, Number))
 Unsupported expressions, dependencies, arities, and contexts throw instead of
 acquiring an invented judgment. In particular, production does not accept `Top`
 and does not compose those two rows into an unconstrained result. That composition
-remains blocked by the already-recorded temporary `Produces`/`Numeric`
-overmembership. Current `Numeric` is wider than exact Number-or-Indeterminate: it
-includes its own wrapper nodes and symbolic Numeric nodes admitted through
-`Produces`; even its `Union(Number, Indeterminate)` result admits wrapper nodes via
-the same result fallback. This slice does not implement general region
+remains blocked by inaccurate blanket `Numeric` bounds on symbolic function forms
+and `Numeric`'s own wrapper membership. Current `Numeric` is therefore wider than
+the exact Number-or-Indeterminate result region. This slice does not implement general region
 normalization, full polynomial normal form, obligations, a dedicated preparation
 cache, `S`, or multi-argument preparation.
 
@@ -505,11 +494,11 @@ Bottom-up traversal, flattening, heterogeneous ordering, left-association,
 containment, disjointness, effective Match remainders, and logical normalization
 remain unimplemented. Host `null`/`undefined` ingress normalization is also not
 landed.
-The separately pending `Produces` correction still applies to these contract
-atoms: a hypothetical node declared to produce `Bottom` or `Null` would currently
-stand at that atom, although no current domain constructor does so.
-The temporary `Produces`/`Numeric` overmembership described above still blocks
-sound production preparation from an unconstrained `Top` context.
+Ordinary `Produces` semantics apply to these contract atoms: a hypothetical node
+whose widest result is `Bottom` or `Null` stands at that atom, although no current
+domain constructor declares either result. Inaccurate blanket `Numeric` bounds on
+symbolic function forms and current Numeric wrapper membership still block sound
+production preparation from an unconstrained `Top` context.
 
 ## 2026-08-22 — pattern construction failure propagates (current behavior)
 
