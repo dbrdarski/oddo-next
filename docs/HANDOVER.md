@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**167 passing, 0 failing**.
+**168 passing, 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -211,9 +211,9 @@ its body under Number and may project it to zero while retaining that demand.
 Demands and call-admission obligations are derived from durable `E` before algebra
 erases syntax from `C`. Accepted region, result contract, obligations, and `C` are
 distinct outputs. Canonical Match rows may encode their correlated partial mapping,
-but do not replace `E`. An admitted Pure, safe, completing call may disappear from
-`C`. A known call can discharge during preparation; unresolved references retain
-obligations for a later boundary. Failure never selects a fallback canonical body.
+but do not replace `E`. Expansion invokes a known nonrecursive call and its
+instantiated body participates in durable `E`; a residual Apply remains as evidence
+for later obligations. Failure never selects a fallback canonical body.
 
 The landed `FunctionRef(form, orderedReferences)` identity is unchanged. Precisely
 where prepared `C` becomes the target canonical FunctionBody while retaining its
@@ -242,9 +242,10 @@ zero is truthy.
 
 ## 8. Implementation backlog
 
-- Derive accurate widest `Produces` bounds for `CallArgument`, `Apply`, and
-  `Match`; their current blanket `Numeric` declarations are temporary, while
-  `Produces` itself is retained.
+- Replace the temporary blanket `Numeric` declarations on `CallArgument`, `Apply`,
+  and `Match` without inferring a FunctionRef return theorem: consumer-derived
+  argument demand, effective Match handling, and residual-call obligations.
+  `Produces` itself remains available to ordinary result-bearing forms.
 - Extend the landed direct-context Preparation beyond its two zero-multiplication
   judgments: compose incoming `Top` after correcting those bounds and Numeric
   boxing behavior; implement

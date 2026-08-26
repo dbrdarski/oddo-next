@@ -34,13 +34,22 @@ The previous diagnosis in this entry incorrectly called `Produces` imported
 machinery and promoted prototype chaining into a semantic alternative. That
 diagnosis is superseded. The actual function-layer defect is narrower:
 `CallArgument`, `Apply`, and `Match` currently use blanket `Numeric` bounds.
-Their bounds must instead follow the argument demand, callee, and effective arm
-results respectively. That correction does not remove `Produces`.
+Those declarations are temporary formation scaffolding, not inferred function
+return contracts. `CallArgument` demand follows from its consuming expression; a
+known nonrecursive `Apply` is actually invoked during expansion, after which its
+instantiated body is durable `E` and Preparation derives contextual `C`; a
+resolved `Match` supplies its selected body. Residual recursive calls and pending
+Matches require later obligation machinery. No result theorem is inferred from or
+stored on `FunctionRef`. Correcting these declarations does not remove `Produces`
+from ordinary result-bearing forms.
 
 **Implementation status.** Static `Produces` and node-anchored generic results
 are landed. Contextual refinements are currently retained in `Preparation` rather
 than replacing the declared bound or durable `E`. General refinement,
-containment, and accurate function-form bounds remain future work.
+containment, and replacement of the temporary function-form declarations remain
+future work. Commit `ffb474f` pins the supported nonrecursive path end to end:
+the invoked helper's instantiated expansion becomes root `E`, and the existing
+Number preparation retains that `E` beside `C = 0`.
 
 ## 2026-08-25 — nominal Tuple, Record, and Enum recognition landed
 
@@ -315,11 +324,11 @@ disposable. If an exact Match arm selects a region, that whole selected
 region is removed from the running remainder before the next arm even when the
 selected body accepts less. Body rejection does not become fallthrough.
 
-An `Apply` is treated the same way: preparation first derives its purity, safety,
-completion, result, and admission obligations from `E`. An admitted call may then
-be combined or erased from `C` without an arbitrary extra delay. A known call can
-discharge during preparation; an unresolved reference retains obligations for a
-later boundary. Discharge failure never chooses a fallback noncanonical body.
+A known nonrecursive `Apply` is invoked during expansion; its instantiated body
+participates in durable `E`, and Preparation derives contextual `C` from that
+expanded body. A residual `Apply` remains structurally present in `E`, where later
+machinery must derive its purity, safety, completion, result, and admission
+obligations. Discharge failure never chooses a fallback noncanonical body.
 
 Pattern matching remains the rule-selection mechanism, but that answers *how*,
 not *when*. Preparation structurally matches durable Enum values. There is no

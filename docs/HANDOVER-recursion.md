@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **167 passing,
+and `decisions.md` remain the design authority. `npm test` reports **168 passing,
 0 failing**.
 
 Semantic contract fulfilment uses
@@ -166,8 +166,9 @@ Construction and expansion reject malformed forms and calls:
 
 `CallArgument`, `Apply`, and `Match` currently declare `Numeric` as a temporary
 result so they can occupy existing Numeric seats. This relies on the repository's
-retained `Produces` machinery, but the blanket bounds are not a final account of
-function result shape.
+retained `Produces` machinery, but the blanket declarations are formation
+scaffolding, not inferred function return contracts. A known nonrecursive Apply is
+invoked during expansion; residual calls require later obligation machinery.
 
 ## 6. Current test surface
 
@@ -193,9 +194,9 @@ The committed suite covers:
 
 The following are not landed:
 
-1. Replacement of the temporary blanket `Numeric` bounds on function expressions
-   with accurate `Produces` bounds derived from argument demand, callee, and
-   effective arms.
+1. Replacement of the temporary blanket `Numeric` declarations on function
+   expressions without a FunctionRef return theorem: consumer-derived argument
+   demand, effective Match handling, and residual-call obligations.
 2. Generalization of the landed matcher-driven, direct-context Preparation beyond
    its two zero-multiplication judgments. `Preparation` already retains durable `E`
    and contextual `C` in its ruled six-field shape; no dedicated lookup cache or

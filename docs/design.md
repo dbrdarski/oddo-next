@@ -10,7 +10,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **167 passing, 0 failing**.
+Current verification: **168 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -80,9 +80,13 @@ identity never depends on repeating a string spelling.
 `Produces` is the retained upper result bound. The canonical-function layer's
 current blanket bounds are temporary: `CallArgument`, `Apply`, and `Match`
 declare `Numeric` so their symbolic nodes can occupy existing Numeric seats.
-Those particular declarations are not a per-function input/result signature and
-must be replaced by bounds derived from argument demand, callee, and effective
-arm results. This corrects the declarations, not the `Produces` relation.
+Those declarations are formation scaffolding, not a per-function input/result
+signature. `CallArgument` demand follows from its consumer. Expansion invokes a
+known nonrecursive `Apply`, making the instantiated body durable `E`, and
+Preparation derives contextual `C`; it does not infer a result theorem from the
+callee. A resolved `Match` supplies its selected body, while residual calls and
+pending Matches require later obligations. This correction does not remove
+`Produces` from ordinary result-bearing forms.
 
 The landed `Preparation` Enum now retains one preparation judgment structurally;
 it is not stored as a fact or cache entry. Future metadata may retain additional
@@ -121,7 +125,9 @@ Name = Enum(
   - **empty** — `()` — no meaningful declared result. Canonical function
     syntax uses this for structural nodes such as `Arm`, `Lambda`, and
     `FunctionRef`; the current machinery receives `undefined`, which provides
-    no usable `Produces` fact.
+    no usable `Produces` fact. A `FunctionRef` is nevertheless the canonical
+    function value by nominal Enum identity; the empty result slot merely avoids
+    inventing a theorem about the result of applying that function.
   A multi-entry result cannot exist. "Produces A or B" is written explicitly:
   `(Union(A, B))`.
 - **Input validation** (Enum's optional second argument) — runs at
@@ -715,14 +721,12 @@ This avoids an always-present accepted-contract parameter, a Top filler, and a
 separate Demand node. Conditional requirements remain correlated with their arm,
 without making the expanded evidence disposable.
 
-In the broader target, an admitted Pure, safe, completing Number call may likewise
-be combined or erased from `C` by the algebra. Its `Apply` in durable `E` supplies
-the obligations. The concrete function later bound to an outer reference
-determines whether those obligations discharge, not which polynomial body is
-selected. Failure rejects the program; it never picks a noncanonical fallback or
-triggers another normalization.
-A known call may discharge during preparation and disappear from `C` immediately;
-only unresolved evidence must survive to a later boundary.
+In the broader target, expansion invokes a known nonrecursive call and places its
+instantiated body in durable `E`; Preparation may combine or erase that expanded
+body from contextual `C`. A residual `Apply` remains in `E` and supplies the
+obligations that later recursion and termination machinery must discharge.
+Failure rejects the program; it never picks a noncanonical fallback or triggers
+another normalization.
 
 The landed function identity remains:
 
@@ -814,11 +818,14 @@ both operations leave
 Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
 ordinary ordered Arms only—no function-AST `Combine` or guards.
 `CallArgument`, `Apply`, and `Match` are provisionally Numeric through inaccurate
-blanket `Produces` bounds; deriving their real widest bounds remains open. This
-does not add an accepted-domain field to functions. Together with `Numeric`'s own
-wrapper membership, it also prevents sound composition of the two landed
-zero-multiplication rows under `Top`: current `Numeric` is wider than the exact
-Number-or-Indeterminate value region.
+blanket `Produces` declarations. They remain formation scaffolding, not inferred
+function results. Replacing them requires consumer-derived argument demands,
+effective Match handling, and residual-call obligations; known nonrecursive calls
+already expand operationally. This does not add an accepted-domain or result field
+to functions. Together with `Numeric`'s own wrapper membership, the placeholders
+also prevent sound composition of the two landed zero-multiplication rows under
+`Top`: current `Numeric` is wider than the exact Number-or-Indeterminate value
+region.
 
 Expansion is synchronous recursive descent and has no fixed-point engine. The
 explicit production `prepare(E)(incomingContract)` stage and structural
@@ -834,10 +841,12 @@ consistent with this demonstrator's non-hardened boundary.
 
 ## 9. Implementation backlog and separate future work
 
-- Derive accurate widest `Produces` bounds for `CallArgument`, `Apply`, and
-  `Match`, then retain narrower per-value/context results through facts and
-  Preparation. Prototype inheritance is only an optional implementation refactor
-  for static factory-shaped bounds; it is not separate language work.
+- Replace the temporary `Numeric` declarations on `CallArgument`, `Apply`, and
+  `Match` without introducing a FunctionRef return theorem: derive argument demand
+  from consumers, retain effective Match results, and represent obligations for
+  residual calls. Known nonrecursive call expansion followed by Preparation is
+  pinned end to end. Prototype inheritance remains only an optional implementation
+  refactor for static factory-shaped bounds; it is not separate language work.
 - Direct contextual preparation, the six-field `Preparation` Enum, and the two
   zero-multiplication judgments are landed. Remaining work includes composition
   under `Top`; the Number polynomial accumulator/emitter and `Pow`; every other
