@@ -2,8 +2,15 @@
 
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **166 passing,
+and `decisions.md` remain the design authority. `npm test` reports **167 passing,
 0 failing**.
+
+Semantic contract fulfilment uses
+`instanceOf(value, Contract) = value?.valueOf() instanceof Contract`.
+`Equals(value)` forwards its nested value, Indeterminate retains itself, and
+generic pattern captures retain the original value. Native `instanceof` remains
+for nominal Tuple, Record, Enum, and exact syntax-kind recognition; see the
+2026-08-26 entry in `decisions.md`.
 
 ## 1. Canonical function values
 
@@ -108,11 +115,11 @@ empty obligations, and `C = 0`. `Difference(Top, Number)` emits accepted/result
 `Indeterminate`, empty obligations, and `C = E`. Every other expression or context
 throws.
 
-Incoming `Top` is deliberately unsupported. The temporary `Produces`/`Numeric`
-bridge and `Numeric`'s own wrapper membership make current `Numeric` wider than the
-exact Number-or-Indeterminate value region. Even the current
-`Union(Number, Indeterminate)` result admits wrapper nodes through the same result
-fallback, so the two landed rows cannot yet be composed into a general result.
+Incoming `Top` is deliberately unsupported. Blanket `Numeric` bounds on function
+forms and `Numeric`'s own wrapper membership make current `Numeric` wider than the
+exact Number-or-Indeterminate result region, so the two landed rows cannot yet be
+composed into a general result. `Produces` remains the ruled widest-result
+relation; the declarations using it must become accurate.
 
 ## 4. Function-level Match
 
@@ -159,7 +166,8 @@ Construction and expansion reject malformed forms and calls:
 
 `CallArgument`, `Apply`, and `Match` currently declare `Numeric` as a temporary
 result so they can occupy existing Numeric seats. This relies on the repository's
-current `Produces` machinery and is not a final account of function result shape.
+retained `Produces` machinery, but the blanket bounds are not a final account of
+function result shape.
 
 ## 6. Current test surface
 
@@ -185,8 +193,9 @@ The committed suite covers:
 
 The following are not landed:
 
-1. Replacement of the temporary Numeric/`Produces` treatment of function
-   expressions.
+1. Replacement of the temporary blanket `Numeric` bounds on function expressions
+   with accurate `Produces` bounds derived from argument demand, callee, and
+   effective arms.
 2. Generalization of the landed matcher-driven, direct-context Preparation beyond
    its two zero-multiplication judgments. `Preparation` already retains durable `E`
    and contextual `C` in its ruled six-field shape; no dedicated lookup cache or

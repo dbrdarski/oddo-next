@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**166 passing, 0 failing**.
+**167 passing, 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -30,7 +30,9 @@ flag, cleanup protocol, or construction residue in the current design.
 `match(value)(...cases)` uses four rules, in this order:
 
 1. `_` matches anything.
-2. A contract pattern uses ordinary membership: `value instanceof pattern`.
+2. A contract pattern uses semantic membership:
+   `instanceOf(value, pattern)`, which forwards `value?.valueOf()` before the
+   underlying JavaScript `instanceof` protocol.
 3. A registered Enum pattern and value require the same node constructor and
    length, then recursively fit their parts.
 4. Every other pattern uses canonical identity: `value === pattern`.
@@ -46,8 +48,9 @@ is decided by the Enum being constructed:
   and can be used as a pattern.
 - A bare membership-defined Enum pattern is interpreted as a contract and tested
   by fulfilment before structural Enum matching. For example, `Range(1, 2)` is a
-  membership pattern, while `Range(Equals(1), Equals(2))` is rejected by Range's
-  endpoint seats. Contextual preparation may therefore need an explicit internal
+  membership pattern. `Range(Equals(1), Equals(2))` is also valid because the
+  transient exact contracts forward their nested endpoints through `valueOf()`.
+  Contextual preparation may therefore need an explicit internal
   structural-decomposition route for contract-valued Enum values; that route does
   not change runtime contract-pattern meaning.
 - Generic seats keep their identity-binding semantics; the structural contract
@@ -185,11 +188,10 @@ prepare(E)(Difference(Top, Number))
 ```
 
 Unsupported expressions, dependencies, arities, wrapped contexts, `_`, `Top`, and
-all other contexts throw. The two rows are not composed under `Top`: the temporary
-`Produces` treatment and `Numeric`'s own wrapper membership make current `Numeric`
-wider than exact Number-or-Indeterminate. Even the current
-`Union(Number, Indeterminate)` result admits wrapper nodes through the result
-fallback. The production slice does not implement general region canonicalization,
+all other contexts throw. The two rows are not composed under `Top`: blanket
+`Numeric` bounds on function forms and `Numeric`'s own wrapper membership make
+current `Numeric` wider than the exact Number-or-Indeterminate result region. The
+production slice does not implement general region canonicalization,
 full polynomial normalization, obligation analysis, a dedicated preparation cache,
 FunctionBody integration, `S`, or multi-argument preparation.
 
@@ -240,11 +242,12 @@ zero is truthy.
 
 ## 8. Implementation backlog
 
-- Replace the temporary `Produces`/declared-result bridge. Function
-  `CallArgument`, `Apply`, and `Match` currently rely on it to stand at Numeric
-  seats.
+- Derive accurate widest `Produces` bounds for `CallArgument`, `Apply`, and
+  `Match`; their current blanket `Numeric` declarations are temporary, while
+  `Produces` itself is retained.
 - Extend the landed direct-context Preparation beyond its two zero-multiplication
-  judgments: compose incoming `Top` after correcting `Produces`/`Numeric`; implement
+  judgments: compose incoming `Top` after correcting those bounds and Numeric
+  boxing behavior; implement
   Number polynomial form and Pow; obligations; every other expression/context
   rule; and eventual FunctionBody association. No cache, `S`, or multi-argument
   preparation is currently present.

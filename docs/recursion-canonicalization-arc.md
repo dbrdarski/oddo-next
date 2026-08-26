@@ -4,7 +4,7 @@ This file records the useful direction changes from the 2026-08-20/21
 investigation. It is **not** the current API or design authority.
 
 The committed implementation is described in `docs/HANDOVER-recursion.md` and
-`src/function.mjs`. The current test suite reports **166 passing, 0 failing**.
+`src/function.mjs`. The current test suite reports **167 passing, 0 failing**.
 
 **Later supersession (2026-08-25).** This history originally concluded that
 canonicalization belonged inside factory formation and that the expanded candidate
@@ -144,8 +144,9 @@ and DNF are internal techniques, not public logical nodes.
 
 ## 5. Current implementation work
 
-- Replace the temporary `Produces` bridge currently used by `CallArgument`,
-  `Apply`, and `Match` at Numeric seats.
+- Replace the temporary blanket `Numeric` bounds currently declared through
+  `Produces` by `CallArgument`, `Apply`, and `Match`; retain `Produces` as the
+  widest-result relation.
 - Implement the ruled matcher-driven contextual preparation of durable `E`,
   contextual `C` retention, later `S` association, Number polynomial form/Pow,
   canonical contract regions, effective Match remainders, Pure logical

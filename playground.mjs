@@ -52,8 +52,8 @@ catch (e) { log('raw child:', String(e)) }`,
     code: `const n = Add(Numeric(1), Add(Numeric(2), Numeric(3)))
 log(n)
 log('interned:', n === Add(Numeric(1), Add(Numeric(2), Numeric(3))))
-log('stands at Numeric seats:', n instanceof Numeric)
-log('at a strict Number seat:', n instanceof Number)`,
+log('stands at Numeric seats:', instanceOf(n, Numeric))
+log('at a strict Number seat:', instanceOf(n, Number))`,
   },
   {
     name: 'Function form & recursion',
@@ -269,9 +269,9 @@ log('children shared:', a.left === shared && b.left === shared)`,
   },
   {
     name: 'Define your own enum',
-    code: `// a contract is a predicate behind instanceof
+    code: `// a contract is a predicate behind semantic instanceOf
 const Even = contractCheck(v => typeof v === "number" && v % 2 === 0)
-log('4 is Even:', 4 instanceof Even, '| 3 is Even:', 3 instanceof Even)
+log('4 is Even:', instanceOf(4, Even), '| 3 is Even:', instanceOf(3, Even))
 
 // an enum is a gated constructor: args checked, result declared, node interned
 const { Pair } = createEnums(() => class {
@@ -289,10 +289,11 @@ try { Pair(3, 4) } catch (e) { log(String(e)) }`,
     code: `const n = Add(1, 2)
 log('raw literals pass (transparency):', String(n))
 log('declared result is Numeric:', producedOf(n) === Numeric)
-log('n stands at Numeric seats:', n instanceof Numeric)
+log('n stands at Numeric seats:', instanceOf(n, Numeric))
 
 // strict Number seats still reject what is not a literal number:
-log('a box at a strict Number seat:', Numeric(1) instanceof Number)`,
+log('a box at a strict Number seat:', instanceOf(Numeric(1), Number))
+log('an exact contract forwards:', instanceOf(Equals(6), Number))`,
   },
   {
     name: 'Facts by identity',
