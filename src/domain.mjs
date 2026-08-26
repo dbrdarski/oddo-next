@@ -2,7 +2,7 @@
 // Domain Definition
 // ==========================================
 
-import { isContract } from './contract.mjs'
+import { instanceOf, isContract } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { match, matchDomain, Combine, _ } from './match.mjs'
@@ -33,14 +33,14 @@ const Domain = createEnums(() => class {
   Null = Enum($ => $()(() => value => value === Null))
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
   Union = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => value instanceof T1 || value instanceof T2),
+    $(T1, T2)((T1, T2) => value => instanceOf(value, T1) || instanceOf(value, T2)),
     regionArguments(2))
   Intersection = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => value instanceof T1 && value instanceof T2),
+    $(T1, T2)((T1, T2) => value => instanceOf(value, T1) && instanceOf(value, T2)),
     regionArguments(2))
   Difference = Enum(($, [base, excluded]) =>
     $(base, excluded)((base, excluded) => value =>
-      value instanceof base && !(value instanceof excluded)),
+      instanceOf(value, base) && !instanceOf(value, excluded)),
     regionArguments(2))
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
   // Numeric = Enum($ => $(Number)(Union(Number, Indeterminate)))
@@ -50,7 +50,7 @@ const Domain = createEnums(() => class {
   Div = Enum($ => $(Numeric, Numeric)(Numeric))
   Equals = Enum(($, [E]) => $(E)(E => value => value === E))
   Range = Enum($ => $(Number, Number)((lo, hi) => value =>
-    value instanceof Number && lo <= value && value <= hi),
+    instanceOf(value, Number) && lo <= value && value <= hi),
     (lo, hi) => lo <= hi)
   LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
@@ -63,6 +63,10 @@ export const {
   Add, Sub, Mul, Div, LL, Numeric,
   Union, Intersection, Difference, Equals, Range
 } = Domain
+
+Object.defineProperty(Equals.kind.prototype, 'valueOf', {
+  value() { return this[0] }
+})
 
 const canonicalCommutative = (candidate, absorbing, identity) =>
   match(Tuple(...candidate))(

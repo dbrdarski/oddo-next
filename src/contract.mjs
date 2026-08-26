@@ -4,6 +4,9 @@
 
 import { fact, Produces } from './facts.mjs'
 
+export const instanceOf = (value, Contract) =>
+  value?.valueOf() instanceof Contract
+
 // What a value stands for: the declared result of the constructor that made
 // it. A stored generic is a thunk - it answers for the node it is asked about.
 export const producedOf = (v, p = fact(v?.constructor, Produces)) =>

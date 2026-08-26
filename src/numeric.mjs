@@ -28,10 +28,12 @@ export const Number = contractCheck(
   globalThis.Number.bind(null)
 )
 
-export class Indeterminate extends globalThis.Number { }
+export class Indeterminate extends globalThis.Number {
+  valueOf() { return this }
+}
 
-// The Number box carries the operand (valueOf() gives it back); the door
-// keys identity by (form, operand), so 1/0 and 2/0 are distinct values.
+// The door keys identity by (form, operand), so 1/0 and 2/0 are distinct
+// values. Indeterminate valueOf() deliberately retains the complete form.
 export class ZeroDivision extends Indeterminate {
   constructor(operand) {
     super(operand)

@@ -1,4 +1,4 @@
-import { contractCheck, isContract } from './contract.mjs'
+import { contractCheck, instanceOf, isContract } from './contract.mjs'
 import { Enum, generic, generics } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 
@@ -15,7 +15,9 @@ const fits = (pattern, value) => {
     return true
 
   if (isContract(pattern))
-    return value instanceof pattern
+    return pattern.generic
+      ? value instanceof pattern
+      : instanceOf(value, pattern)
 
   if (pattern instanceof Enum)
     return (

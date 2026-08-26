@@ -7,7 +7,7 @@
 // the pending suite documents exactly where the work stands.
 
 import { Tuple, Record } from '../src/intern.mjs'
-import { producedOf } from '../src/contract.mjs'
+import { instanceOf, producedOf } from '../src/contract.mjs'
 import { fact, learn, Resolve, Produces, Transparent } from '../src/facts.mjs'
 import { Enum, createEnums, mapEnum } from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
@@ -35,8 +35,8 @@ const test = (label, run) => ({ label, run })
 const throws = (run) => { try { run(); return false } catch { return true } }
 const isUnionOf = (candidate, left, right) =>
   candidate instanceof Union && match(Tuple(...candidate))(
-    $ => Combine(Equals(left), Equals(right))(() => true),
-    $ => $(_)(() => false)
+    ($, [a, b]) => Combine(a, b)((a, b) =>
+      a === left && b === right || a === right && b === left)
   )
 const armFor = (candidate, region) =>
   candidate[1].find(arm => arm[0] === region)
@@ -320,7 +320,10 @@ export const suites = [
     test('interned: same operand, same instance', () => new ZeroDivision(1) === new ZeroDivision(1)),
     test('operand is in the identity: 1/0 differs from 2/0', () => new ZeroDivision(1) !== new ZeroDivision(2)),
     test('forms are distinct doors: 1/0 differs from 1%0', () => new ZeroDivision(1) !== new ZeroMod(1)),
-    test('the box carries the operand back (valueOf)', () => +new ZeroMod(2) === 2),
+    test('valueOf retains the complete Indeterminate form', () => {
+      const value = new ZeroMod(2)
+      return value.valueOf() === value
+    }),
     test('a form is an Indeterminate', () => new ZeroDivision(1) instanceof Indeterminate),
     test('a form is a Numeric (union branch)', () => new ZeroDivision(1) instanceof Numeric),
     test('a form is NOT a Number', () => !(new ZeroDivision(1) instanceof Number)),
@@ -359,8 +362,8 @@ export const suites = [
     test('different bounds, different ranges', () => Range(0, 100) !== Range(0, 1)),
     test('Range(0, Infinity) constructs', () => String(Range(0, Infinity)) === 'Range(0, Infinity)'),
     test('Range(5, 1) rejected by input validation', () => throws(() => Range(5, 1))),
-    test('Range bounds must be Numbers, not contracts', () =>
-      throws(() => Range(Equals(1), Equals(2)))),
+    test('Equals forwards its value through Range Number seats', () =>
+      Range(Equals(1), Equals(2)) === Range(Equals(1), Equals(2))),
     test('membership: 50 in Range(0, 100)', () => 50 instanceof Range(0, 100)),
     test('membership: 200 not in Range(0, 100)', () => !(200 instanceof Range(0, 100))),
     test('a Tuple is not in a Range (no coercion)', () => !(Tuple(50) instanceof Range(0, 100))),
@@ -675,6 +678,10 @@ export const suites = [
         ($, [b]) => $(Add(Equals(1), b))(b => b === 9),
         $ => $(_)(() => false)
       )),
+    test('Equals forwards its value through semantic instanceof', () =>
+      Equals(6).valueOf() === 6
+        && instanceOf(Equals(6), Number)
+        && instanceOf(Equals(6), Numeric)),
     test('contract-valued Enum leaves use membership', () =>
       match(50)(
         $ => $(Range(0, 100))(value => value === 50),
