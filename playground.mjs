@@ -268,23 +268,6 @@ log('whole records:', a === b)
 log('children shared:', a.left === shared && b.left === shared)`,
   },
   {
-    name: 'Define your own enum',
-    code: `// a contract is a predicate behind semantic instanceOf
-const Even = contractCheck(v => typeof v === "number" && v % 2 === 0)
-log('4 is Even:', instanceOf(4, Even), '| 3 is Even:', instanceOf(3, Even))
-
-// an enum is a gated constructor: args checked, result declared, node interned
-const { Pair } = createEnums(() => class {
-  Pair = Enum($ => $(Even, Even)(Even))
-})
-const p = Pair(2, 4)
-log(p, '- interned:', p === Pair(2, 4))
-
-// declared result: a Pair stands wherever Even is demanded, so pairs nest
-log(Pair(6, Pair(2, 4)))
-try { Pair(3, 4) } catch (e) { log(String(e)) }`,
-  },
-  {
     name: 'Facts & the gate',
     code: `const n = Add(1, 2)
 log('raw literals pass (transparency):', String(n))
