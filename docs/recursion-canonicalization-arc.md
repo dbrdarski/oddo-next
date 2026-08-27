@@ -4,7 +4,7 @@ This file records the useful direction changes from the 2026-08-20/21
 investigation. It is **not** the current API or design authority.
 
 The committed implementation is described in `docs/HANDOVER-recursion.md` and
-`src/function.mjs`. The current test suite reports **168 passing, 0 failing**.
+`src/function.mjs`. The current test suite reports **162 passing, 0 failing**.
 
 **Later supersession (2026-08-25).** This history originally concluded that
 canonicalization belonged inside factory formation and that the expanded candidate
@@ -113,8 +113,9 @@ Add(1, 2) !== Add(2, 1)
 Sub(Sub(n, 1), 1) !== Sub(n, 2)
 ```
 
-The later placement is contextual preparation. Factories validate, construct, and
-structurally intern their nodes; the complete pre-normal expression is durable
+The later placement is contextual preparation. Factories check declared seats,
+construct, and structurally intern their nodes without linting controlled lowering
+output; the complete pre-normal expression is durable
 `E`. Pure preparation takes `E` plus explicit semantic context, derives
 demands/regions/obligations, and retains canonical `C`. A later separate judgment
 may derive retained `S`; its input/API remains unpinned. Structural matching still

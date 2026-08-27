@@ -65,6 +65,40 @@ for Enums. Enum seats and `Combine` use Tuple itself directly. The parallel
 These changes preserve the three distinct identity namespaces and do not make
 Tuple or Record into Enums.
 
+## 2026-08-27 — internal form constructors are not lint boundaries
+
+**Ruling (Dane), implemented in the current working slice.** The demonstrator's
+lowering, expansion, and canonicalization machinery controls the internal forms it
+constructs. Their reusable Enum definitions must therefore remain at the highest
+useful abstraction instead of defensively rechecking every promise made by that
+producer.
+
+Declared Enum seats, generic binding, construction, and interning remain the form
+mechanics. Enum's optional cross-argument validator remains an available language
+facility, but it is not a default hardening layer and none of the current internal
+Domain, function-form, or Preparation declarations needs it. Source validity and
+producer invariants belong in lowering, a linter, or the semantic judgment that
+actually needs them.
+
+Accordingly, the following constructor/helper checks were removed:
+
+- `Range(lo, hi)` no longer rejects `lo > hi`; the reversed interval is an
+  expressible empty form and may later canonicalize to `Bottom`;
+- region factories no longer recheck branch contract-ness, arity, or stored `_`
+  syntax at their low-level doors; the ruled binary contract vocabulary and the
+  prohibition on persistent `_` remain lowering/canonicalization rules;
+- function-form constructors no longer recheck whole indexes/counts, owner kinds,
+  arm collections, outer-reference bounds, or host-function absence;
+- `internFn`, symbolic argument substitution, invocation, and `expand` no longer
+  duplicate producer checks for reference counts, indexes, call arity, or nominal
+  entry type;
+- `Preparation` no longer repeats constraints already stated by its seats.
+
+This is not a ruling that malformed source is valid. It is a ruling about where
+validity is established. Operational rejection remains where it selects an actual
+semantic boundary—for example, an unsupported preparation judgment, an
+unmaterializable callee, or a match with no fitting arm.
+
 ## 2026-08-26 — transient contract values forward through `valueOf`
 
 **Ruling (Dane), implemented in `e6e09a0`.** Oddo's semantic contract check is
@@ -494,11 +528,12 @@ pre-normalization demands. Effectful code and non-exact ordered matches are not
 reordered under that rule.
 
 **Implementation status through `f232b36`.** `Top`, `Bottom`, and the one language
-`Null` are canonical zero-seat membership-defined Enum values/contracts. Strict
-binary `Union`, `Intersection`, and `Difference` contract Enums are also landed.
-No parallel contract-construction helper remains. `_` is rejected as a stored
-region branch. `Optional` is removed and `LL` uses an explicit `Null` terminator
-through `Union(Null, LL)`.
+`Null` are canonical zero-seat membership-defined Enum values/contracts. Binary
+`Union`, `Intersection`, and `Difference` contract Enums are also landed. No
+parallel contract-construction helper remains. `_` remains invalid as a stored
+region branch in the canonical language, but the reusable factories no longer
+duplicate that lowering rule as construction-time lint. `Optional` is removed and
+`LL` uses an explicit `Null` terminator through `Union(Null, LL)`.
 
 The manually invoked `canonicalizeDomain` kernel now lands immediate
 deduplication; Bottom identity and Top absorption for Union; Top identity and

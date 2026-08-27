@@ -2,7 +2,7 @@
 
 Agreed 2026-08-19, before the enum/contract implementation (revised the same
 day: the result slot merges C2 and V2), and updated through the author rulings of
-2026-08-26 and implementation `e6e09a0`. Sections 1–6 preserve the core
+2026-08-27. Sections 1–6 preserve the core
 enum/contract implementation; sections
 7–8 describe matching, canonical functions, and the ruled canonicalization layer,
 including the first contextual-preparation slice landed on 2026-08-25. This file
@@ -10,7 +10,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **168 passing, 0 failing**.
+Current verification: **162 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -130,11 +130,14 @@ Name = Enum(
     inventing a theorem about the result of applying that function.
   A multi-entry result cannot exist. "Produces A or B" is written explicitly:
   `(Union(A, B))`.
-- **Input validation** (Enum's optional second argument) — runs at
-  construction over all call arguments together, after the seat checks. Its
-  only job is what per-position contracts cannot say: relations between
-  arguments (`Range` needs `lo <= hi`). Anything about one argument alone
-  belongs in a seat.
+- **Input validation** (Enum's optional second argument) — an available way for
+  an Enum to define an intrinsic relation across its arguments. It is not a
+  defensive layer for facts guaranteed by the producer. The demonstrator's
+  lowering, expansion, and canonicalization machinery controls its internal
+  forms, so source diagnostics and producer promises belong in that producer, a
+  linter, or the semantic judgment that consumes them. None of the current
+  internal Domain, function-form, or Preparation declarations uses this optional
+  hook.
 
 For a nonempty result, telling the two forms apart needs no marker: a bare
 arrow—no `.prototype`, no `Symbol.hasInstance` of its own—can only be a check.
@@ -164,7 +167,7 @@ would read shared mutable state and is ruled out (§10).
 Each lazy Enum factory also registers its hidden constructor with the public
 factory. `mapEnum(value, map)` uses that registry to map one level of a known
 Enum value and rebuild it through its original factory. Rebuilding therefore
-reruns per-construction validation, generic binding, and interning while reusing
+reruns declared-seat checking, generic binding, and interning while reusing
 the once-resolved declaration and facts. It does not bypass the front door. It
 returns `undefined` for values that are not registered Enums. Recursive
 traversal is the caller's job—canonical-function expansion handles Tuples
@@ -175,12 +178,12 @@ Registered Enum values satisfy it; Tuple and Record values do not. Runtime
 structural matching uses this relation rather than treating every Array subclass
 as an Enum.
 
-`mapEnum` reconstruction validates and structurally interns the rebuilt Enum
-through that same front door. It is phase-blind and does not by itself transform
-expanded `E` into canonical `C`: it has no incoming semantic context. A later
-explicit preparation stage uses the matcher to derive and retain `C`. `expand`
-produces `E`; preparation is general machinery rather than an `expand`-specific
-pass.
+`mapEnum` reconstruction checks declared seats and structurally interns the
+rebuilt Enum through that same front door. It is phase-blind and does not by
+itself transform expanded `E` into canonical `C`: it has no incoming semantic
+context. A later explicit preparation stage uses the matcher to derive and retain
+`C`. `expand` produces `E`; preparation is general machinery rather than an
+`expand`-specific pass.
 
 ## 4. Membership
 
@@ -279,16 +282,13 @@ holes as well as values. No second capture implementation exists.
 
 ## 6. The domain
 
-This listing summarizes the demonstrator landed through `e6e09a0`. The region
-constructors currently provide strict construction, canonical structural identity,
+This listing summarizes the current demonstrator. The region constructors provide
+canonical structural identity,
 membership, and a local root-reduction kernel. The broader normalization laws
 immediately below remain a target.
 
 ```js
 export const isRegion = value => isContract(value) && value !== _
-
-const regionArguments = length => (...regions) =>
-  regions.length === length && regions.every(isRegion)
 
 const Domain = createEnums(() => class {
 
@@ -298,18 +298,15 @@ const Domain = createEnums(() => class {
 
   Union = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value =>
-      instanceOf(value, T1) || instanceOf(value, T2)),
-    regionArguments(2))
+      instanceOf(value, T1) || instanceOf(value, T2)))
 
   Intersection = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value =>
-      instanceOf(value, T1) && instanceOf(value, T2)),
-    regionArguments(2))
+      instanceOf(value, T1) && instanceOf(value, T2)))
 
   Difference = Enum(($, [base, excluded]) =>
     $(base, excluded)((base, excluded) => value =>
-      instanceOf(value, base) && !instanceOf(value, excluded)),
-    regionArguments(2))
+      instanceOf(value, base) && !instanceOf(value, excluded)))
 
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
 
@@ -320,11 +317,8 @@ const Domain = createEnums(() => class {
 
   Equals = Enum(($, [E]) => $(E)(E => value => value === E))
 
-  Range = Enum(
-    $ => $(Number, Number)((lo, hi) => value =>
-      instanceOf(value, Number) && lo <= value && value <= hi),
-    (lo, hi) => lo <= hi
-  )
+  Range = Enum($ => $(Number, Number)((lo, hi) => value =>
+    instanceOf(value, Number) && lo <= value && value <= hi))
 
   LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
@@ -352,9 +346,11 @@ Object.defineProperty(Equals.kind.prototype, 'valueOf', {
   No current domain constructor produces `Bottom` or `Null`.
   Here Bottom admits no realized value; a form declared to produce Bottom is a
   result-bound statement about that form, not a realized member of Bottom.
-- `Union`, `Intersection`, and `Difference` — binary membership-defined Enums.
-  They require exactly two contract branches and reject `_`, which remains wildcard
-  syntax rather than a stored region value. `Difference` is ordered.
+- `Union`, `Intersection`, and `Difference` — binary membership-defined Enums in
+  the canonical region vocabulary; `Difference` is ordered. Their operands are
+  contract regions and `_` remains wildcard syntax rather than a persistent
+  region value. Those are lowering/canonicalization rules, not defensive checks at
+  the reusable Enum door.
 - `Numeric` — the transparency rule at work: contract-form result identical
   to its one seat; membership reaches `typeof` through declared structure
   only, nothing repeated anywhere.
@@ -372,10 +368,12 @@ Object.defineProperty(Equals.kind.prototype, 'valueOf', {
   exact-value contract for matching and later judgments. It is transient for
   semantic admission: `Equals(E).valueOf()` forwards `E` through `instanceOf`.
 - `Range` — a membership-defined two-seat Enum whose nodes are contracts. Seat
-  contracts check each endpoint; the input validator enforces `lo <= hi`;
-  membership checks the closed interval. A transient exact contract can occupy
-  an endpoint seat through its value, so `Range(Equals(1), Equals(2))` is valid
-  and retains those written contract operands.
+  contracts check each endpoint and membership checks the closed interval. A
+  reversed interval remains an expressible empty form and may later canonicalize
+  to `Bottom`; the constructor does not lint endpoint order. A transient exact
+  contract can occupy an endpoint seat through its value, so
+  `Range(Equals(1), Equals(2))` is valid and retains those written contract
+  operands.
 - `LL` — a two-seat recursive value with an explicit `Null` terminator. `LL(1)`
   and raw host-nullish tails reject; the empty/terminal tail is written `Null`.
 
@@ -460,11 +458,10 @@ partial tree such as `Add(Number, 2)` is both a legal structural value and a
 pattern. Declared value seats still validate normally through `instanceOf`:
 `Range(1, 2)` and `Range(Equals(1), Equals(2))` are both valid because the exact
 contracts forward `1` and `2`. Generic seats retain and capture their original
-values. The landed binary region Enums add ordinary input validation on
-top: `Union`, `Intersection`, and `Difference` require exactly two contract
-branches and reject wildcard `_` as a persistent region operand. This strict
-construction boundary is separate from the still-unimplemented algebraic
-normalization relation.
+values. `Union`, `Intersection`, and `Difference` remain a binary canonical
+vocabulary over contract regions, and `_` remains invalid as a persistent branch.
+Lowering/canonicalization owns those source rules; their reusable Enum factories
+do not duplicate them as construction-time lint.
 
 An ordinary successful case calls its handler with generic bindings in generic
 declaration order, not pattern traversal order. Non-generic pattern parts do
@@ -511,12 +508,19 @@ expand(functionRef)                  // residual structural formula
 ```
 
 `Lambda` is an already-lowered function form. `OuterRef(i)` names position
-`i` in its ordered reference environment. `internFn` requires exactly the
-form's declared number of references and returns a frozen canonical
-`FunctionRef(form, Tuple(...references))`. Form plus the complete ordered
-environment is function identity: equal inputs reintern, while changing or
-reordering references produces a different function value. No source parser,
-closure inspection, or JavaScript-source canonicalizer is implied by this API.
+`i` in its ordered reference environment. The lowering producer supplies the
+form's complete ordered references; `internFn` does not duplicate that source
+check and returns a frozen canonical `FunctionRef(form, Tuple(...references))`.
+Form plus the complete ordered environment is function identity: equal inputs
+reintern, while changing or reordering references produces a different function
+value. No source parser, closure inspection, or JavaScript-source canonicalizer is
+implied by this API.
+
+The same boundary applies to the lowered syntax Enums: their factories state
+seats and preserve structure but do not lint whole indexes/counts, reference
+bounds, owner kinds, arm collections, host functions, or call arity. Those are
+producer/source rules. Expansion retains only operational rejection needed by
+the semantics it currently implements.
 
 An internal reference can be stored as a canonical `Lambda` form in the
 environment. When its `OuterRef` is resolved—including in value, pattern, or
@@ -832,12 +836,9 @@ explicit production `prepare(E)(incomingContract)` stage and structural
 `Preparation(E, context, accepted, resultContract, obligations, C)` value are
 landed for the two zero-multiplication contexts described above. They retain `E`
 and contextual `C` without a wrapper context, dedicated lookup cache, facts-side
-association, FunctionBody integration, `S`, or multi-argument support. The host-function
-guard rejects an ordinary function but
-admits any function
-carrying an own `Symbol.hasInstance` property. It checks presence only—not
-callability, canonical provenance, or full contract validity—which is
-consistent with this demonstrator's non-hardened boundary.
+association, FunctionBody integration, `S`, or multi-argument support. Internal
+form constructors deliberately do not harden this controlled demonstrator against
+malformed lowering output; a future parser/linter owns those diagnostics.
 
 ## 9. Implementation backlog and separate future work
 

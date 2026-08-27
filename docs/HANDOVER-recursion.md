@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **168 passing,
+and `decisions.md` remain the design authority. `npm test` reports **162 passing,
 0 failing**.
 
 Semantic contract fulfilment uses
@@ -35,10 +35,9 @@ exactly:
 
 Rebuilding equal forms with equal ordered references returns the same function
 reference. Changing a reference or its position produces a different function.
-Ordinary host functions are rejected as bodies/references. The current
-demonstrator guard admits a function carrying any own `Symbol.hasInstance`
-property; it checks presence only, not callability or canonical provenance.
-Language-level function values themselves are canonical Enums.
+The lowering producer supplies the complete valid form and ordered reference
+environment. `internFn` preserves and interns that structure; it does not harden
+the demonstrator by rechecking reference counts or rejecting host functions.
 
 This is a lowered-form API. Source parsing and source-to-`Lambda` lowering are not
 implemented here. Consequently, the `a`/`b`/`c`/`d` collapse discussed during the
@@ -95,8 +94,8 @@ input domain, or simplify arithmetic itself. It still preserves a value such as
 preparation stage has one production zero-multiplication rule; it is not integrated
 into `expand`.
 
-Factories continue to validate, construct, and structurally intern their nodes;
-the complete expansion result is durable `E`. The landed call is
+Factories continue to check declared seats, construct, and structurally intern
+their nodes; the complete expansion result is durable `E`. The landed call is
 `prepare(E)(incomingContract)`, where the context is the direct region contract—not
 a context Enum or Tuple wrapper. It returns the canonical structural value
 `Preparation(E, context, accepted, resultContract, obligations, C)` in exactly that
@@ -146,23 +145,21 @@ Pattern construction and pattern fitting are different phases. If constructing a
 arm's pattern throws, the match aborts because no valid pattern exists. Fallthrough
 occurs only after a valid pattern has been constructed and fails to fit.
 
-## 5. Validation boundaries
+## 5. Formation boundary
 
-Construction and expansion reject malformed forms and calls:
+These Enums are a reusable representation of already-lowered internal forms, not
+a linter for the producer that creates them. Their factories state seats and
+intern structure, but they do not duplicate lowering promises about whole
+indexes/counts, outer-reference bounds, complete reference environments, owner
+kinds, Tuple arm contents, host functions, or call arity. `internFn`, symbolic
+substitution, invocation, and `expand` likewise omit those defensive preflights.
 
-- reference and argument indices must be non-negative integers;
-- outer references in a Lambda body must fit its declared reference count;
-- `internFn` requires exactly that many applied references;
-- argument and arm collections must satisfy `instanceof Tuple` directly; there is
-  no separate Tuple-recognition contract;
-- callee and CallArgument owner expressions must be an `OuterRef`, `Lambda`, or
-  canonical `FunctionRef`;
-- `argumentCountOf` reports a known `Lambda`/`FunctionRef` arity and returns
-  `undefined` for an unresolved owner; the first preparation rule uses it to require
-  argument zero of a known unary function;
-- call arity is checked before a call can become residual;
-- ordinary host functions without an own `Symbol.hasInstance` marker are rejected;
-  the marker is a presence-only demonstrator guard, not provenance validation.
+Those constraints still describe valid lowering where applicable; malformed
+source has not become valid. A future parser/linter owns its diagnostics. Runtime
+checks remain only where the current evaluator must select an implemented semantic
+path, such as materializing a supported callee. `argumentCountOf` reports a known
+`Lambda`/`FunctionRef` arity and the first preparation rule uses it to select
+argument zero of a known unary function.
 
 `CallArgument`, `Apply`, and `Match` currently declare `Numeric` as a temporary
 result so they can occupy existing Numeric seats. This relies on the repository's
@@ -183,10 +180,9 @@ The committed suite covers:
 - ordered, contract-only, and nested Match bindings;
 - captured and closed-function patterns;
 - residual Match continuations;
-- invalid references, host functions, Tuple shape, and arity;
 - nominal Tuple/Record identity and registered `instanceof Enum` provenance;
-- canonical zero-seat Top/Bottom/Null contract Enum values and strict binary
-  region membership Enums;
+- canonical zero-seat Top/Bottom/Null contract Enum values and binary region
+  membership Enums;
 - local, nonrecursive region deduplication and Top/Bottom reduction laws;
 - the six-field Preparation value and both zero-multiplication contexts.
 
@@ -213,8 +209,8 @@ The following are not landed:
    association mechanism remain unpinned; retained `S` never merges with or
    replaces `E` or `C`.
 4. General canonical region/logic normalization. Zero-seat Top, Bottom, and Null
-   contract Enum values, strict binary Union/Intersection/Difference membership
-   Enums, Optional removal, explicit-Null LL, and the immediate root deduplication
+   contract Enum values, binary Union/Intersection/Difference membership Enums,
+   Optional removal, explicit-Null LL, and the immediate root deduplication
    and Top/Bottom laws are landed. The kernel does not recurse. Bottom-up traversal,
    flattening/order/left-association, containment/disjointness, effective Match
    remainders, Pure exact region-to-result logical normalization, guard/`~`

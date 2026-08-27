@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**168 passing, 0 failing**.
+**162 passing, 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -23,7 +23,14 @@ flag, cleanup protocol, or construction residue in the current design.
   the Enum registry. Tuple and Record therefore cannot be mistaken for structural
   Enums.
 - `mapEnum(value, map)` rebuilds a registered Enum through its original factory, so
-  validation and interning remain the one construction path.
+  declared-seat checking and interning remain the one construction path.
+
+Internal form factories are not linter boundaries. Lowering, expansion, and
+canonicalization control the forms they produce, so their reusable constructors do
+not duplicate producer promises such as whole indexes, reference bounds, owner
+kinds, arm contents, endpoint ordering, or call arity. Source diagnostics belong
+in lowering or a future linter; semantic judgments still reject inputs outside the
+behavior they implement.
 
 ## 2. Structural pattern matching
 
@@ -140,9 +147,10 @@ See `docs/HANDOVER-recursion.md` for canonical function identity and expansion.
 
 ## 7. Contextual formula preparation
 
-Enum factories validate, construct, and structurally intern their nodes. Once
-writing, lowering, or expansion has produced a complete pre-normal expression,
-that durable form is `E`. Canonicalization is a later pure contextual stage:
+Enum factories check declared seats, construct, and structurally intern their
+nodes. Once writing, lowering, or expansion has produced a complete pre-normal
+expression, that durable form is `E`. Canonicalization is a later pure contextual
+stage:
 
 ```text
 retain complete expanded/pre-normal E
@@ -222,8 +230,10 @@ unpinned and require author judgment. No accepted-domain field or Top filler is
 added by this ruling.
 
 `Top`, `Bottom`, and the one language `Null` are canonical zero-seat contract Enum
-values; strict binary `Union`, `Intersection`, and relative `Difference` are
-contract Enums. `Optional` is removed in favor of `Union(Null, T)`, and `LL` has an
+values; binary `Union`, `Intersection`, and relative `Difference` are the canonical
+contract vocabulary. Their reusable factories do not lint branch validity; that is
+a lowering/canonicalization responsibility. `Optional` is removed in favor of
+`Union(Null, T)`, and `LL` has an
 explicit `Null` terminator. The manually invoked root kernel lands deduplication,
 Union's Bottom identity and Top absorption, Intersection's Top identity and Bottom
 absorption, and the direct Difference laws for equal operands, Bottom, and Top.
