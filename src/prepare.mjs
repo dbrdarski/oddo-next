@@ -15,10 +15,7 @@ import { CallArgument, argumentCountOf } from './function.mjs'
 const Region = Object.freeze(contractCheck(isRegion))
 
 const { Preparation } = createEnums(() => class {
-  Preparation = Enum(
-    $ => $(Top, Region, Region, Region, Tuple, Top)(),
-    (...values) => values.length === 6 && values.slice(1, 4).every(isRegion)
-  )
+  Preparation = Enum($ => $(Top, Region, Region, Region, Tuple, Top)())
 })
 
 const Language = Object.freeze({

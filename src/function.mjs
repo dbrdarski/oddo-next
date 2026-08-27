@@ -2,14 +2,11 @@
 // Canonical Functions
 // ==========================================
 
-import { isContract } from './contract.mjs'
 import { Enum, createEnums, mapEnum } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import { Numeric } from './domain.mjs'
-
-const whole = value => globalThis.Number.isInteger(value) && value >= 0
 
 const {
   OuterRef,
@@ -23,93 +20,26 @@ const {
 } = createEnums(() => class {
   // References are holes in a canonical form. Their values are supplied
   // only when that form is applied to an ordered reference environment.
-  OuterRef = Enum(
-    $ => $(Number)(index => () => true),
-    index => whole(index)
-  )
-  CallArgument = Enum(
-    $ => $(Number, _)(Numeric),
-    (...values) => values.length === 2 && whole(values[0]) && isFunctionOwner(values[1])
-  )
-  MatchArgument = Enum(
-    $ => $(Number)(index => () => true),
-    index => whole(index)
-  )
-  Apply = Enum(
-    $ => $(_, Tuple)(Numeric),
-    (...values) => (
-      values.length === 2 &&
-      isFunctionOwner(values[0]) &&
-      values[1] instanceof Tuple
-    )
-  )
-  Arm = Enum(
-    $ => $(_, _)(),
-    (...values) => values.length === 2
-  )
-  Match = Enum(
-    $ => $(_, Tuple)(Numeric),
-    (...values) => (
-      values.length === 2 &&
-      values[1] instanceof Tuple &&
-      values[1].every(arm => arm instanceof Arm)
-    )
-  )
-  Lambda = Enum(
-    $ => $(Number, Number, _)(),
-    (...values) => (
-      values.length === 3 &&
-      whole(values[0]) &&
-      whole(values[1]) &&
-      !containsHostFunction(values[2]) &&
-      outerReferencesWithin(values[2], values[0])
-    )
-  )
+  OuterRef = Enum($ => $(Number)(index => () => true))
+  CallArgument = Enum($ => $(Number, _)(Numeric))
+  MatchArgument = Enum($ => $(Number)(index => () => true))
+  Apply = Enum($ => $(_, Tuple)(Numeric))
+  Arm = Enum($ => $(_, _)())
+  Match = Enum($ => $(_, Tuple)(Numeric))
+  Lambda = Enum($ => $(Number, Number, _)())
   FunctionRef = Enum($ => $(Lambda, Tuple)())
 })
-
-const isFunctionOwner = value =>
-  value instanceof OuterRef || value instanceof Lambda || value instanceof FunctionRef
 
 export const argumentCountOf = owner => {
   const form = owner instanceof FunctionRef ? owner[0] : owner
   return form instanceof Lambda ? form[1] : undefined
 }
 
-const containsHostFunction = (value, seen = new WeakSet()) => {
-  if (typeof value === 'function')
-    return !Object.hasOwn(value, Symbol.hasInstance)
-  if (value === null || typeof value !== 'object' || isContract(value))
-    return false
-  if (value instanceof Lambda || value instanceof FunctionRef || seen.has(value))
-    return false
-
-  seen.add(value)
-  return Reflect.ownKeys(value).some(key => containsHostFunction(value[key], seen))
-}
-
-const outerReferencesWithin = (value, count, seen = new WeakSet()) => {
-  if (value instanceof OuterRef) return value[0] < count
-  if (value === null || typeof value !== 'object') return true
-  if (value instanceof Lambda || value instanceof FunctionRef || seen.has(value))
-    return true
-
-  seen.add(value)
-  return Reflect.ownKeys(value).every(key => outerReferencesWithin(value[key], count, seen))
-}
-
-export const internFn = (form, ...references) => {
-  if (!(form instanceof Lambda) || references.length !== form[0])
-    throw new TypeError('Invalid canonical function application')
-  if (references.some(reference => containsHostFunction(reference)))
-    throw new TypeError('Host functions must be represented as canonical function values')
-  return FunctionRef(form, Tuple(...references))
-}
+export const internFn = (form, ...references) =>
+  FunctionRef(form, Tuple(...references))
 
 const resolveOuter = (reference, frame) => {
   if (!(reference instanceof OuterRef)) return reference
-  if (!(reference[0] in frame.references))
-    throw new TypeError(`Missing outer reference at index ${reference[0]}`)
 
   const value = frame.references[reference[0]]
   return value instanceof Lambda ? internFn(value, ...frame.references) : value
@@ -124,9 +54,6 @@ const materialize = (value, frame) => {
 
 const callArgument = (tree, frame, context) => {
   const owner = materialize(tree[1], frame)
-  if (tree[0] >= owner[0][1])
-    throw new TypeError(`Invalid call argument at index ${tree[0]}`)
-
   const ownerFrame = context.stack.findLast(active => active.fn === owner)
   return ownerFrame ? ownerFrame.arguments[tree[0]] : CallArgument(tree[0], owner)
 }
@@ -153,8 +80,6 @@ const evaluate = (tree, frame, context, execute = true) => {
   if (tree instanceof MatchArgument) {
     if (!execute) return tree
     const bindings = context.matches.at(-1)
-    if (!bindings || !(tree[0] in bindings))
-      throw new TypeError(`Missing match argument at index ${tree[0]}`)
     return bindings[tree[0]]
   }
 
@@ -206,12 +131,7 @@ const evaluate = (tree, frame, context, execute = true) => {
 }
 
 const invoke = (fn, arguments_, context) => {
-  if (!(fn instanceof FunctionRef))
-    throw new TypeError(`Not a canonical function: ${fn}`)
-
   const [form, references] = fn
-  if (arguments_.length !== form[1])
-    throw new TypeError(`Expected ${form[1]} call arguments, got ${arguments_.length}`)
   if (context.stack.some(frame => frame.fn === fn))
     return Apply(fn, Tuple(...arguments_))
 
@@ -221,15 +141,11 @@ const invoke = (fn, arguments_, context) => {
   finally { context.stack.pop() }
 }
 
-export const expand = fn => {
-  if (!(fn instanceof FunctionRef))
-    throw new TypeError(`Not a canonical function: ${fn}`)
-
-  return invoke(
+export const expand = fn =>
+  invoke(
     fn,
     Array.from({ length: fn[0][1] }, (_, index) => CallArgument(index, fn)),
     { stack: [], matches: [] }
   )
-}
 
 export { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda }

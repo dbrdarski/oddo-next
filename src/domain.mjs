@@ -12,9 +12,6 @@ import { Number, Indeterminate } from './numeric.mjs'
 // syntax; persistent region operands use the named Top contract instead.
 export const isRegion = value => isContract(value) && value !== _
 
-const regionArguments = length => (...regions) =>
-  regions.length === length && regions.every(isRegion)
-
 // const Union = (conA, conB) => value => value instanceof conA || value instanceof conB
 
 /*
@@ -33,15 +30,12 @@ const Domain = createEnums(() => class {
   Null = Enum($ => $()(() => value => value === Null))
   // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
   Union = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => instanceOf(value, T1) || instanceOf(value, T2)),
-    regionArguments(2))
+    $(T1, T2)((T1, T2) => value => instanceOf(value, T1) || instanceOf(value, T2)))
   Intersection = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => instanceOf(value, T1) && instanceOf(value, T2)),
-    regionArguments(2))
+    $(T1, T2)((T1, T2) => value => instanceOf(value, T1) && instanceOf(value, T2)))
   Difference = Enum(($, [base, excluded]) =>
     $(base, excluded)((base, excluded) => value =>
-      instanceOf(value, base) && !instanceOf(value, excluded)),
-    regionArguments(2))
+      instanceOf(value, base) && !instanceOf(value, excluded)))
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
   // Numeric = Enum($ => $(Number)(Union(Number, Indeterminate)))
   Add = Enum($ => $(Numeric, Numeric)(Numeric))
@@ -50,8 +44,7 @@ const Domain = createEnums(() => class {
   Div = Enum($ => $(Numeric, Numeric)(Numeric))
   Equals = Enum(($, [E]) => $(E)(E => value => value === E))
   Range = Enum($ => $(Number, Number)((lo, hi) => value =>
-    instanceOf(value, Number) && lo <= value && value <= hi),
-    (lo, hi) => lo <= hi)
+    instanceOf(value, Number) && lo <= value && value <= hi))
   LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
 

@@ -195,27 +195,6 @@ export const suites = [
           )
       )
     }),
-    test('Preparation enforces its concrete field contracts and arity', () => {
-      const expanded = Mul(0, CallArgument(0, OuterRef(0)))
-      const valid = [expanded, Number, Number, Equals(0), Tuple(), 0]
-      return throws(() => Preparation(...valid.slice(0, 5)))
-        && throws(() => Preparation(...valid, 1))
-        && throws(() => Preparation(expanded, 1, Number, Equals(0), Tuple(), 0))
-        && throws(() => Preparation(expanded, Number, 1, Equals(0), Tuple(), 0))
-        && throws(() => Preparation(expanded, Number, Number, 1, Tuple(), 0))
-        && throws(() => Preparation(expanded, _, Number, Equals(0), Tuple(), 0))
-        && throws(() => Preparation(expanded, Number, _, Equals(0), Tuple(), 0))
-        && throws(() => Preparation(expanded, Number, Number, _, Tuple(), 0))
-        && throws(() => Preparation(expanded, Number, Number, Equals(0), [], 0))
-        && throws(() => Preparation(
-          expanded,
-          Number,
-          Number,
-          Equals(0),
-          Object.freeze([]),
-          0
-        ))
-    }),
   ]),
 
   suite('Contextual preparation', [
@@ -385,7 +364,12 @@ export const suites = [
     test('Range(0, 100) is interned', () => Range(0, 100) === Range(0, 100)),
     test('different bounds, different ranges', () => Range(0, 100) !== Range(0, 1)),
     test('Range(0, Infinity) constructs', () => String(Range(0, Infinity)) === 'Range(0, Infinity)'),
-    test('Range(5, 1) rejected by input validation', () => throws(() => Range(5, 1))),
+    test('a reversed Range remains an empty representable form', () => {
+      const range = Range(5, 1)
+      return range === Range(5, 1)
+        && !(1 instanceof range)
+        && !(5 instanceof range)
+    }),
     test('Equals forwards its value through Range Number seats', () =>
       Range(Equals(1), Equals(2)) === Range(Equals(1), Equals(2))),
     test('membership: 50 in Range(0, 100)', () => 50 instanceof Range(0, 100)),
@@ -397,8 +381,6 @@ export const suites = [
     test('Add(1, 2) with raw literals', () => String(Add(1, 2)) === 'Add(1, 2)'),
     test('Add(1, Mul(2, Sub(5, 3))) with raw literals', () =>
       Add(1, Mul(2, Sub(5, 3))) === Add(1, Mul(2, Sub(5, 3)))),
-    test('Union rejects values where it requires contract branches', () =>
-      throws(() => Union(Numeric(1), Numeric(2)))),
     test('LL(Numeric(1), Null) - result-stage thread', () =>
       String(LL(Numeric(1), Null)) === 'LL(Numeric(1), Null())'),
   ]),
@@ -451,17 +433,6 @@ export const suites = [
         && 1 instanceof region
         && !(0 instanceof region)
     }),
-    test('binary region Enums require exactly two contracts', () =>
-      [Union, Intersection, Difference].every(factory =>
-        throws(() => factory()) &&
-        throws(() => factory(Number)) &&
-        throws(() => factory(Number, Number, Number)) &&
-        throws(() => factory(1, Number))
-      )),
-    test('wildcard syntax cannot become a stored region branch', () =>
-      [Union, Intersection, Difference].every(factory =>
-        throws(() => factory(_, Number)) && throws(() => factory(Number, _))
-      )),
   ]),
 
   suite('Domain canonicalization', [
@@ -1051,25 +1022,11 @@ export const suites = [
         Tuple(Arm(_, Add(arrived, 1)))
       )
     }),
-    test('function syntax rejects invalid references and host functions', () => {
-      const form = loopForm()
-      return throws(() => CallArgument(0))
-        && throws(() => CallArgument(0, 7))
-        && throws(() => Apply(OuterRef(0), Object.freeze([])))
-        && throws(() => Lambda(1, 0, OuterRef(1)))
-        && throws(() => Lambda(0, 0, () => undefined))
-        && throws(() => internFn(form, () => undefined))
-    }),
     test('CallArgument and Apply temporarily stand at Numeric seats', () => {
       const form = countDownForm()
       const fn = internFn(form, form)
       return producedOf(CallArgument(0, fn)) === Numeric
         && producedOf(Apply(fn, Tuple(CallArgument(0, fn)))) === Numeric
-    }),
-    test('call arity is checked before a call can residualize', () => {
-      const self = OuterRef(0)
-      const form = Lambda(1, 1, Apply(self, Tuple()))
-      return throws(() => expand(internFn(form, form)))
     }),
   ]),
 
