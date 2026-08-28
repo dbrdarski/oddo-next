@@ -4,7 +4,7 @@
 
 // The interner never creates a value it returns. It only decides which
 // already-created reference is the canonical one: on a hit the given value
-// is discarded, on a miss it is frozen and becomes canonical. Values enter
+// is discarded, on a miss it becomes canonical. Values enter
 // one level at a time - children must already be interned (or primitive)
 // before their container is constructed, so no walk ever recurses.
 
@@ -53,7 +53,6 @@ export const canonical = (tag, parts, value) => {
     if (cached) return cached;
   }
 
-  Object.freeze(value);
   current.ref = new WeakRef(value);
   finalizer.register(value, current);
 

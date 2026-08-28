@@ -75,13 +75,12 @@ const unite = (left, right) => {
   throw new TypeError('Unsupported reference union')
 }
 
-const row = (accepted, produced, canonical) =>
-  Object.freeze({
-    [Row]: true,
-    [Accepted]: accepted,
-    [ResultContract]: produced,
-    [Canonical]: canonical,
-  })
+const row = (accepted, produced, canonical) => ({
+  [Row]: true,
+  [Accepted]: accepted,
+  [ResultContract]: produced,
+  [Canonical]: canonical,
+})
 
 const regionOf = pattern => {
   if (pattern === _) return Top
@@ -119,14 +118,14 @@ const result = (expanded, incoming, scrutinee, rows) => {
     (region, item) => unite(region, item[ResultContract]),
     Bottom
   )
-  return Object.freeze({
+  return {
     [Expanded]: expanded,
     [Accepted]: accepted,
     [ResultContract]: produced,
     [Canonical]: canonicalOf(scrutinee, incoming, accepted, rows),
     [Obligations]: Tuple(),
     [Rows]: rows,
-  })
+  }
 }
 
 const prepareZeroMul = (expanded, incoming, dependency) => {

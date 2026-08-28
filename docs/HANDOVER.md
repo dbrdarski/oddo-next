@@ -16,7 +16,7 @@ flag, cleanup protocol, or construction residue in the current design.
   factories themselves are lazily memoized, not interned.
 - `ZeroDivision` and `ZeroMod` are additional canonical front doors keyed by
   their form class and operand.
-- Equal live constructions return the same frozen reference.
+- Equal live constructions return the same canonical reference.
 - Enum identity is its hidden node class. Factories expose that class as `.kind`;
   the ordinary JavaScript `.constructor` remains the node's constructor.
 - `value instanceof Enum` recognizes only values whose hidden constructor is in

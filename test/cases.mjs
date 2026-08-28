@@ -71,10 +71,9 @@ export const suites = [
 
   suite('Interning engine', [
     test('Tuple(1, 2) === Tuple(1, 2)', () => Tuple(1, 2) === Tuple(1, 2)),
-    test('tuples are frozen Tuple arrays', () => {
+    test('tuples are nominal Tuple arrays', () => {
       const tuple = Tuple(1, 2)
-      return Object.isFrozen(tuple)
-        && tuple instanceof Tuple
+      return tuple instanceof Tuple
         && tuple instanceof Array
         && tuple.constructor === Tuple
     }),
@@ -388,7 +387,6 @@ export const suites = [
       [DomainTop, Bottom, Null].every(value =>
         Array.isArray(value)
           && value.constructor !== Array
-          && Object.isFrozen(value)
           && mapEnum(value, part => part) === value
       )
         && DomainTop.constructor !== Bottom.constructor
@@ -745,7 +743,7 @@ export const suites = [
         $ => Combine(Number, Number)(() => false),
         $ => $(_)(() => true)
       )
-      return run([1, 2]) && run(Object.freeze([1, 2]))
+      return run([1, 2])
     }),
     test('ambiguous assignments use occurrence order', () => {
       const add = Add(1, 2)
@@ -807,7 +805,7 @@ export const suites = [
     test('a form and its ordered references determine function identity', () => {
       const form = countDownForm()
       const fn = internFn(form, form)
-      return fn === internFn(countDownForm(), countDownForm()) && Object.isFrozen(fn)
+      return fn === internFn(countDownForm(), countDownForm())
     }),
     test('one lowered form/self application has one canonical identity', () => {
       const [a, b, c, d] = Array.from(

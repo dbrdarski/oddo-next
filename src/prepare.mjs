@@ -12,15 +12,15 @@ import {
 } from './domain.mjs'
 import { CallArgument, argumentCountOf } from './function.mjs'
 
-const Region = Object.freeze(contractCheck(isRegion))
+const Region = contractCheck(isRegion)
 
 const { Preparation } = createEnums(() => class {
   Preparation = Enum($ => $(Top, Region, Region, Region, Tuple, Top)())
 })
 
-const Language = Object.freeze({
+const Language = {
   Mul, Difference, Equals, CallArgument,
-})
+}
 
 const prepareZeroMul = (E, context, dependency, {
   Difference, Equals,

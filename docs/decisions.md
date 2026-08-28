@@ -65,6 +65,23 @@ for Enums. Enum seats and `Combine` use Tuple itself directly. The parallel
 These changes preserve the three distinct identity namespaces and do not make
 Tuple or Record into Enums.
 
+## 2026-08-28 — canonical values use Oddo's mutation boundary
+
+**Ruling (Dane), reflected in the current working slice.** Ordinary Oddo code
+cannot mutate values. Mutation is confined to mutator functions, which proxy
+objects and copy them on edit/set. A published canonical reference is therefore
+never edited in place; mutation produces a distinct value. The original pre-NEXT
+Oddo implementation already follows this rule.
+
+This repository does not implement those mutators or prevent direct host-JavaScript
+writes; its controlled pipeline assumes that published values are not edited in
+place. The demonstrator therefore trusts the language boundary rather than
+duplicating it with host hardening. The interner caches and returns canonical
+references without `Object.freeze`, and freezing is not used as provenance.
+Private contracts, lookup objects, and test-model records likewise need no
+scattered freezing. Runtime representation choices do not participate in
+canonical identity.
+
 ## 2026-08-27 — internal form constructors are not lint boundaries
 
 **Ruling (Dane), implemented in the current working slice.** The demonstrator's

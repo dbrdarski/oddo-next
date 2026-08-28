@@ -2,7 +2,7 @@ import { contractCheck, instanceOf, isContract } from './contract.mjs'
 import { Enum, generic, generics } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 
-export const _ = Object.freeze(contractCheck(() => true))
+export const _ = contractCheck(() => true)
 
 const caseOf = (pattern) => (handler) => [pattern, handler]
 const combined = Symbol()

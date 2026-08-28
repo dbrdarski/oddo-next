@@ -16,8 +16,8 @@ Current verification: **160 passing, 0 failing**.
 
 The interner never creates a value it returns. It only decides which
 already-created reference is canonical: a hit returns the cached reference
-(the given duplicate becomes garbage), a miss freezes the given value and
-remembers it. Values enter one level at a time — children must already be
+(the given duplicate becomes garbage), and a miss remembers the given value.
+Values enter one level at a time — children must already be
 interned (or primitive) before their container is constructed — so no walk
 recurses, nothing is copied, and no caller's object is ever rewritten.
 
@@ -39,6 +39,16 @@ recurses, nothing is copied, and no caller's object is ever rewritten.
 Consequence: structurally equal means pointer-equal, so `===` is value
 equality, deep equality is one pointer comparison, and canonical references
 are perfect keys.
+
+Under Oddo's language semantics, canonical references remain stable through the
+mutation boundary rather than host-JavaScript freezing. Ordinary language code
+cannot mutate values. Mutation is confined to mutator functions, which proxy
+objects and copy on edit/set, so an edit never rewrites a published canonical
+value. The pre-NEXT Oddo implementation already uses this model. This repository
+does not implement those mutators or prevent direct host writes; its controlled
+pipeline assumes the boundary and does not duplicate it with `Object.freeze`.
+Direct host writes and direct use of inherited Array construction methods on
+Tuple values are outside the language model.
 
 The cache stores leaves through `WeakRef`. Canonical identity is therefore a
 live, process-local property: equal values held at the same time share a
@@ -232,7 +242,7 @@ A factory's membership resolves the declaration on demand — first need,
 not first construction: `Add(1, 1)` asks `Numeric` before `Numeric` ever
 ran, so the check itself triggers the (once-cached) resolve.
 
-Termination is structural, not assumed: membership descends through frozen,
+Termination is structural, not assumed: membership descends through finite,
 acyclic contract nodes to ground checks; finite declarations, finite
 descent.
 
@@ -506,7 +516,7 @@ expand(functionRef)                  // residual structural formula
 `Lambda` is an already-lowered function form. `OuterRef(i)` names position
 `i` in its ordered reference environment. The lowering producer supplies the
 form's complete ordered references; `internFn` does not duplicate that source
-check and returns a frozen canonical `FunctionRef(form, Tuple(...references))`.
+check and returns a canonical `FunctionRef(form, Tuple(...references))`.
 Form plus the complete ordered environment is function identity: equal inputs
 reintern, while changing or reordering references produces a different function
 value. No source parser, closure inspection, or JavaScript-source canonicalizer is
