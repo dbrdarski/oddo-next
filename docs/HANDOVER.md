@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**162 passing, 0 failing**.
+**160 passing, 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.

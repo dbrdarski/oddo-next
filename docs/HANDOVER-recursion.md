@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **162 passing,
+and `decisions.md` remain the design authority. `npm test` reports **160 passing,
 0 failing**.
 
 Semantic contract fulfilment uses

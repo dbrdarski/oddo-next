@@ -4,7 +4,7 @@ This file records the useful direction changes from the 2026-08-20/21
 investigation. It is **not** the current API or design authority.
 
 The committed implementation is described in `docs/HANDOVER-recursion.md` and
-`src/function.mjs`. The current test suite reports **162 passing, 0 failing**.
+`src/function.mjs`. The current test suite reports **160 passing, 0 failing**.
 
 **Later supersession (2026-08-25).** This history originally concluded that
 canonicalization belonged inside factory formation and that the expanded candidate

@@ -45,10 +45,6 @@ const step = (current, item) => {
 export const canonical = (tag, parts, value) => {
   let current = step(root, tag);
   for (const part of parts) {
-    // Every interned value is frozen, so an unfrozen object can never be a
-    // legitimate child - it is a raw literal that skipped its constructor.
-    if (part !== null && typeof part === 'object' && !Object.isFrozen(part))
-      throw TypeError(`Not an interned value: ${part}`);
     current = step(current, part);
   }
 

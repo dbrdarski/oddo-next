@@ -42,10 +42,7 @@ const b = Tuple(1, 2)
 log('same tuple:', a === b)
 
 const r = Record({ x: a, tag: "point" })
-log('key order free:', r === Record({ tag: "point", x: Tuple(1, 2) }))
-
-try { Record({ raw: { skipped: "the gate" } }) }
-catch (e) { log('raw child:', String(e)) }`,
+log('key order free:', r === Record({ tag: "point", x: Tuple(1, 2) }))`,
   },
   {
     name: 'Enum nodes',

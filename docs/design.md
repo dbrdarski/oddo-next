@@ -10,7 +10,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **162 passing, 0 failing**.
+Current verification: **160 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -24,8 +24,6 @@ recurses, nothing is copied, and no caller's object is ever rewritten.
 - One trie, one walk: every path is prefixed by its door-specific tag
   (`Record`, `Tuple`, a hidden Enum class, or an Indeterminate-form class), so
   namespaces are structurally disjoint.
-- An unfrozen object child is a raw literal that skipped its constructor:
-  rejected with a TypeError at the door.
 - Construction lives only in the front doors: `Record` (keyed by sorted
   entries), `Tuple` (keyed by elements), the Enum factories, and canonical
   Indeterminate-form constructors such as `ZeroDivision`/`ZeroMod`. Expansion
@@ -49,11 +47,9 @@ scheme. A value may be reconstructed after every prior live reference has
 been collected.
 
 Two boundary facts, stated so they are read as chosen: the JS surface is a
-demonstrator, not a hardened API — the door's frozen guard catches
-accidents (raw literals that skipped their constructor), not fence-hoppers;
-an arbitrary object frozen by hand is outside the model, and legitimate
-values exist only through the front doors. And `+0`/`-0` collapse to one
-key (JS Map semantics) — deliberate, not accidental: the intended number
+demonstrator, not a hardened API, and legitimate language values exist through
+the controlled front doors rather than host literals. And `+0`/`-0` collapse to
+one key (JS Map semantics) — deliberate, not accidental: the intended number
 model has no signed zero.
 
 ## 2. Facts (landed)

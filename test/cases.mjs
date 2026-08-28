@@ -96,8 +96,6 @@ export const suites = [
     test('empty record is canonical', () => Record({}) === Record({})),
     test('children pass through untouched', () => { const t = Tuple(1, 2); return Record({ x: t }).x === t }),
     test('deep nesting is canonical', () => Record({ x: Tuple(1, Tuple(2, 3)) }) === Record({ x: Tuple(1, Tuple(2, 3)) })),
-    test('raw object child is rejected at the door', () => throws(() => Record({ x: { raw: 1 } }))),
-    test('raw array child is rejected at the door', () => throws(() => Tuple([1, 2]))),
   ]),
 
   suite('Facts store', [
