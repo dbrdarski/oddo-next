@@ -2,7 +2,7 @@
 // Domain Definition
 // ==========================================
 
-import { instanceOf, isContract } from './contract.mjs'
+import { fulfills, isContract } from './contract.mjs'
 import { Enum, createEnums } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { match, matchDomain, Combine, _ } from './match.mjs'
@@ -12,14 +12,14 @@ import { Number, Indeterminate } from './numeric.mjs'
 // syntax; persistent region operands use the named Top contract instead.
 export const isRegion = value => isContract(value) && value !== _
 
-// const Union = (conA, conB) => value => value instanceof conA || value instanceof conB
+// const Union = (conA, conB) => value => fulfills(value, conA) || fulfills(value, conB)
 
 /*
     So, Symbol.jasInstance if static element on the class and it can be used to check Enum args
-    Union (A, B) valuue instanceof A || value instanceof B is for argument side
+    Union (A, B) fulfills(value, A) || fulfills(value, B) is for argument side
     The return contract is separate mechanics that needs resolving.
 
-    Idea Return Contract instanceof: Instead of Array, Enums extend the Return Contract (Enum), this way any instace is true for instanceof checks.
+    Idea Return Contract fulfilment: Instead of Array, Enums extend the Return Contract (Enum), this way any instance fulfils its declared return contract.
     This will work for Add and Numeric. But will it work for Unions? The way I see it, create two classes for each type of the Union, and when you instatiate an Union match it to that type.
     But this is a problem for non Union members (like Union(Number, Indeterminate))
 */
@@ -28,14 +28,14 @@ const Domain = createEnums(() => class {
   Top = Enum($ => $()(() => value => value != null))
   Bottom = Enum($ => $()(() => () => false))
   Null = Enum($ => $()(() => value => value === Null))
-  // Union = Enum(($, [T1, T2], { contract = value => value instanceof T1 || value instanceof T2 }) => $(T1, T2))
+  // Union = Enum(($, [T1, T2], { contract = value => fulfills(value, T1) || fulfills(value, T2) }) => $(T1, T2))
   Union = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => instanceOf(value, T1) || instanceOf(value, T2)))
+    $(T1, T2)((T1, T2) => value => fulfills(value, T1) || fulfills(value, T2)))
   Intersection = Enum(($, [T1, T2]) =>
-    $(T1, T2)((T1, T2) => value => instanceOf(value, T1) && instanceOf(value, T2)))
+    $(T1, T2)((T1, T2) => value => fulfills(value, T1) && fulfills(value, T2)))
   Difference = Enum(($, [base, excluded]) =>
     $(base, excluded)((base, excluded) => value =>
-      instanceOf(value, base) && !instanceOf(value, excluded)))
+      fulfills(value, base) && !fulfills(value, excluded)))
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
   // Numeric = Enum($ => $(Number)(Union(Number, Indeterminate)))
   Add = Enum($ => $(Numeric, Numeric)(Numeric))
@@ -44,7 +44,7 @@ const Domain = createEnums(() => class {
   Div = Enum($ => $(Numeric, Numeric)(Numeric))
   Equals = Enum(($, [E]) => $(E)(E => value => value === E))
   Range = Enum($ => $(Number, Number)((lo, hi) => value =>
-    instanceOf(value, Number) && lo <= value && value <= hi))
+    fulfills(value, Number) && lo <= value && value <= hi))
   LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
 

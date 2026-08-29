@@ -1,6 +1,7 @@
 // --- Test Suite ---
 
 import { Record, Tuple } from './src/intern.mjs'
+import { isInstance } from './src/contract.mjs'
 import { Add, Sub, Mul } from './src/domain.mjs'
 
 console.log("=== ENUM INTERNING TESTS ===");
@@ -10,7 +11,7 @@ const node3 = Mul(1, 2);
 
 console.log("Strict Reference Equality (Add === Add):", node1 === node2); // true
 console.log("Different Constructor Identity (Add !== Mul):", node1 === node3); // false
-console.log("Is instance of Add:", node1 instanceof Add); // true
+console.log("Is instance of Add:", isInstance(node1, Add)); // true
 console.log("String Output:", String(node1)); // Add(1, 2)
 
 console.log("\n=== NESTED STRUCTURAL INTERNING ===");

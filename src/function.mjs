@@ -5,7 +5,7 @@
 import { Enum, createEnums, mapEnum } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { Kinds } from './kinds.mjs'
-import { instanceOf } from './contract.mjs'
+import { isInstance } from './contract.mjs'
 import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import { Numeric } from './domain.mjs'
@@ -72,7 +72,7 @@ const callArgument = (tree, frame, context) => {
 }
 
 const rebuild = (tree, visit, mapped = mapEnum(tree, visit)) =>
-  mapped ?? (instanceOf(tree, Tuple) ? Tuple(...Array.from(tree, visit)) : tree)
+  mapped ?? (isInstance(tree, Tuple) ? Tuple(...Array.from(tree, visit)) : tree)
 
 const instantiatePattern = (tree, frame, genericAt) => match(tree)(
   $ => $(MatchArgument.kind)(tree => genericAt(tree[0])),
@@ -88,7 +88,7 @@ const containsCall = tree => match(tree)(
   $ => $(Lambda.kind)(() => false),
   $ => $(FunctionRef.kind)(() => false),
   ($, [value]) => $(value)(value =>
-    instanceOf(value, Array) && value.some(containsCall))
+    isInstance(value, Array) && value.some(containsCall))
 )
 
 const evaluate = (tree, frame, context, execute = true) => match(tree)(

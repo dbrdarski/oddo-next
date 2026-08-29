@@ -3,7 +3,9 @@
 // ==========================================
 
 import { canonical } from './intern.mjs'
-import { contractCheck, instanceOf, isContract, producedOf, sub } from './contract.mjs'
+import {
+  contractCheck, fulfills, isContract, isInstance, producedOf, sub
+} from './contract.mjs'
 import { fact, learn, Resolve, Produces, Transparent } from './facts.mjs'
 
 const once = (fn, cached = false, cache) => (...args) => (
@@ -69,7 +71,7 @@ export const Enum = (build, input) => {
       // if (!definitions[i](args[i]))
       if (!(
         structural && !definitions[i].generic && isContract(args[i]) ||
-        instanceOf(args[i], definitions[i])
+        fulfills(args[i], definitions[i])
       ))
         throw TypeError(`Validation failed at index ${i} for value: ${JSON.stringify(args[i])}`)
     if (input && !input(...args))
@@ -104,7 +106,7 @@ const lazyEnumFactory = (name, fn) => {
   // declaration on demand - first need, not first construction.
   const factory = contractCheck(
     (v, transparent = (fact(fn, Resolve)(constructor), fact(constructor, Transparent))) =>
-      v instanceof constructor || transparent != null && instanceOf(v, transparent),
+      isInstance(v, constructor) || transparent != null && fulfills(v, transparent),
     (...args) => {
       // The gate constructs; the interner only caches. A duplicate
       // construction is discarded in favor of the canonical instance.

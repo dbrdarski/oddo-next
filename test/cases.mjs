@@ -7,7 +7,7 @@
 // the pending suite documents exactly where the work stands.
 
 import { Tuple, Record } from '../src/intern.mjs'
-import { instanceOf, producedOf } from '../src/contract.mjs'
+import { fulfills, isInstance, producedOf } from '../src/contract.mjs'
 import { fact, learn, Resolve, Produces, Transparent } from '../src/facts.mjs'
 import { Enum, createEnums, mapEnum } from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
@@ -34,7 +34,7 @@ const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
 const throws = (run) => { try { run(); return false } catch { return true } }
 const isUnionOf = (candidate, left, right) =>
-  candidate instanceof Union && match(Tuple(...candidate))(
+  isInstance(candidate, Union) && match(Tuple(...candidate))(
     ($, [a, b]) => Combine(a, b)((a, b) =>
       a === left && b === right || a === right && b === left)
   )
@@ -73,8 +73,8 @@ export const suites = [
     test('Tuple(1, 2) === Tuple(1, 2)', () => Tuple(1, 2) === Tuple(1, 2)),
     test('tuples are nominal Tuple arrays', () => {
       const tuple = Tuple(1, 2)
-      return tuple instanceof Tuple
-        && tuple instanceof Array
+      return isInstance(tuple, Tuple)
+        && isInstance(tuple, Array)
         && tuple.constructor === Tuple
     }),
     test('a single Number remains a Tuple element', () =>
@@ -87,7 +87,7 @@ export const suites = [
       const props = Object.create(null)
       props.__proto__ = 1
       const record = Record(props)
-      return record instanceof Record
+      return isInstance(record, Record)
         && Object.getPrototypeOf(record) === Record.prototype
         && Object.hasOwn(record, '__proto__')
         && record.__proto__ === 1
@@ -163,7 +163,7 @@ export const suites = [
         obligations,
         0
       )
-        && prepared instanceof Preparation
+        && isInstance(prepared, Preparation)
         && prepared[0] === expanded
         && prepared[1] === Number
         && prepared[2] === Number
@@ -257,9 +257,9 @@ export const suites = [
     test('the non-Number judgment admits only Indeterminate values', () => {
       const context = Difference(DomainTop, Number)
       const accepted = prepareProduction(expandedZeroMul())(context)[2]
-      return new ZeroDivision(1) instanceof accepted
-        && !(Numeric(1) instanceof accepted)
-        && !(Add(1, 2) instanceof accepted)
+      return fulfills(new ZeroDivision(1), accepted)
+        && !fulfills(Numeric(1), accepted)
+        && !fulfills(Add(1, 2), accepted)
     }),
     test('the first slice rejects contexts it has not ruled', () => {
       const expanded = expandedZeroMul()
@@ -277,21 +277,22 @@ export const suites = [
 
   suite('Enum nodes', [
     test('Enum membership uses registered constructors', () =>
-      Add(1, 2) instanceof Enum
-        && Null instanceof Enum
-        && !(Tuple(1, 2) instanceof Enum)),
+      isInstance(Add(1, 2), Enum)
+        && isInstance(Null, Enum)
+        && !isInstance(Tuple(1, 2), Enum)),
     test('mapEnum returns null for a non-Enum value', () =>
       mapEnum(Tuple(1, 2), value => value) === null),
     test('Numeric(1) === Numeric(1)', () => Numeric(1) === Numeric(1)),
     test('String(Numeric(1)) is "Numeric(1)"', () => String(Numeric(1)) === 'Numeric(1)'),
-    test('Numeric(1) instanceof Numeric', () => Numeric(1) instanceof Numeric),
+    test('Numeric(1) fulfils Numeric', () => fulfills(Numeric(1), Numeric)),
     test('Add and Mul of equal elements stay distinct', () =>
       Add(Numeric(1), Numeric(2)) !== Mul(Numeric(1), Numeric(2))),
-    test('node instanceof its own factory', () => Add(Numeric(1), Numeric(2)) instanceof Add),
+    test('node is an instance of its own factory', () =>
+      isInstance(Add(Numeric(1), Numeric(2)), Add)),
     test('factory kind is the node constructor', () => Add.kind === Add(1, 2).constructor),
     test('different factories expose different kinds', () => Add.kind !== Mul.kind),
     test('a resolved factory does not stand at its result contract', () =>
-      (Mul(1, 2), !(Mul instanceof Numeric))),
+      (Mul(1, 2), !fulfills(Mul, Numeric))),
     test('enum node as record child keeps identity', () => { const n = Numeric(7); return Record({ n }).n === n }),
     test('Tuple(1) and Numeric(1) live in different namespaces', () => Tuple(1) !== Numeric(1)),
   ]),
@@ -299,12 +300,15 @@ export const suites = [
   suite('Declared results - "stands at" membership', [
     test('Add(Numeric(1), Numeric(2)) constructs', () => String(Add(Numeric(1), Numeric(2))) === 'Add(Numeric(1), Numeric(2))'),
     test('the fact landed: producedOf(add node) === Numeric', () => producedOf(Add(Numeric(1), Numeric(2))) === Numeric),
-    test('add node stands at Numeric seats', () => Add(Numeric(1), Numeric(2)) instanceof Numeric),
+    test('add node stands at Numeric seats', () =>
+      fulfills(Add(Numeric(1), Numeric(2)), Numeric)),
     test('Add(Add(...)) nests and interns', () =>
       Add(Numeric(1), Add(Numeric(2), Numeric(3))) === Add(Numeric(1), Add(Numeric(2), Numeric(3)))),
-    test('Numeric(1) is a Numeric', () => Numeric(1) instanceof Numeric),
-    test('strict Number seats reject Numeric boxes (discharge discipline)', () => !(Numeric(1) instanceof Number)),
-    test('add node does NOT stand at strict Number seats', () => !(Add(Numeric(1), Numeric(2)) instanceof Number)),
+    test('Numeric(1) is a Numeric', () => fulfills(Numeric(1), Numeric)),
+    test('strict Number seats reject Numeric boxes (discharge discipline)', () =>
+      !fulfills(Numeric(1), Number)),
+    test('add node does NOT stand at strict Number seats', () =>
+      !fulfills(Add(Numeric(1), Numeric(2)), Number)),
   ]),
 
   suite('Indeterminate forms', [
@@ -315,9 +319,12 @@ export const suites = [
       const value = new ZeroMod(2)
       return value.valueOf() === value
     }),
-    test('a form is an Indeterminate', () => new ZeroDivision(1) instanceof Indeterminate),
-    test('a form is a Numeric (union branch)', () => new ZeroDivision(1) instanceof Numeric),
-    test('a form is NOT a Number', () => !(new ZeroDivision(1) instanceof Number)),
+    test('a form is an Indeterminate', () =>
+      fulfills(new ZeroDivision(1), Indeterminate)),
+    test('a form is a Numeric (union branch)', () =>
+      fulfills(new ZeroDivision(1), Numeric)),
+    test('a form is NOT a Number', () =>
+      !fulfills(new ZeroDivision(1), Number)),
     test('forms are childable: Add(1, 1/0) constructs and interns', () =>
       Add(1, new ZeroDivision(2)) === Add(1, new ZeroDivision(2))),
   ]),
@@ -362,19 +369,23 @@ export const suites = [
     test('a reversed Range remains an empty representable form', () => {
       const range = Range(5, 1)
       return range === Range(5, 1)
-        && !(1 instanceof range)
-        && !(5 instanceof range)
+        && !fulfills(1, range)
+        && !fulfills(5, range)
     }),
     test('Equals forwards its value through Range Number seats', () =>
       Range(Equals(1), Equals(2)) === Range(Equals(1), Equals(2))),
     test('CallArgument passes Number seats symbolically', () => {
       const argument = CallArgument(0, OuterRef(0))
-      return instanceOf(argument, Number)
+      return fulfills(argument, Number)
+        && !isInstance(argument, Number)
         && Range(argument, 10) === Range(argument, 10)
     }),
-    test('membership: 50 in Range(0, 100)', () => 50 instanceof Range(0, 100)),
-    test('membership: 200 not in Range(0, 100)', () => !(200 instanceof Range(0, 100))),
-    test('a Tuple is not in a Range (no coercion)', () => !(Tuple(50) instanceof Range(0, 100))),
+    test('membership: 50 in Range(0, 100)', () =>
+      fulfills(50, Range(0, 100))),
+    test('membership: 200 not in Range(0, 100)', () =>
+      !fulfills(200, Range(0, 100))),
+    test('a Tuple is not in a Range (no coercion)', () =>
+      !fulfills(Tuple(50), Range(0, 100))),
   ]),
 
   suite('Raw literals, Union, LL - landed with the result-slot design', [
@@ -398,14 +409,15 @@ export const suites = [
         && String(Bottom) === 'Bottom()'
         && String(Null) === 'Null()'),
     test('Top admits language values', () =>
-      1 instanceof DomainTop && Null instanceof DomainTop),
-    test('Top rejects raw host null', () => !(null instanceof DomainTop)),
+      fulfills(1, DomainTop) && fulfills(Null, DomainTop)),
+    test('Top rejects raw host null', () => !fulfills(null, DomainTop)),
     test('Bottom admits no value', () =>
-      !(1 instanceof Bottom) && !(Null instanceof Bottom)),
-    test('Null is its own value and contract', () => Null instanceof Null),
-    test('raw host null is not language Null', () => !(null instanceof Null)),
+      !fulfills(1, Bottom) && !fulfills(Null, Bottom)),
+    test('Null is its own value and contract', () => fulfills(Null, Null)),
+    test('raw host null is not language Null', () => !fulfills(null, Null)),
     test('Union(Null, Number) replaces Optional membership', () =>
-      Null instanceof Union(Null, Number) && 1 instanceof Union(Null, Number)),
+      fulfills(Null, Union(Null, Number)) &&
+      fulfills(1, Union(Null, Number))),
     test('LL uses an explicit Null terminator', () =>
       LL(1, Null) === LL(1, Null)),
     test('LL nests through its recursive tail contract', () =>
@@ -419,15 +431,15 @@ export const suites = [
     test('Intersection is an interned contract value', () => {
       const region = Intersection(Number, Range(0, 10))
       return region === Intersection(Number, Range(0, 10))
-        && 5 instanceof region
-        && !(20 instanceof region)
+        && fulfills(5, region)
+        && !fulfills(20, region)
     }),
     test('Difference is an ordered interned contract value', () => {
       const region = Difference(Number, Equals(0))
       return region === Difference(Number, Equals(0))
         && region !== Difference(Equals(0), Number)
-        && 1 instanceof region
-        && !(0 instanceof region)
+        && fulfills(1, region)
+        && !fulfills(0, region)
     }),
   ]),
 
@@ -520,7 +532,7 @@ export const suites = [
       const analysis = prepare(written)(Top)
       return analysis[Accepted] === Number
         && analysis[ResultContract] === Equals(0)
-        && analysis[Canonical] instanceof Match
+        && isInstance(analysis[Canonical], Match)
         && analysis[Canonical][1].length === 1
         && analysis[Canonical][1][0][0] === Number
         && analysis[Canonical][1][0][1] === 0
@@ -535,7 +547,7 @@ export const suites = [
       const indeterminateArm = armFor(analysis[Canonical], Indeterminate)
       return analysis[Accepted] === Numeric
         && isUnionOf(analysis[ResultContract], Equals(0), Indeterminate)
-        && analysis[Canonical] instanceof Match
+        && isInstance(analysis[Canonical], Match)
         && analysis[Canonical][1].length === 2
         && numberArm?.[1] === 0
         && indeterminateArm?.[1] === expanded
@@ -676,10 +688,11 @@ export const suites = [
         ($, [b]) => $(Add(Equals(1), b))(b => b === 9),
         $ => $(_)(() => false)
       )),
-    test('Equals forwards its value through semantic instanceof', () =>
+    test('Equals forwards its value through contract fulfilment', () =>
       Equals(6).valueOf() === 6
-        && instanceOf(Equals(6), Number)
-        && instanceOf(Equals(6), Numeric)),
+        && !isInstance(Equals(6), Number)
+        && fulfills(Equals(6), Number)
+        && fulfills(Equals(6), Numeric)),
     test('contract-valued Enum leaves use membership', () =>
       match(50)(
         $ => $(Range(0, 100))(value => value === 50),

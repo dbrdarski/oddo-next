@@ -6,11 +6,11 @@ and `decisions.md` remain the design authority. `npm test` reports **160 passing
 0 failing**.
 
 Semantic contract fulfilment uses
-`instanceOf(value, Contract) = value?.valueOf() instanceof Contract`.
+`fulfills(value, Contract) = isInstance(value?.valueOf(), Contract)`.
 `Equals(value)` forwards its nested value, Indeterminate retains itself, and
-generic pattern captures retain the original value. Native `instanceof` remains
-for nominal Tuple, Record, Enum, and exact syntax-kind recognition; see the
-2026-08-26 entry in `decisions.md`.
+generic pattern captures retain the original value. `isInstance` remains the
+direct relation for nominal Tuple, Record, Enum, and exact syntax-kind recognition;
+see the 2026-08-26 entry in `decisions.md`.
 
 ## 1. Canonical function values
 
@@ -178,7 +178,8 @@ The committed suite covers:
 - ordered, contract-only, and nested Match bindings;
 - captured and closed-function patterns;
 - residual Match continuations;
-- nominal Tuple/Record identity and registered `instanceof Enum` provenance;
+- nominal Tuple/Record identity and registered `isInstance(value, Enum)`
+  provenance;
 - canonical zero-seat Top/Bottom/Null contract Enum values and binary region
   membership Enums;
 - local, nonrecursive region deduplication and Top/Bottom reduction laws;

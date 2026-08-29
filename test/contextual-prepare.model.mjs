@@ -6,7 +6,7 @@
 // canonical contract vocabulary instead of constructing parallel contract values.
 // Unsupported algebra throws instead of pretending to be the future engine.
 
-import { isContract } from '../src/contract.mjs'
+import { fulfills, isContract, isInstance } from '../src/contract.mjs'
 import { Tuple } from '../src/intern.mjs'
 import { _ } from '../src/match.mjs'
 import { Number, Indeterminate } from '../src/numeric.mjs'
@@ -27,7 +27,9 @@ const Row = Symbol('Row')
 const Rows = Symbol('Rows')
 
 const differenceIs = (region, base, excluded) =>
-  region instanceof Difference.kind && region[0] === base && region[1] === excluded
+  isInstance(region, Difference.kind) &&
+  region[0] === base &&
+  region[1] === excluded
 
 const intersect = (left, right) => {
   if (left === Bottom || right === Bottom) return Bottom
@@ -147,7 +149,7 @@ const prepareZeroMul = (expanded, incoming, dependency) => {
 
 const prepareMatch = (expanded, incoming, dependency) => {
   if (
-    !(expanded[0] instanceof CallArgument) ||
+    !isInstance(expanded[0], CallArgument) ||
     expanded[0][0] !== 0 ||
     dependency && expanded[0] !== dependency
   )
@@ -169,7 +171,7 @@ const prepareMatch = (expanded, incoming, dependency) => {
 }
 
 const prepareAtomic = (expanded, incoming) => {
-  if (!(expanded instanceof Number))
+  if (!fulfills(expanded, Number))
     throw new TypeError('Unsupported reference expression')
   return result(
     expanded,
@@ -182,12 +184,12 @@ const prepareAtomic = (expanded, incoming) => {
 const prepareExpression = (expanded, dependency) => context => {
   const incoming = incomingOf(context)
   if (
-    expanded instanceof Mul &&
+    isInstance(expanded, Mul) &&
     expanded[0] === 0 &&
-    expanded[1] instanceof CallArgument
+    isInstance(expanded[1], CallArgument)
   )
     return prepareZeroMul(expanded, incoming, dependency)
-  if (expanded instanceof Match)
+  if (isInstance(expanded, Match))
     return prepareMatch(expanded, incoming, dependency)
   return prepareAtomic(expanded, incoming)
 }

@@ -53,12 +53,12 @@ temporary function-form declarations remain future work.
 **Implementation status through `d10cf15`; no new semantic ruling.** Tuple and
 Record remain peer doors on the shared interner rather than Enums, but their
 demonstrator values are now nominal Array/Object subclasses recognized directly by
-`instanceof Tuple` and `instanceof Record`. Numeric singleton Tuple construction
-preserves the element rather than invoking Array's length overload. Record identity
+`isInstance(value, Tuple)` and `isInstance(value, Record)`. Numeric singleton
+Tuple construction preserves the element rather than invoking Array's length overload. Record identity
 uses sorted key/value entries and preserves an own `__proto__` entry as an ordinary
 data property.
 
-The existing Enum registry now defines `value instanceof Enum`; runtime structural
+The existing Enum registry now defines `isInstance(value, Enum)`; runtime structural
 matching uses that nominal relation, so Tuple and Record values are not mistaken
 for Enums. Enum seats and `Combine` use Tuple itself directly. The parallel
 `CanonicalTuple` contract and reconstructive `isTuple` probe have been removed.
@@ -118,25 +118,29 @@ unmaterializable callee, or a match with no fitting arm.
 
 ## 2026-08-26 — transient contract values forward through `valueOf`
 
-**Ruling (Dane), implemented in `e6e09a0`.** Oddo's semantic contract check is
-one wrapper over JavaScript's protocol:
+**Ruling (Dane), implemented in `e6e09a0` and named explicitly in the current
+slice.** Oddo exposes separate direct-instance and semantic-fulfilment relations:
 
 ```js
-instanceOf(value, Contract) = value?.valueOf() instanceof Contract
+fulfills(value, Contract) = isInstance(value?.valueOf(), Contract)
 ```
+
+`isInstance(value, Constructor)` is the sole wrapper around JavaScript's direct
+instance relation. `fulfills(value, Contract)` adds transient-value forwarding;
+the current `CallArgument` symbolic-admission rule is its one explicit precheck.
 
 `Equals(value)` is a transient exact contract whose `valueOf()` returns its
 nested value. `Indeterminate.valueOf()` returns the complete current instance;
 ordinary Tuple, Record, Enum, and `Numeric(...)` values already retain themselves.
-Consequently `instanceOf(Equals(6), Number)` and
-`instanceOf(Equals(6), Range(0, 10))` are true, while an Indeterminate remains
+Consequently `fulfills(Equals(6), Number)` and
+`fulfills(Equals(6), Range(0, 10))` are true, while an Indeterminate remains
 outside `Number` and inside `Numeric`.
 
-Use this wrapper for semantic contract fulfilment: Enum seats, transparent
-delegation, contract patterns, and consuming contract definitions. Native
-`instanceof` remains the nominal representation test for Tuple, Record, Enum,
-and exact syntax kinds. Generic pattern capture also retains the original value;
-it does not replace a captured `Equals(...)` contract with its forwarded payload.
+Use `fulfills` for semantic contract fulfilment: Enum seats, transparent
+delegation, contract patterns, and consuming contract definitions. Use
+`isInstance` for direct Tuple, Record, Enum, and exact syntax-kind recognition.
+Generic pattern capture also retains the original value; it does not replace a
+captured `Equals(...)` contract with its forwarded payload.
 
 ## 2026-08-20 — formula canonicalization happens at formation (placement superseded)
 

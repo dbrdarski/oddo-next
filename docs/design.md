@@ -31,8 +31,8 @@ recurses, nothing is copied, and no caller's object is ever rewritten.
   call syntax such as `FunctionRef` and `Apply` are still ordinary Enum
   constructions, so equal nodes deduplicate normally.
 - `Tuple` and `Record` are nominal peer doors, not Enums. Their values answer
-  `instanceof Tuple` and `instanceof Record` directly while retaining Array and
-  Object behavior respectively. A one-element Tuple remains one element even
+  `isInstance(value, Tuple)` and `isInstance(value, Record)` while retaining Array
+  and Object behavior respectively. A one-element Tuple remains one element even
   when that element is a Number. Record copies sorted own enumerable entries;
   an own `__proto__` entry remains an ordinary data property.
 
@@ -161,8 +161,8 @@ included:
 const inner = Union(Number, Indeterminate)
 const outer = Union(inner, String)
 
-instanceOf(5, outer)
-// call check(inner, String)   → its own T1, T2 → instanceOf(5, inner) …
+fulfills(5, outer)
+// call check(inner, String)   → its own T1, T2 → fulfills(5, inner) …
 //    call check(Number, Indeterminate) → its OWN T1, T2 → true
 // … back outside: T2 still holds String. Nothing shared, nothing to restore.
 ```
@@ -179,7 +179,7 @@ returns `null` for values that are not registered Enums. Recursive
 traversal is the caller's job—canonical-function expansion handles Tuples
 separately and otherwise leaves non-Enum values atomic.
 
-That same registry defines the nominal relation `value instanceof Enum`.
+That same registry defines the nominal relation `isInstance(value, Enum)`.
 Registered Enum values satisfy it; Tuple and Record values do not. Runtime
 structural matching uses this relation rather than treating every Array subclass
 as an Enum.
@@ -193,23 +193,27 @@ context. A later explicit preparation stage uses the matcher to derive and retai
 
 ## 4. Membership
 
-`instanceOf(v, K)` means "v can stand where K is demanded" and is implemented
+`fulfills(v, K)` means "v can stand where K is demanded" and is implemented
 by the single semantic wrapper:
 
 ```js
-const instanceOf = (value, Contract) =>
-  value?.valueOf() instanceof Contract
+const fulfills = (value, Contract) =>
+  (!Contract?.generic &&
+    Kinds.CallArgument &&
+    value?.constructor === Kinds.CallArgument) ||
+  isInstance(value?.valueOf(), Contract)
 ```
 
-The underlying JavaScript `instanceof` remains the nominal protocol. The wrapper
-lets a transient contract forward its represented value before that protocol is
-asked:
+`isInstance(value, Constructor)` is the sole wrapper around JavaScript's direct
+instance relation. `fulfills` lets a transient contract forward its represented
+value before asking that relation, and owns universal symbolic `CallArgument`
+admission for non-generic contract seats:
 
 1. **Ground contracts** (a `contractCheck` predicate like `Number`, or a
    plain class like `Indeterminate`) answer directly. Every chain ends here.
 2. **Enum factory** `F`: true if `v` is an `F`-node; or `v`'s recorded
    `Produces` fact satisfies `F` (stands-at, via `sub`); or `F` is
-   *transparent* — then `instanceOf(v, C2)`.
+   *transparent* — then `fulfills(v, C2)`.
 3. **Enum node** `n` of enum `E`: if `E`'s result is the function form,
    apply it to `n`'s own elements and then to `v` (plus the stands-at
    clause). A node of an enum whose result is an opaque contract is not itself
@@ -224,7 +228,7 @@ membership includes its declared contract's members.
 
 **Opacity is load-bearing**: `Add`'s membership stays "is an Add node"
 because solve-time dispatch will depend on shape tests; a widened default
-would make `3 instanceof Add` true.
+would make `isInstance(3, Add)` true.
 
 `sub` is reference identity today. Consequently, no containment is currently
 derived between distinct `Equals`, `Range`, `Union`, kind, or transparent-box
@@ -235,7 +239,7 @@ contracts that expose their structure; opaque `contractCheck` predicates keep
 identity-only treatment.
 
 Transient forwarding already makes
-`instanceOf(Equals(1), Range(0, 100))` true; it does not install or cache the
+`fulfills(Equals(1), Range(0, 100))` true; it does not install or cache the
 separate general `sub` verdict.
 
 A factory's membership resolves the declaration on demand — first need,
@@ -304,15 +308,15 @@ const Domain = createEnums(() => class {
 
   Union = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value =>
-      instanceOf(value, T1) || instanceOf(value, T2)))
+      fulfills(value, T1) || fulfills(value, T2)))
 
   Intersection = Enum(($, [T1, T2]) =>
     $(T1, T2)((T1, T2) => value =>
-      instanceOf(value, T1) && instanceOf(value, T2)))
+      fulfills(value, T1) && fulfills(value, T2)))
 
   Difference = Enum(($, [base, excluded]) =>
     $(base, excluded)((base, excluded) => value =>
-      instanceOf(value, base) && !instanceOf(value, excluded)))
+      fulfills(value, base) && !fulfills(value, excluded)))
 
   Numeric = Enum($ => $(Union(Number, Indeterminate))(Union(Number, Indeterminate)))
 
@@ -324,7 +328,7 @@ const Domain = createEnums(() => class {
   Equals = Enum(($, [E]) => $(E)(E => value => value === E))
 
   Range = Enum($ => $(Number, Number)((lo, hi) => value =>
-    instanceOf(value, Number) && lo <= value && value <= hi))
+    fulfills(value, Number) && lo <= value && value <= hi))
 
   LL = Enum($ => $(Numeric, Union(Null, LL))(LL))
 })
@@ -372,7 +376,7 @@ Object.defineProperty(Equals.kind.prototype, 'valueOf', {
   recorded fact.
 - `Equals` — the singleton: `value === E`, exact because of interning; an
   exact-value contract for matching and later judgments. It is transient for
-  semantic admission: `Equals(E).valueOf()` forwards `E` through `instanceOf`.
+  semantic admission: `Equals(E).valueOf()` forwards `E` through `fulfills`.
 - `Range` — a membership-defined two-seat Enum whose nodes are contracts. Seat
   contracts check each endpoint and membership checks the closed interval. A
   reversed interval remains an expressible empty form and may later canonicalize
@@ -424,9 +428,9 @@ Match remainder, or logical canonicalization.
 ### Traces
 
 `Add(1, 1)`:
-seat asks `instanceOf(1, Numeric)` → transparent →
-`instanceOf(1, Union(Number, Indeterminate))` → apply Union's check to that
-node's elements → `instanceOf(1, Number)` → typeof → true. Every step is either a declared
+seat asks `fulfills(1, Numeric)` → transparent →
+`fulfills(1, Union(Number, Indeterminate))` → apply Union's check to that
+node's elements → `fulfills(1, Number)` → typeof → true. Every step is either a declared
 check applied to a node's own elements, or ground.
 
 `Add(1, Mul(2, 3))`:
@@ -445,11 +449,11 @@ case returns its handler result. If no case matches, `match` throws a
 `fits(pattern, value)` has one small decision chain:
 
 1. `_` matches anything and captures nothing.
-2. A contract pattern uses `instanceOf(value, pattern)`. A generic capture keeps
-   the original value instead, because capture is structural rather than a
-   fulfilment check.
+2. A contract pattern uses `fulfills(value, pattern)`. A generic capture uses
+   `isInstance(value, pattern)` instead, because capture is structural and must
+   retain the original value rather than forward it.
 3. A structural Enum pattern and value must both satisfy the registered nominal
-   `instanceof Enum` relation, then have the same hidden kind and arity; their
+   `isInstance(value, Enum)` relation, then have the same hidden kind and arity; their
    corresponding seats are fitted recursively.
 4. Everything else matches by canonical identity (`===`).
 
@@ -461,7 +465,7 @@ to the next case. There is no catch-and-skip arm behavior.
 
 Structural Enums may contain contracts in ordinary non-generic seats, so a
 partial tree such as `Add(Number, 2)` is both a legal structural value and a
-pattern. Declared value seats still validate normally through `instanceOf`:
+pattern. Declared value seats still validate normally through `fulfills`:
 `Range(1, 2)` and `Range(Equals(1), Equals(2))` are both valid because the exact
 contracts forward `1` and `2`. Generic seats retain and capture their original
 values. `Union`, `Intersection`, and `Difference` remain a binary canonical
@@ -478,9 +482,9 @@ passes nothing.
 ### Combine
 
 `Combine(...patterns)(handler)` is a separate case combinator for unordered
-occurrence assignment. Its matched value must directly satisfy `instanceof Tuple`,
-and tuple cardinality must equal pattern cardinality. Tuple itself is the carrier
-contract; there is no parallel Tuple-recognition wrapper. It searches for a
+occurrence assignment. Its matched value must satisfy `isInstance(value, Tuple)`,
+and tuple cardinality must equal pattern cardinality. Tuple itself is the carrier;
+there is no parallel Tuple-recognition contract. It searches for a
 one-to-one assignment from pattern positions to tuple occurrence indexes:
 
 - duplicate values remain separate occurrences;
@@ -925,7 +929,7 @@ malformed lowering output; a future parser/linter owns those diagnostics.
   This is independent of the `Produces` result-bound relation.
 - Per-node storage of class-level facts; per-node membership closures
   (derivable data is not stored — a node's elements are its storage).
-- `instanceof` behavior on opaque value nodes (silent false) — misuse stays
+- `isInstance` behavior on opaque value nodes (silent false) — misuse stays
   a loud error.
 - Context-variable channels for declaration facts (`resolving`) — the constructor
   binds lexically. This rejected ambient channel is unrelated to the explicit

@@ -12,14 +12,14 @@ flag, cleanup protocol, or construction residue in the current design.
 
 - `Tuple`/`Record` calls and values produced by Enum factories enter through the
   shared interner. Tuple and Record are nominal peer doors: their values satisfy
-  `instanceof Tuple` and `instanceof Record` directly and are not Enums. The Enum
-  factories themselves are lazily memoized, not interned.
+  `isInstance(value, Tuple)` and `isInstance(value, Record)` and are not Enums.
+  The Enum factories themselves are lazily memoized, not interned.
 - `ZeroDivision` and `ZeroMod` are additional canonical front doors keyed by
   their form class and operand.
 - Equal live constructions return the same canonical reference.
 - Enum identity is its hidden node class. Factories expose that class as `.kind`;
   the ordinary JavaScript `.constructor` remains the node's constructor.
-- `value instanceof Enum` recognizes only values whose hidden constructor is in
+- `isInstance(value, Enum)` recognizes only values whose hidden constructor is in
   the Enum registry. Tuple and Record therefore cannot be mistaken for structural
   Enums.
 - `mapEnum(value, map)` rebuilds a registered Enum through its original factory, so
@@ -38,8 +38,8 @@ behavior they implement.
 
 1. `_` matches anything.
 2. A contract pattern uses semantic membership:
-   `instanceOf(value, pattern)`, which forwards `value?.valueOf()` before the
-   underlying JavaScript `instanceof` protocol.
+   `fulfills(value, pattern)`, which forwards `value?.valueOf()` before applying
+   the direct `isInstance` relation.
 3. A registered Enum pattern and value require the same node constructor and
    length, then recursively fit their parts.
 4. Every other pattern uses canonical identity: `value === pattern`.
@@ -95,7 +95,7 @@ match(Add(1, 2))(
 
 Its current contract is exact and deterministic:
 
-- the candidate pool must satisfy `instanceof Tuple` directly; there is no
+- the candidate pool must satisfy `isInstance(value, Tuple)` directly; there is no
   separate Tuple-recognition contract;
 - pattern count and occurrence count must be equal;
 - patterns are not tied to corresponding source positions;

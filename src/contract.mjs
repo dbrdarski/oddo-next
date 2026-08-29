@@ -5,11 +5,14 @@
 import { fact, Produces } from './facts.mjs'
 import { Kinds } from './kinds.mjs'
 
-export const instanceOf = (value, Contract) =>
+export const isInstance = (value, Constructor) =>
+  value instanceof Constructor
+
+export const fulfills = (value, Contract) =>
   (!Contract?.generic &&
     Kinds.CallArgument &&
     value?.constructor === Kinds.CallArgument) ||
-  value?.valueOf() instanceof Contract
+  isInstance(value?.valueOf(), Contract)
 
 // What a value stands for: the declared result of the constructor that made
 // it. A stored generic is a thunk - it answers for the node it is asked about.

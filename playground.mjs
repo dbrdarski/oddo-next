@@ -49,8 +49,8 @@ log('key order free:', r === Record({ tag: "point", x: Tuple(1, 2) }))`,
     code: `const n = Add(Numeric(1), Add(Numeric(2), Numeric(3)))
 log(n)
 log('interned:', n === Add(Numeric(1), Add(Numeric(2), Numeric(3))))
-log('stands at Numeric seats:', instanceOf(n, Numeric))
-log('at a strict Number seat:', instanceOf(n, Number))`,
+log('stands at Numeric seats:', fulfills(n, Numeric))
+log('at a strict Number seat:', fulfills(n, Number))`,
   },
   {
     name: 'Function form & recursion',
@@ -269,11 +269,11 @@ log('children shared:', a.left === shared && b.left === shared)`,
     code: `const n = Add(1, 2)
 log('raw literals pass (transparency):', String(n))
 log('declared result is Numeric:', producedOf(n) === Numeric)
-log('n stands at Numeric seats:', instanceOf(n, Numeric))
+log('n stands at Numeric seats:', fulfills(n, Numeric))
 
 // strict Number seats still reject what is not a literal number:
-log('a box at a strict Number seat:', instanceOf(Numeric(1), Number))
-log('an exact contract forwards:', instanceOf(Equals(6), Number))`,
+log('a box at a strict Number seat:', fulfills(Numeric(1), Number))
+log('an exact contract forwards:', fulfills(Equals(6), Number))`,
   },
   {
     name: 'Facts by identity',
