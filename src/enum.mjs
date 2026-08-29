@@ -6,7 +6,9 @@ import { canonical } from './intern.mjs'
 import {
   contractCheck, fulfills, isContract, isInstance, producedOf, sub
 } from './contract.mjs'
-import { fact, learn, Resolve, Produces, Transparent } from './facts.mjs'
+import {
+  fact, learn, Resolve, Consumes, Produces, Transparent
+} from './facts.mjs'
 
 const once = (fn, cached = false, cache) => (...args) => (
   cached || (cache = fn(...args), cached = true), cache
@@ -31,6 +33,7 @@ const membership = (check) => function (v) { return check(...this)(v) || sub(pro
 
 export const argContracts = (constructor) => (...argContracts) => (result = null) => (
   argContracts.forEach((c, i) => c?.generic && (c.seat ??= i)),
+  learn(constructor, Consumes, argContracts),
   isCheck(result)
     ? Object.defineProperty(constructor.prototype, Symbol.hasInstance, { value: membership(result) })
     : (learn(constructor, Produces, result),

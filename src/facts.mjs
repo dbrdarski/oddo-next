@@ -10,6 +10,7 @@
 const store = new WeakMap()
 
 export const Resolve = Symbol('Resolve')
+export const Consumes = Symbol('Consumes')
 export const Produces = Symbol('Produces')
 export const Transparent = Symbol('Transparent')
 

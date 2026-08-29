@@ -8,7 +8,9 @@
 
 import { Tuple, Record } from '../src/intern.mjs'
 import { fulfills, isInstance, producedOf } from '../src/contract.mjs'
-import { fact, learn, Resolve, Produces, Transparent } from '../src/facts.mjs'
+import {
+  fact, learn, Resolve, Consumes, Produces, Transparent
+} from '../src/facts.mjs'
 import { Enum, createEnums, mapEnum } from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
@@ -99,7 +101,8 @@ export const suites = [
 
   suite('Facts store', [
     test('built-in fact keys are shared Symbols', () =>
-      [Resolve, Produces, Transparent].every(key => typeof key === 'symbol')),
+      [Resolve, Consumes, Produces, Transparent]
+        .every(key => typeof key === 'symbol')),
     test('equal Symbol descriptions remain distinct fact keys', () => {
       const subject = Tuple('fact subject')
       const first = Symbol('Fact')
@@ -114,6 +117,11 @@ export const suites = [
     test('declared results are stored under the shared Produces key', () => {
       const node = Add(1, 2)
       return fact(node.constructor, Produces) === Numeric
+    }),
+    test('declared argument contracts are stored under Consumes', () => {
+      const node = Mul(1, 2)
+      const contracts = fact(node.constructor, Consumes)
+      return contracts[0] === Numeric && contracts[1] === Numeric
     }),
   ]),
 
