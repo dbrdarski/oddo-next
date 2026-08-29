@@ -2,7 +2,7 @@
 
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **160 passing,
+and `decisions.md` remain the design authority. `npm test` reports **166 passing,
 0 failing**.
 
 Semantic contract fulfilment uses
@@ -122,8 +122,9 @@ relation; the declarations using it must become accurate.
 
 ## 4. Function-level Match
 
-Function `Match` delegates pattern selection to the ordinary ordered `match()`
-implementation.
+Symbolic `expand` preserves every complete function `Match` without selecting an
+arm. Concrete `apply(fn, ...arguments)` delegates pattern selection to the ordinary
+ordered `match()` implementation.
 
 - Arms are tried in order; the first fit wins.
 - `MatchArgument(i)` creates or refers to generic binding seat `i`.
@@ -132,14 +133,15 @@ implementation.
 - Captured patterns are resolved before matching.
 - Pattern instantiation does not rewrite inside Lambda forms or closed FunctionRef
   values; ordinary matching can still inspect their Enum structure.
-- If the evaluated scrutinee still contains an `Apply`, the complete `Match`
+- If a concrete scrutinee still contains an `Apply`, the complete `Match`
   continuation remains residual instead of selecting an arm prematurely.
 
 This is ordered matching. The separate value-level `Combine` combinator is landed
 and tested, but there is no Combine arm in the function Enum vocabulary.
 
-A bare symbolic `CallArgument` is matched using the same ordinary pattern semantics
-as every other value. General symbolic branch judgment is not implemented.
+A symbolic `CallArgument` remains inside the preserved expanded Match. It is not
+sent through concrete pattern fulfilment during formation. General symbolic branch
+judgment remains a later preparation concern.
 
 Pattern construction and pattern fitting are different phases. If constructing an
 arm's pattern throws, the match aborts because no valid pattern exists. Fallthrough

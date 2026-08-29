@@ -90,9 +90,10 @@ Those declarations are formation scaffolding, not a per-function input/result
 signature. `CallArgument` demand follows from its consumer. Expansion invokes a
 known nonrecursive `Apply`, making the instantiated body durable `E`, and
 Preparation derives contextual `C`; it does not infer a result theorem from the
-callee. A resolved `Match` supplies its selected body, while residual calls and
-pending Matches require later obligations. This correction does not remove
-`Produces` from ordinary result-bearing forms.
+callee. Concrete application may select a `Match` body; symbolic formation retains
+the complete Match in `E`. Residual calls and effective Match regions require later
+obligations. This correction does not remove `Produces` from ordinary
+result-bearing forms.
 
 The landed `Preparation` Enum now retains one preparation judgment structurally;
 it is not stored as a fact or cache entry. Future metadata may retain additional
@@ -546,7 +547,11 @@ value.
 form by resolving outer references, substituting active call arguments,
 invoking helper function values, and rebuilding registered Enums and canonical
 Tuples through their normal factories. It does not accept concrete call
-arguments and does not make `FunctionRef` a callable host function.
+arguments, select `Match` arms, or make `FunctionRef` a callable host function.
+
+`apply(fn, ...arguments)` is the separate concrete operation. It uses the same
+reference resolution, call stack, and Enum/Tuple rebuilding, but concrete Match
+selection is enabled.
 
 The active call stack is keyed by the exact canonical `FunctionRef`—not just
 its `Lambda` form, and not `(function, arguments)`. Re-entering a function
@@ -558,13 +563,18 @@ formula and completed helpers leave no stale recursion marker. A body containing
 two such calls therefore produces a tree containing both occurrences rather than
 selecting one representative.
 
-### Function Match reuses runtime matching
+### Function Match separates formation from concrete application
 
-Canonical `Match` does not implement a second pattern engine. It instantiates
+Symbolic `expand` never selects a `Match` arm. It rebuilds and preserves the
+complete Match, resolving outer references and symbolic call arguments throughout
+its scrutinee, patterns, and continuations. This complete Enum tree is durable
+expanded form `E`.
+
+Concrete `apply` does not implement a second pattern engine. It instantiates
 `MatchArgument(i)` as the corresponding generic, resolves `OuterRef` patterns,
 and delegates the ordered arms to lowercase `match`. Arm order, contract
-membership, structural matching, identity, construction failures, and
-no-match errors consequently retain the semantics from §7.
+fulfilment, structural matching, identity, construction failures, and no-match
+errors consequently retain the semantics from §7.
 
 The selected continuation reads its `MatchArgument` bindings. A nested Match
 extends a copy of the prior binding vector rather than replacing it, including
@@ -573,12 +583,10 @@ value. Pattern instantiation does not rewrite inside `Lambda` forms or closed
 `FunctionRef` values; after that, lowercase `fits` may still match their Enum
 structure normally.
 
-If an evaluated Match scrutinee still contains a residual `Apply`, expansion
-does not guess an arm. It rebuilds and preserves the complete Match, including
-all patterns and continuations, with execution disabled. The residual Enum
-tree is durable expanded form `E`. A later contextual preparation may combine or
-erase an admitted pure call from canonical `C`, after deriving and retaining the
-call's demands and admission obligations from `E`.
+If a concrete Match scrutinee still contains a residual `Apply`, application does
+not guess an arm and preserves the complete continuation. A later contextual
+preparation may combine or erase an admitted pure call from canonical `C`, after
+deriving and retaining the call's demands and admission obligations from `E`.
 
 ### Contextual formula preparation (ruled; first production slice landed)
 

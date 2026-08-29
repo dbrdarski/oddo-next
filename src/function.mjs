@@ -111,7 +111,7 @@ const evaluate = (tree, frame, context, execute = true) => match(tree)(
   }),
   $ => $(Match.kind)(tree => {
     const value = evaluate(tree[0], frame, context, execute)
-    if (!execute || containsCall(value)) return Match(
+    if (!execute || !context.selectMatches || containsCall(value)) return Match(
       value,
       Tuple(...Array.from(tree[1], arm => Arm(
         evaluate(arm[0], frame, context, false),
@@ -157,11 +157,18 @@ const invoke = (fn, arguments_, context) => {
   finally { context.stack.pop() }
 }
 
+export const apply = (fn, ...arguments_) =>
+  invoke(fn, arguments_, {
+    stack: [],
+    matches: [],
+    selectMatches: true,
+  })
+
 export const expand = fn =>
   invoke(
     fn,
     Array.from({ length: fn[0][1] }, (_, index) => CallArgument(index, fn)),
-    { stack: [], matches: [] }
+    { stack: [], matches: [], selectMatches: false }
   )
 
 export { OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda }

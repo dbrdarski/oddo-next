@@ -5,6 +5,25 @@ therefore postdate a following topic's original entry. `design.md` stays the
 settled specification; entries here capture what was decided, on what grounds,
 and what remains open before the specification absorbs it.
 
+## 2026-08-29 — symbolic formation and concrete application are separate
+
+**Ruling (Dane), implemented in the current slice.** Function formation invokes
+the body with owner-qualified `CallArgument` values to obtain the complete
+pre-normal form. That symbolic run does not select any `Match` arm. It preserves
+the complete `Match`, with all patterns and continuations, in durable expanded
+`E` before contextual canonicalization.
+
+Concrete application is a separate operation:
+
+```js
+apply(fn, ...arguments)
+```
+
+Only this concrete path delegates a `Match` to the ordinary ordered matcher and
+selects an arm. If its scrutinee still contains a residual `Apply`, the continuation
+remains unresolved. This phase split does not change recursion: exact function
+re-entry still returns the same residual `Apply` form.
+
 ## 2026-08-20 — declared result bounds (corrected 2026-08-26)
 
 **Final ruling (Dane).** `Produces` is retained. A contract in an Enum's result
@@ -38,7 +57,7 @@ Those declarations are temporary formation scaffolding, not inferred function
 return contracts. In the target function-formation pipeline, input demands are
 inferred from the complete pre-normal candidate before canonicalization and the
 result contract is derived rather than stored as an independent identity field.
-Residual recursive calls and pending Matches require later obligation machinery.
+Residual recursive calls and symbolic Matches require later obligation machinery.
 Correcting these declarations does not remove `Produces` from ordinary
 result-bearing forms.
 
@@ -598,8 +617,8 @@ The form and complete ordered reference Tuple are the FunctionRef identity.
 Internal Lambda references materialize lazily with the current ordered environment
 when resolved. Recursion is detected by an exact-FunctionRef call stack. Re-entry
 preserves a residual `Apply` node. Expansion retains all residual calls encountered
-along the evaluated symbolic path; when a Match scrutinee remains pending, it
-retains that complete Match and all of its continuations.
+along the evaluated symbolic path and retains every complete Match with all of its
+continuations.
 
 `expand` is structural symbolic unfolding. At the current commit it retains every
 residual call it encounters, because formula canonicalization is not implemented.

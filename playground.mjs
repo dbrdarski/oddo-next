@@ -67,6 +67,7 @@ log('at a strict Number seat:', fulfills(n, Number))`,
 const form = countDownForm()
 const countDown = internFn(form, form)
 const formula = expand(countDown)
+const argument = CallArgument(0, countDown)
 
 const forkSelf = OuterRef(0)
 const forkArgument = CallArgument(0, forkSelf)
@@ -80,10 +81,14 @@ const forkFormula = expand(fork)
 log('form canonical:', form === countDownForm())
 log('function canonical:', countDown === internFn(countDownForm(), countDownForm()))
 log('recursive formula:', formula)
-log('exact call:', formula === Apply(
-  countDown,
-  Tuple(Sub(CallArgument(0, countDown), 2))
+log('complete symbolic Match:', formula === Match(
+  argument,
+  Tuple(
+    Arm(Equals(0), 0),
+    Arm(_, Apply(countDown, Tuple(Sub(argument, 2))))
+  )
 ))
+log('concrete zero:', apply(countDown, 0))
 log('both recursive calls survive:', forkFormula)`,
   },
   {

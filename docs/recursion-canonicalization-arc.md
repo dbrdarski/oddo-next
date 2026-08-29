@@ -4,7 +4,7 @@ This file records the useful direction changes from the 2026-08-20/21
 investigation. It is **not** the current API or design authority.
 
 The committed implementation is described in `docs/HANDOVER-recursion.md` and
-`src/function.mjs`. The current test suite reports **160 passing, 0 failing**.
+`src/function.mjs`. The current test suite reports **166 passing, 0 failing**.
 
 **Later supersession (2026-08-25).** This history originally concluded that
 canonicalization belonged inside factory formation and that the expanded candidate
@@ -30,14 +30,14 @@ The following ideas survived into the implementation:
    Expansion must not collapse an evaluated body to a scalar “drift” or keep only
    one recursive call. Every residual `Apply` encountered through supported
    Enum/Tuple traversal remains in that current pre-normalization structural result;
-   a pending Match preserves its complete continuation. That result is durable `E`.
+   every symbolic Match preserves its complete continuation. That result is durable `E`.
    Later contextual preparation may combine or erase an admitted pure call from
    `C` while preserving `E` and its derived demands/admission obligations.
 6. **Recursion requires a call stack.** Re-entry is detected by exact canonical
    FunctionRef identity, not by function form, a root-only sentinel, a depth cap,
    or a fuel counter.
-7. **Matching is reused.** Function-level `Match` delegates fitting to the existing
-   ordered matcher rather than introducing a second pattern system.
+7. **Matching is reused.** Concrete function `apply` delegates `Match` fitting to
+   the existing ordered matcher rather than introducing a second pattern system.
 8. **There is one value universe.** Existing domain Enums are rebuilt through their
    factories; no coefficient arrays or shadow formula AST landed.
 
@@ -80,8 +80,8 @@ Add(
 )
 ```
 
-therefore retains both calls in expanded `E`. A pending call in a Match scrutinee
-retains the complete Match continuation. These facts do not require every call
+therefore retains both calls in expanded `E`. Symbolic expansion also retains every
+complete Match continuation. These facts do not require every call
 occurrence to survive contextual canonical `C`.
 
 ## 3. Probe machinery that did not land

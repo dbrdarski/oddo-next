@@ -18,7 +18,7 @@ import {
 } from '../src/domain.mjs'
 import {
   OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda,
-  argumentCountOf, internFn, expand
+  argumentCountOf, internFn, apply, expand
 } from '../src/function.mjs'
 import { Preparation, prepare as prepareProduction } from '../src/prepare.mjs'
 import {
@@ -850,12 +850,16 @@ export const suites = [
       const fn = internFn(form, form)
       return expand(fn) === Add(CallArgument(0, fn), 1)
     }),
-    test('reaching self leaves the exact residual call', () => {
+    test('symbolic expansion preserves a recursive Match', () => {
       const form = countDownForm()
       const fn = internFn(form, form)
-      return expand(fn) === Apply(
-        fn,
-        Tuple(Sub(CallArgument(0, fn), 2))
+      const argument = CallArgument(0, fn)
+      return expand(fn) === Match(
+        argument,
+        Tuple(
+          Arm(Equals(0), 0),
+          Arm(_, Apply(fn, Tuple(Sub(argument, 2))))
+        )
       )
     }),
     test('every recursive call remains in the complete tree', () => {
@@ -956,7 +960,7 @@ export const suites = [
       const fn = internFn(form, form)
       return expand(fn) === LL(CallArgument(0, fn), Null)
     }),
-    test('Match uses its ordinary generic binding order', () => {
+    test('concrete Match uses its ordinary generic binding order', () => {
       const first = MatchArgument(0)
       const second = MatchArgument(1)
       const form = Lambda(0, 0, Match(
@@ -966,9 +970,11 @@ export const suites = [
           Arm(_, 0)
         )
       ))
-      return expand(internFn(form)) === Add(2, 1)
+      const fn = internFn(form)
+      return expand(fn) === form[2]
+        && apply(fn) === Add(2, 1)
     }),
-    test('a nested Match extends the existing handler bindings', () => {
+    test('a concrete nested Match extends the existing handler bindings', () => {
       const a = MatchArgument(0)
       const b = MatchArgument(1)
       const c = MatchArgument(2)
@@ -980,16 +986,16 @@ export const suites = [
           Tuple(Arm(Add(c, d), Tuple(a, b, c, d)))
         )))
       ))
-      return expand(internFn(form)) === Tuple(1, 2, 3, 4)
+      return apply(internFn(form)) === Tuple(1, 2, 3, 4)
     }),
-    test('a contract-only Match forwards the matched value', () => {
+    test('a concrete contract-only Match forwards the matched value', () => {
       const form = Lambda(0, 0, Match(
         9,
         Tuple(Arm(Number, MatchArgument(0)))
       ))
-      return expand(internFn(form)) === 9
+      return apply(internFn(form)) === 9
     }),
-    test('a nested contract value follows the existing bindings', () => {
+    test('a concrete nested contract value follows existing bindings', () => {
       const a = MatchArgument(0)
       const b = MatchArgument(1)
       const value = MatchArgument(2)
@@ -1000,9 +1006,9 @@ export const suites = [
           Tuple(Arm(Number, Tuple(a, b, value)))
         )))
       ))
-      return expand(internFn(form)) === Tuple(1, 2, 9)
+      return apply(internFn(form)) === Tuple(1, 2, 9)
     }),
-    test('captured patterns are resolved before matching', () => {
+    test('concrete captured patterns are resolved before matching', () => {
       const form = Lambda(1, 0, Match(
         0,
         Tuple(
@@ -1010,9 +1016,9 @@ export const suites = [
           Arm(_, -1)
         )
       ))
-      return expand(internFn(form, Equals(0))) === 0
+      return apply(internFn(form, Equals(0))) === 0
     }),
-    test('closed function values remain atomic patterns', () => {
+    test('closed function values remain atomic concrete patterns', () => {
       const targetForm = loopForm()
       const target = internFn(targetForm, targetForm)
       const form = Lambda(1, 0, Match(
@@ -1022,9 +1028,31 @@ export const suites = [
           Arm(_, 0)
         )
       ))
-      return expand(internFn(form, 7)) === 1
+      return apply(internFn(form, 7)) === 1
     }),
-    test('a pending call keeps its Match continuation in the tree', () => {
+    test('symbolic formation and concrete application keep separate Matches', () => {
+      const self = OuterRef(0)
+      const argument = CallArgument(0, self)
+      const form = Lambda(1, 1, Match(
+        argument,
+        Tuple(
+          Arm(Equals(0), 10),
+          Arm(_, 20)
+        )
+      ))
+      const fn = internFn(form, form)
+      const arrived = CallArgument(0, fn)
+      return expand(fn) === Match(
+        arrived,
+        Tuple(
+          Arm(Equals(0), 10),
+          Arm(_, 20)
+        )
+      )
+        && apply(fn, 0) === 10
+        && apply(fn, 1) === 20
+    }),
+    test('symbolic expansion preserves a Match with a residual call', () => {
       const self = OuterRef(0)
       const argument = CallArgument(0, self)
       const form = Lambda(1, 1, Match(

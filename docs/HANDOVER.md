@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**160 passing, 0 failing**.
+**166 passing, 0 failing**.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -134,11 +134,12 @@ as non-matches.
 
 ## 6. Function-level Match
 
-Canonical function forms use `Match(scrutinee, Tuple(...Arm))` and delegate fitting
-to the same ordered `match()` implementation. `MatchArgument(index)` represents
-handler bindings in the function formula; nested matches extend the existing sparse
-binding vector. A pending recursive `Apply` in the scrutinee preserves the complete
-Match continuation instead of selecting an arm prematurely.
+Canonical function forms use `Match(scrutinee, Tuple(...Arm))`. Symbolic
+`expand(fn)` preserves the complete Match and does not select an arm. Concrete
+`apply(fn, ...arguments)` delegates fitting to the same ordered `match()`
+implementation. `MatchArgument(index)` represents handler bindings in the function
+formula; nested concrete matches extend the existing sparse binding vector. A
+residual `Apply` in a concrete scrutinee preserves the complete Match continuation.
 
 Function forms currently support ordered Arms only. Value-level Combine is landed,
 but no Combine arm exists in the function Enum vocabulary.
