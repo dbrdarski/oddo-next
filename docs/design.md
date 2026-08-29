@@ -130,7 +130,7 @@ Name = Enum(
     the value-check. Records nothing as a fact.
   - **empty** — `()` — no meaningful declared result. Canonical function
     syntax uses this for structural nodes such as `Arm`, `Lambda`, and
-    `FunctionRef`; the current machinery receives `undefined`, which provides
+    `FunctionRef`; the current machinery receives `null`, which provides
     no usable `Produces` fact. A `FunctionRef` is nevertheless the canonical
     function value by nominal Enum identity; the empty result slot merely avoids
     inventing a theorem about the result of applying that function.
@@ -149,7 +149,7 @@ For a nonempty result, telling the two forms apart needs no marker: a bare
 arrow—no `.prototype`, no `Symbol.hasInstance` of its own—can only be a check.
 Everything else is treated as the contract-form result; intended examples are
 an Enum factory, a `contractCheck` contract, a class, or a membership-defined
-contract node. `undefined` is the explicit empty case described above.
+contract node. `null` is the explicit empty case described above.
 
 **Parameters, not shared variables.** The membership function receives the
 branches as ordinary parameters. JS function parameters are fresh per call
@@ -175,7 +175,7 @@ factory. `mapEnum(value, map)` uses that registry to map one level of a known
 Enum value and rebuild it through its original factory. Rebuilding therefore
 reruns declared-seat checking, generic binding, and interning while reusing
 the once-resolved declaration and facts. It does not bypass the front door. It
-returns `undefined` for values that are not registered Enums. Recursive
+returns `null` for values that are not registered Enums. Recursive
 traversal is the caller's job—canonical-function expansion handles Tuples
 separately and otherwise leaves non-Enum values atomic.
 
@@ -345,7 +345,7 @@ Object.defineProperty(Equals.kind.prototype, 'valueOf', {
 
 - `Top`, `Bottom`, and `Null` — canonical zero-seat membership-defined Enum
   values/contracts. `Top` admits every language value, `Bottom` admits none, and
-  `Null` admits only itself. Raw host `null` and `undefined` are not `Null`; host
+  `Null` admits only itself. Raw host-nullish values are not `Null`; host
   ingress normalization is not yet implemented. Like every current contract,
   these atoms also participate in ordinary `Produces` stands-at admission: a
   hypothetical node whose widest declared result is an atom stands at that atom.
@@ -389,9 +389,9 @@ Object.defineProperty(Equals.kind.prototype, 'valueOf', {
   by none. They are the algebraic concepts sometimes called Any and Never. `_`
   is extensionally the all-values match region while remaining captureless
   wildcard syntax; future unconstrained contract seats use `Top`, not `_`.
-- There is one language `Null` value and contract. Explicit host `null` and
-  `undefined` normalize to that value only at a host-value ingress. Missing
-  arguments, absent fields, and JavaScript control-flow `undefined` do not.
+- There is one language `Null` value and contract. Explicit host-nullish values
+  normalize to that value only at a host-value ingress. Missing arguments,
+  absent fields, and JavaScript control-flow absence do not.
 - `Optional` is removed in current code. Its former denotation is written
   `Union(Null, T)`.
 - `Union`, `Intersection`, and relative `Difference` form canonical regions.

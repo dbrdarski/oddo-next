@@ -59,7 +59,7 @@ const combineFits = (patterns, values, genericState) => {
     return false
   }
 
-  return search(0) ? assigned : undefined
+  return search(0) ? assigned : null
 }
 
 export const match = (value) => (...cases) => {
@@ -71,7 +71,7 @@ export const match = (value) => (...cases) => {
 
     if (kind === combined) {
       const assigned = combineFits(pattern, value, genericState)
-      if (assigned !== undefined) return handler(...assigned)
+      if (assigned != null) return handler(...assigned)
       continue
     }
 

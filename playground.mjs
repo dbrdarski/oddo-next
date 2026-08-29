@@ -283,7 +283,7 @@ log('an exact contract forwards:', instanceOf(Equals(6), Number))`,
 const Label = Symbol('Label')
 learn(Tuple(1, 2), Label, "origin pair")
 log('read back:', fact(Tuple(1, 2), Label))
-log('other tuples unaffected:', fact(Tuple(1, 3), Label) === undefined)`,
+log('other tuples unaffected:', fact(Tuple(1, 3), Label) === null)`,
   },
 ]
 
@@ -326,7 +326,7 @@ const run = () => {
   console.log = (...vals) => { log(...vals); original.apply(console, vals) }
   try {
     const result = compile(editor.state.doc.toString())(...values, log)
-    if (result !== undefined) print(`→ ${show(result)}`)
+    if (result != null) print(`→ ${show(result)}`)
   } catch (e) {
     print(String(e), 'err')
   } finally {

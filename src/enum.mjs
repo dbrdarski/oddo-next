@@ -19,15 +19,15 @@ const enumFactories = new WeakMap()
 export const mapEnum = (value, map, factory =
   value !== null && typeof value === 'object'
     ? enumFactories.get(value.constructor)
-    : undefined
-) => factory?.(...value.map(map))
+    : null
+) => factory == null ? null : factory(...value.map(map))
 
 // A bare arrow - no prototype, no hasInstance of its own - can only be a check.
 const isCheck = (x) => typeof x === 'function' && !x.prototype && !Object.hasOwn(x, Symbol.hasInstance)
 
 const membership = (check) => function (v) { return check(...this)(v) || sub(producedOf(v), this) }
 
-export const argContracts = (constructor) => (...argContracts) => (result) => (
+export const argContracts = (constructor) => (...argContracts) => (result = null) => (
   argContracts.forEach((c, i) => c?.generic && (c.seat ??= i)),
   isCheck(result)
     ? Object.defineProperty(constructor.prototype, Symbol.hasInstance, { value: membership(result) })
@@ -39,7 +39,7 @@ export const argContracts = (constructor) => (...argContracts) => (result) => (
 
 // A generic seat binds the call argument itself on first use; a repeated
 // seat re-checks by identity - under interning, === is value equality.
-// Unbound is an array hole, so null and undefined are bindable values.
+// Unbound is an array hole, so null remains a bindable value.
 // The carrier is a thunk over the node it is asked about - a stored
 // generic answers "what does this node make" from the node itself.
 export const generic = (state, i = 0) => [

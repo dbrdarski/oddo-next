@@ -81,7 +81,7 @@ export const suites = [
       Tuple(0).length === 1
         && Tuple(0)[0] === 0
         && Tuple(0) !== Tuple()
-        && Tuple(2) !== Tuple(undefined, undefined)),
+        && Tuple(2) !== Tuple(null, null)),
     test('Record key-order independence', () => Record({ a: 1, b: 2 }) === Record({ b: 2, a: 1 })),
     test('Record copies __proto__ as an own data property', () => {
       const props = Object.create(null)
@@ -109,6 +109,8 @@ export const suites = [
       learn(subject, first, 3)
       return fact(subject, first) === 1 && fact(subject, second) === 2
     }),
+    test('a missing fact is null', () =>
+      fact(Tuple('missing fact'), Symbol('Missing')) === null),
     test('declared results are stored under the shared Produces key', () => {
       const node = Add(1, 2)
       return fact(node.constructor, Produces) === Numeric
@@ -291,6 +293,8 @@ export const suites = [
       Add(1, 2) instanceof Enum
         && Null instanceof Enum
         && !(Tuple(1, 2) instanceof Enum)),
+    test('mapEnum returns null for a non-Enum value', () =>
+      mapEnum(Tuple(1, 2), value => value) === null),
     test('Numeric(1) === Numeric(1)', () => Numeric(1) === Numeric(1)),
     test('String(Numeric(1)) is "Numeric(1)"', () => String(Numeric(1)) === 'Numeric(1)'),
     test('Numeric(1) instanceof Numeric', () => Numeric(1) instanceof Numeric),
@@ -336,7 +340,7 @@ export const suites = [
     test('a repeated seat rejects a different value', () => throws(() => Twin(7, 8))),
     test('null is a bindable value: Twin(null, null) constructs', () => String(Twin(null, null)) === 'Twin(null, null)'),
     test('null does not match 1: Twin(null, 1) rejected', () => throws(() => Twin(null, 1))),
-    test('undefined does not match 5: Twin(undefined, 5) rejected', () => throws(() => Twin(undefined, 5))),
+    test('null does not match 5: Twin(null, 5) rejected', () => throws(() => Twin(null, 5))),
     test('a Twin makes what it holds: producedOf(Twin(2, 2)) is 2', () => producedOf(Twin(2, 2)) === 2),
     test('a Twin is not its element: Twin(1, Twin(2, 2)) rejected', () => throws(() => Twin(1, Twin(2, 2)))),
     test('the same twin twice: Twin(Twin(1,1), Twin(1,1)) constructs', () =>
@@ -408,13 +412,11 @@ export const suites = [
         && String(Null) === 'Null()'),
     test('Top admits language values', () =>
       1 instanceof DomainTop && Null instanceof DomainTop),
-    test('Top rejects raw host nullish values', () =>
-      !(null instanceof DomainTop) && !(undefined instanceof DomainTop)),
+    test('Top rejects raw host null', () => !(null instanceof DomainTop)),
     test('Bottom admits no value', () =>
       !(1 instanceof Bottom) && !(Null instanceof Bottom)),
     test('Null is its own value and contract', () => Null instanceof Null),
-    test('raw host nullish values are not language Null', () =>
-      !(null instanceof Null) && !(undefined instanceof Null)),
+    test('raw host null is not language Null', () => !(null instanceof Null)),
     test('Union(Null, Number) replaces Optional membership', () =>
       Null instanceof Union(Null, Number) && 1 instanceof Union(Null, Number)),
     test('LL uses an explicit Null terminator', () =>
@@ -423,8 +425,7 @@ export const suites = [
       LL(1, LL(2, Null)) === LL(1, LL(2, Null))),
     test('LL rejects an omitted or raw host-nullish tail', () =>
       throws(() => LL(1)) &&
-      throws(() => LL(1, null)) &&
-      throws(() => LL(1, undefined))),
+      throws(() => LL(1, null))),
   ]),
 
   suite('Region contract Enums', [
@@ -679,9 +680,9 @@ export const suites = [
         ($, [a]) => $(Add(a, a))(() => false),
         $ => $(_)(() => true)
       )),
-    test('undefined remains a bindable repeated capture', () =>
-      match(Twin(undefined, undefined))(
-        ($, [a]) => $(Twin(a, a))(a => a === undefined)
+    test('null remains a bindable repeated capture', () =>
+      match(Twin(null, null))(
+        ($, [a]) => $(Twin(a, a))(a => a === null)
       )),
     test('Equals provides exact-value matching', () =>
       match(Add(1, 9))(
@@ -1043,6 +1044,8 @@ export const suites = [
       return producedOf(CallArgument(0, fn)) === Numeric
         && producedOf(Apply(fn, Tuple(CallArgument(0, fn)))) === Numeric
     }),
+    test('an empty result slot produces null', () =>
+      producedOf(Arm(_, 0)) === null),
   ]),
 
 ]

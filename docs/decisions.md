@@ -463,10 +463,10 @@ called Any and Never). `_` is extensionally the all-values match region while
 remaining captureless wildcard syntax; it is not the named `Top` contract. Future
 unconstrained contract seats use `Top`, not `_`.
 
-There is one language `Null` value and contract. Explicit host `null` and
-`undefined` normalize to it at a host-value ingress; omitted arguments,
-missing fields, JavaScript control-flow `undefined`, and arity are not silently
-converted to Null. Remove `Optional`; its former meaning is `Union(Null, T)`.
+There is one language `Null` value and contract. Explicit host-nullish values
+normalize to it at a host-value ingress; omitted arguments, missing fields,
+JavaScript control-flow absence, and arity are not silently converted to Null.
+Remove `Optional`; its former meaning is `Union(Null, T)`.
 
 `Union`, `Intersection`, and relative `Difference` form the canonical region
 vocabulary. At minimum:
@@ -560,7 +560,7 @@ accept either operand order. Equality is canonical pointer equality. Handlers
 inspect only immediate operands, preserve unknown candidates, and never recurse.
 Bottom-up traversal, flattening, heterogeneous ordering, left-association,
 containment, disjointness, effective Match remainders, and logical normalization
-remain unimplemented. Host `null`/`undefined` ingress normalization is also not
+remain unimplemented. Host-nullish ingress normalization is also not
 landed.
 Ordinary `Produces` semantics apply to these contract atoms: a hypothetical node
 whose widest result is `Bottom` or `Null` stands at that atom, although no current
