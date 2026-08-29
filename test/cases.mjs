@@ -9,7 +9,7 @@
 import { Tuple, Record } from '../src/intern.mjs'
 import { fulfills, isInstance, producedOf } from '../src/contract.mjs'
 import {
-  fact, learn, Resolve, Consumes, Produces, Transparent
+  fact, learn, Resolve, Consumes, Produces, Transparent, Callable
 } from '../src/facts.mjs'
 import { Enum, createEnums, mapEnum } from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
@@ -20,7 +20,7 @@ import {
 } from '../src/domain.mjs'
 import {
   OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda,
-  argumentCountOf, internFn, apply, expand
+  Function, argumentCountOf, internFn, apply, expand
 } from '../src/function.mjs'
 import { Preparation, prepare as prepareProduction } from '../src/prepare.mjs'
 import {
@@ -101,7 +101,7 @@ export const suites = [
 
   suite('Facts store', [
     test('built-in fact keys are shared Symbols', () =>
-      [Resolve, Consumes, Produces, Transparent]
+      [Resolve, Consumes, Produces, Transparent, Callable]
         .every(key => typeof key === 'symbol')),
     test('equal Symbol descriptions remain distinct fact keys', () => {
       const subject = Tuple('fact subject')
@@ -279,6 +279,7 @@ export const suites = [
     test('unsupported expressions do not acquire invented judgments', () => {
       const dependency = expandedZeroMul()[1]
       return throws(() => prepareProduction(Mul(0, 0))(Number))
+        && throws(() => prepareProduction(Mul(dependency, dependency))(Number))
         && throws(() => prepareProduction(Add(0, dependency))(Number))
     }),
   ]),
@@ -1082,6 +1083,74 @@ export const suites = [
     }),
     test('an empty result slot produces null', () =>
       producedOf(Arm(_, 0)) === null),
+  ]),
+
+  suite('Nonrecursive Function formation', [
+    test('formed functions are canonical Enum values', () => {
+      const fn = Function(() => x => x)
+      return isInstance(fn, Enum)
+        && isInstance(fn, Function)
+        && fn.constructor === Function.kind
+    }),
+    test('the body factory produces E before a Function exists', () => {
+      const argument = CallArgument(0)
+      const bodyForm = () => x => Mul(x, 0)
+      return bodyForm()(argument) === Mul(argument, 0)
+    }),
+    test('formation infers the complete ordered demand Tuple', () => {
+      const fn = Function(() => (unused, n) => Mul(n, 0))
+      return fn[2] === Tuple(DomainTop, Numeric)
+    }),
+    test('C orders multiplication without erasing a Numeric argument', () => {
+      const fn = Function(() => x => Mul(x, 0))
+      return fn[0] === Mul(0, CallArgument(0))
+    }),
+    test('equivalent operand order has one Function identity', () =>
+      Function(() => x => Mul(0, x))
+        === Function(() => x => Mul(x, 0))),
+    test('a repeated symbolic argument is not mistaken for literal zero', () => {
+      const fn = Function(() => x => Mul(x, x))
+      return fn[0] === Mul(CallArgument(0), CallArgument(0))
+    }),
+    test('canonicalization reaches nested expressions', () =>
+      Function(() => x => Add(1, Mul(0, x)))
+        === Function(() => x => Add(1, Mul(x, 0)))),
+    test('retained demand distinguishes multiplication from a constant', () => {
+      const multiplied = Function(() => x => Mul(0, x))
+      const constant = Function(() => x => 0)
+      return multiplied !== constant
+        && multiplied[2] === Tuple(Numeric)
+        && constant[2] === Tuple(DomainTop)
+    }),
+    test('complete ordered outer references participate in identity', () => {
+      const bodyForm = (first, second) => x => x
+      return Function(bodyForm, 1, 2) !== Function(bodyForm, 2, 1)
+    }),
+    test('unused call parameters still participate through contract arity', () =>
+      Function(() => () => 0) !== Function(() => x => 0)),
+    test('the first equivalent callable remains attached', () => {
+      const reference = Symbol('first callable test')
+      const first = x => Mul(0, x)
+      const second = x => Mul(x, 0)
+      const a = Function(() => first, reference)
+      const b = Function(() => second, reference)
+      return a === b
+        && fact(a, Callable) === first
+        && fact(b, Callable) === first
+    }),
+    test('nested Apply remains in the canonical body', () => {
+      const helper = Function(() => x => Add(x, 1))
+      const wrapper = Function(
+        helper => x => Apply(helper, Tuple(x)),
+        helper
+      )
+      return wrapper[0] === Apply(helper, Tuple(CallArgument(0)))
+        && wrapper[2] === Tuple(Numeric)
+    }),
+    test('a symbolic Apply target demands Function', () => {
+      const caller = Function(() => fn => Apply(fn, Tuple(1)))
+      return caller[2] === Tuple(Function)
+    }),
   ]),
 
 ]

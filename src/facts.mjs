@@ -13,6 +13,7 @@ export const Resolve = Symbol('Resolve')
 export const Consumes = Symbol('Consumes')
 export const Produces = Symbol('Produces')
 export const Transparent = Symbol('Transparent')
+export const Callable = Symbol('Callable')
 
 export const fact = (subject, key) => store.get(subject)?.[key] ?? null
 

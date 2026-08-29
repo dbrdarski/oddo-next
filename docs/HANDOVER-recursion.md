@@ -2,8 +2,12 @@
 
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **166 passing,
+and `decisions.md` remain the design authority. `npm test` reports **180 passing,
 0 failing**.
+
+This document covers the retained legacy recursive evaluator. The additive
+nonrecursive callable-formation path is specified by the later ruling in
+`decisions.md`; recursion for that representation remains deferred.
 
 Semantic contract fulfilment uses
 `fulfills(value, Contract) = isInstance(value?.valueOf(), Contract)`.

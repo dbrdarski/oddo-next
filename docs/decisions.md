@@ -7,11 +7,11 @@ and what remains open before the specification absorbs it.
 
 ## 2026-08-29 — symbolic formation and concrete application are separate
 
-**Ruling (Dane), implemented in the current slice.** Function formation invokes
-the body with owner-qualified `CallArgument` values to obtain the complete
-pre-normal form. That symbolic run does not select any `Match` arm. It preserves
-the complete `Match`, with all patterns and continuations, in durable expanded
-`E` before contextual canonicalization.
+**Legacy implementation status.** The Lambda-based expansion path invokes its
+body with owner-qualified `CallArgument` values. The nonrecursive callable
+formation path described below supersedes that representation: it invokes the
+actual body with ownerless `CallArgument(index)` values. Neither symbolic path
+selects a `Match` arm.
 
 Concrete application is a separate operation:
 
@@ -632,8 +632,9 @@ landed.
 ## 2026-08-26 — callable function formation and contract-retaining identity
 
 **Ruling (Dane; overrides the function-formation parts of the two sections marked
-superseded above).** A function is an actual callable. Its reusable written form is
-a callable body factory:
+superseded above, and amended by the later Function-Enum ruling).** A function's
+body is an actual callable. The canonical language value is a `Function` Enum
+formed through a callable body factory:
 
 ```js
 FunctionBody(...outerRefs) // returns the callable function
@@ -716,6 +717,20 @@ If an actual enclosing contract restricts the parameter to `Number`, then
 demand. No generated branch is needed.
 
 In this JavaScript demonstrator, when separately written candidates reach the
-same canonical identity, the first callable placed in the intern table is the
-one returned thereafter. This does not change their semantic equality. A future
-parser/compiler can emit the canonical callable body directly.
+same canonical identity, the first callable attached to the canonical `Function`
+Enum is retained thereafter. This does not change their semantic equality. A
+future parser/compiler can emit the canonical callable body directly.
+
+**Implementation status (2026-08-29).** The nonrecursive slice is additive and
+leaves the legacy recursive evaluator untouched. `Function(bodyForm,
+...outerRefs)` now invokes the produced callable with ownerless positional
+`CallArgument` values to obtain `E`, derives the ordered input-demand Tuple from
+the consuming contracts already declared by the Enums in `E`, derives `C`, and
+interns the canonical `Function(C, Tuple(...outerRefs), contract)` Enum. `E` is
+not retained. Equivalent zero-multiplication operand order reaches one `C`, while
+the inferred `Numeric` demand prevents erasing the argument. An `Apply` already
+present in `E` remains an `Apply`; for a direct symbolic argument, formation may
+read a known callee Function's input contract but does not invoke or expand that
+callee. The first callable for an identity is retained as a fact for later
+concrete application. Apply-result refinement, Match-effective regions, generic
+correlations, captured nested-function scopes, and recursion are later slices.

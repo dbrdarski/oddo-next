@@ -5,12 +5,16 @@
 import { Enum, createEnums, mapEnum } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { Kinds } from './kinds.mjs'
-import { isInstance } from './contract.mjs'
-import { match, _ } from './match.mjs'
+import { contractCheck, isInstance } from './contract.mjs'
+import { fact, learn, Consumes, Callable } from './facts.mjs'
+import { match, Combine, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
-import { Numeric } from './domain.mjs'
+import {
+  Top, Numeric, Intersection, Equals, Mul, canonicalizeDomain
+} from './domain.mjs'
 
 const {
+  Function: FunctionEnum,
   OuterRef,
   CallArgument,
   MatchArgument,
@@ -20,6 +24,7 @@ const {
   Lambda,
   FunctionRef,
 } = createEnums(() => class {
+  Function = Enum($ => $(_, Tuple, Tuple)())
   // References are holes in a canonical form. Their values are supplied
   // only when that form is applied to an ordered reference environment.
   OuterRef = Enum($ => $(Number)(index => () => true))
@@ -33,6 +38,88 @@ const {
 })
 
 Kinds.CallArgument = CallArgument.kind
+
+const demandedContract = contract =>
+  contract === _ || contract?.generic ? Top : contract
+
+const mergeDemand = (current, demanded) =>
+  canonicalizeDomain(Intersection(current, demanded))
+
+const visitDemands = (value, demanded, demands) => match(value)(
+  $ => $(CallArgument.kind)(argument => {
+    const index = argument[0]
+    demands[index] = mergeDemand(demands[index], demanded)
+  }),
+  $ => $(Apply.kind)(application => {
+    const [target, arguments_] = application
+    visitDemands(target, Function, demands)
+    const contracts = match(target)(
+      $ => $(FunctionEnum.kind)(target => target[2]),
+      $ => $(_)(() => Tuple(...Array.from(arguments_, () => Top)))
+    )
+    return Array.from(arguments_, (argument, index) =>
+      visitDemands(argument, contracts[index], demands))
+  }),
+  $ => $(FunctionEnum.kind)(() => null),
+  $ => $(Enum)(candidate => {
+    const contracts = fact(candidate.constructor, Consumes)
+    return Array.from(candidate, (part, index) =>
+      visitDemands(part, demandedContract(contracts[index]), demands))
+  }),
+  $ => $(Tuple)(tuple => Array.from(tuple, part =>
+    visitDemands(part, Top, demands))),
+  $ => $(_)(() => null)
+)
+
+const inputDemandsOf = (E, arity) => {
+  const demands = Array.from({ length: arity }, () => Top)
+  visitDemands(E, Top, demands)
+  return Tuple(...demands)
+}
+
+const canonicalExpression = (candidate, contract) => match(candidate)(
+  $ => $(Mul.kind)(candidate => match(Tuple(...candidate))(
+    $ => Combine(0, CallArgument.kind)((_zero, argument) =>
+      match(contract[argument[0]])(
+        $ => $(Equals(Number))(() => 0),
+        $ => $(_)(() => Mul(0, argument))
+      )),
+    $ => $(_)(() => candidate)
+  )),
+  $ => $(_)(() => candidate)
+)
+
+const canonicalBody = (E, contract) => match(E)(
+  $ => $(FunctionEnum.kind)(() => E),
+  $ => $(Enum)(candidate => canonicalExpression(
+    mapEnum(candidate, part => canonicalBody(part, contract)),
+    contract
+  )),
+  $ => $(Tuple)(tuple => Tuple(...Array.from(tuple, part =>
+    canonicalBody(part, contract)))),
+  $ => $(_)(() => E)
+)
+
+const formFunction = (bodyForm, ...outerRefs) => {
+  const references = Tuple(...outerRefs)
+  const callable = bodyForm(...references)
+  const arguments_ = Array.from(
+    { length: callable.length },
+    (_, index) => CallArgument(index)
+  )
+  const E = callable(...arguments_)
+  const contract = inputDemandsOf(E, arguments_.length)
+  const C = canonicalBody(E, contract)
+  const fn = FunctionEnum(C, references, contract)
+  learn(fn, Callable, callable)
+  return fn
+}
+
+export const Function = contractCheck(
+  value => isInstance(value, FunctionEnum),
+  formFunction,
+  { kind: FunctionEnum.kind }
+)
 
 export const argumentCountOf = owner => match(owner)(
   $ => $(FunctionRef.kind)(owner => owner[0][1]),

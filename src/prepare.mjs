@@ -52,7 +52,7 @@ export const prepare = matchDomain(Language, (matches, language) => context => {
   const { Mul, Equals, CallArgument } = language
   return matches(
     $ => $(Mul.kind)(E => match(Tuple(...E))(
-      $ => Combine(Equals(0), CallArgument.kind)(() =>
+      $ => Combine(0, CallArgument.kind)(() =>
         prepareZeroMul(E, context, language))
     ))
   )
