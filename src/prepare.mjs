@@ -10,7 +10,7 @@ import { Number, Indeterminate } from './numeric.mjs'
 import {
   Top, isRegion, Mul, Difference, Equals
 } from './domain.mjs'
-import { CallArgument, argumentCountOf } from './function.mjs'
+import { CallArgument } from './function.mjs'
 
 const Region = contractCheck(isRegion)
 
@@ -22,12 +22,9 @@ const Language = {
   Mul, Difference, Equals, CallArgument,
 }
 
-const prepareZeroMul = (E, context, dependency, {
+const prepareZeroMul = (E, context, {
   Difference, Equals,
 }) => {
-  if (dependency[0] !== 0 || argumentCountOf(dependency[1]) !== 1)
-    throw new TypeError('Expected argument zero of a known unary function')
-
   const everythingButNumber = Difference(Top, Number)
   const obligations = Tuple()
 
@@ -52,14 +49,11 @@ const prepareZeroMul = (E, context, dependency, {
 }
 
 export const prepare = matchDomain(Language, (matches, language) => context => {
-  if (!isRegion(context))
-    throw new TypeError('Expected an incoming region contract')
-
   const { Mul, Equals, CallArgument } = language
   return matches(
     $ => $(Mul.kind)(E => match(Tuple(...E))(
-      $ => Combine(Equals(0), CallArgument.kind)((_zero, dependency) =>
-        prepareZeroMul(E, context, dependency, language))
+      $ => Combine(Equals(0), CallArgument.kind)(() =>
+        prepareZeroMul(E, context, language))
     ))
   )
 })

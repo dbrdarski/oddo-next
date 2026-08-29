@@ -415,7 +415,7 @@ caching or choosing semantic result shapes. `canonicalizeDomain` was an explicit
 manually invoked root matcher with one `Union(C, C) → C` rule and no production
 caller. Contextual preparation existed only as test pressure scaffolding.
 
-**Later implementation ruling and status (2026-08-25, through `fce81ac`; overrides
+**Later implementation ruling and status (2026-08-25; overrides
 the representation-open language above).** Preparation is invoked as
 `prepare(E)(incomingContract)`. `incomingContract` is the direct canonical region
 contract—not a `Context` Enum and not a one-element `Tuple` wrapper. The canonical
@@ -434,8 +434,8 @@ with later solved `S`. Ordinary Enum interning still canonicalizes equal
 multi-argument contexts and FunctionBody identity integration remain unimplemented.
 
 The only production preparation rule currently recognizes zero multiplied, in
-either operand order, by argument zero of a known unary function. Its two admitted
-contexts and exact results are:
+either operand order, by a `CallArgument`. Its two admitted contexts and exact
+results are:
 
 ```text
 prepare(E)(Number)
@@ -446,8 +446,8 @@ prepare(E)(Difference(Top, Number))
               Indeterminate, Indeterminate, Tuple(), E)
 ```
 
-Unsupported expressions, dependencies, arities, and contexts throw instead of
-acquiring an invented judgment. In particular, production does not accept `Top`
+Unsupported expressions and contexts throw instead of acquiring an invented
+judgment. In particular, production does not accept `Top`
 and does not compose those two rows into an unconstrained result. That composition
 remains blocked by inaccurate blanket `Numeric` bounds on symbolic function forms
 and `Numeric`'s own wrapper membership. Current `Numeric` is therefore wider than

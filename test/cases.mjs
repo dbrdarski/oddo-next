@@ -268,19 +268,6 @@ export const suites = [
         && throws(() => prepareProduction(expanded)(Indeterminate))
         && throws(() => prepareProduction(expanded)(DomainTop))
     }),
-    test('the first slice requires argument zero of a known unary owner', () => {
-      const unary = internFn(Lambda(0, 1, 0))
-      const binary = internFn(Lambda(0, 2, 0))
-      return throws(() => prepareProduction(
-        Mul(0, CallArgument(1, unary))
-      )(Number))
-        && throws(() => prepareProduction(
-          Mul(0, CallArgument(0, binary))
-        )(Number))
-        && throws(() => prepareProduction(
-          Mul(0, CallArgument(0, OuterRef(0)))
-        )(Number))
-    }),
     test('unsupported expressions do not acquire invented judgments', () => {
       const dependency = expandedZeroMul()[1]
       return throws(() => prepareProduction(Mul(0, 0))(Number))

@@ -183,8 +183,8 @@ preparation rather than an Enum/createEnums formation hook. `E`, `C`, and a futu
 `S` remain in one ordinary value universe. No `S` integration is landed. Retaining
 `E` does not give runtime matching an inverse route from `C` to erased operands.
 
-The production rule through `fce81ac` recognizes only literal zero multiplied, in
-either operand order, by argument zero of a known unary function:
+The production rule recognizes only literal zero multiplied, in either operand
+order, by a `CallArgument`:
 
 ```text
 prepare(E)(Number)
@@ -195,8 +195,8 @@ prepare(E)(Difference(Top, Number))
               Indeterminate, Indeterminate, Tuple(), E)
 ```
 
-Unsupported expressions, dependencies, arities, wrapped contexts, `_`, `Top`, and
-all other contexts throw. The two rows are not composed under `Top`: blanket
+Unsupported expressions, wrapped contexts, `_`, `Top`, and all other contexts
+throw. The two rows are not composed under `Top`: blanket
 `Numeric` bounds on function forms and `Numeric`'s own wrapper membership make
 current `Numeric` wider than the exact Number-or-Indeterminate result region. The
 production slice does not implement general region canonicalization,

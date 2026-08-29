@@ -630,12 +630,10 @@ third `createEnums`/`Enum` callback. If contract-valued Enums require an explici
 structural-decomposition relation, it belongs to the preparation rule surface;
 runtime/user bare contract patterns retain fulfilment semantics.
 
-#### Landed preparation slice through `fce81ac`
+#### Landed preparation slice
 
 Production currently recognizes only a `Mul` whose operands are literal zero and
-`CallArgument(0, owner)`, in either order, where `owner` is a known unary `Lambda`
-or `FunctionRef`. `argumentCountOf` exposes that known arity for this guard. The two
-supported direct contexts produce:
+a `CallArgument`, in either order. The two supported direct contexts produce:
 
 ```text
 prepare(E)(Number)
@@ -648,9 +646,9 @@ prepare(E)(Difference(Top, Number))
 
 The Number row retains expanded `E` while contextual `C` collapses to zero. The
 non-Number row retains the Indeterminate judgment and leaves `C` equal to `E` until
-the broader consuming algebra is ruled. Unsupported expressions, dependencies,
-arities, wrapped contexts, `_`, `Top`, and every other context throw; production
-does not invent a default judgment.
+the broader consuming algebra is ruled. Unsupported expressions, wrapped
+contexts, `_`, `Top`, and every other context throw; production does not invent a
+default judgment.
 
 The two rows are not yet composed into a result for incoming `Top`. That work is
 blocked by inaccurate blanket `Numeric` bounds on symbolic function forms and

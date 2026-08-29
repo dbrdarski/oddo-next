@@ -108,8 +108,8 @@ The Preparation value retains `E` beside contextual `C`; there is no dedicated
 `(E, context)` lookup cache, facts-side association, solved-`S` integration,
 FunctionBody integration, or multi-argument support. Ordinary Enum interning still
 canonicalizes equal Preparation values. Production currently recognizes only
-literal zero multiplied, in either order, by argument zero of a known unary
-function. `Number` context emits accepted `Number`, result contract `Equals(0)`,
+literal zero multiplied, in either order, by a `CallArgument`. `Number` context
+emits accepted `Number`, result contract `Equals(0)`,
 empty obligations, and `C = 0`. `Difference(Top, Number)` emits accepted/result
 `Indeterminate`, empty obligations, and `C = E`. Every other expression or context
 throws.
@@ -157,9 +157,7 @@ substitution, invocation, and `expand` likewise omit those defensive preflights.
 Those constraints still describe valid lowering where applicable; malformed
 source has not become valid. A future parser/linter owns its diagnostics. Runtime
 checks remain only where the current evaluator must select an implemented semantic
-path, such as materializing a supported callee. `argumentCountOf` reports a known
-`Lambda`/`FunctionRef` arity and the first preparation rule uses it to select
-argument zero of a known unary function.
+path, such as materializing a supported callee.
 
 `CallArgument`, `Apply`, and `Match` currently declare `Numeric` as a temporary
 result so they can occupy existing Numeric seats. This relies on the repository's
