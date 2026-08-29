@@ -353,6 +353,13 @@ export const suites = [
     }),
     test('different contract values still fail a repeated generic seat', () =>
       throws(() => Twin(Number, Numeric))),
+    test('CallArgument still follows repeated generic identity', () => {
+      const owner = OuterRef(0)
+      const argument = CallArgument(0, owner)
+      const other = CallArgument(1, owner)
+      return Twin(argument, argument) === Twin(argument, argument)
+        && throws(() => Twin(argument, other))
+    }),
   ]),
 
   suite('Div & Range', [
@@ -369,6 +376,11 @@ export const suites = [
     }),
     test('Equals forwards its value through Range Number seats', () =>
       Range(Equals(1), Equals(2)) === Range(Equals(1), Equals(2))),
+    test('CallArgument passes Number seats symbolically', () => {
+      const argument = CallArgument(0, OuterRef(0))
+      return instanceOf(argument, Number)
+        && Range(argument, 10) === Range(argument, 10)
+    }),
     test('membership: 50 in Range(0, 100)', () => 50 instanceof Range(0, 100)),
     test('membership: 200 not in Range(0, 100)', () => !(200 instanceof Range(0, 100))),
     test('a Tuple is not in a Range (no coercion)', () => !(Tuple(50) instanceof Range(0, 100))),
@@ -644,6 +656,13 @@ export const suites = [
         ($, [a, b]) => $(Add(a, b))(() => false),
         $ => $(_)(() => true)
       )),
+    test('Enum kind cases use nominal membership', () => {
+      const argument = CallArgument(0, OuterRef(0))
+      return match(argument)(
+        $ => $(OuterRef.kind)(() => false),
+        $ => $(CallArgument.kind)(value => value === argument)
+      )
+    }),
     test('nested Enum shapes capture in generic creation order', () => {
       const result = match(Add(1, Mul(2, 3)))(
         ($, [a, b, c]) => $(Add(a, Mul(b, c)))((a, b, c) => [a, b, c])
@@ -798,7 +817,7 @@ export const suites = [
       const fn = internFn(form)
       return argumentCountOf(form) === 2
         && argumentCountOf(fn) === 2
-        && argumentCountOf(OuterRef(0)) === undefined
+        && argumentCountOf(OuterRef(0)) === null
     }),
     test('function forms are canonical Enum trees', () =>
       countDownForm() === countDownForm()),

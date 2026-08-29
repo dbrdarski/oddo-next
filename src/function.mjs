@@ -4,6 +4,8 @@
 
 import { Enum, createEnums, mapEnum } from './enum.mjs'
 import { Tuple } from './intern.mjs'
+import { Kinds } from './kinds.mjs'
+import { instanceOf } from './contract.mjs'
 import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import { Numeric } from './domain.mjs'
@@ -30,26 +32,37 @@ const {
   FunctionRef = Enum($ => $(Lambda, Tuple)())
 })
 
-export const argumentCountOf = owner => {
-  const form = owner instanceof FunctionRef ? owner[0] : owner
-  return form instanceof Lambda ? form[1] : undefined
-}
+Kinds.CallArgument = CallArgument.kind
+
+export const argumentCountOf = owner => match(owner)(
+  $ => $(FunctionRef.kind)(owner => owner[0][1]),
+  $ => $(Lambda.kind)(form => form[1]),
+  $ => $(_)(() => null)
+)
 
 export const internFn = (form, ...references) =>
   FunctionRef(form, Tuple(...references))
 
-const resolveOuter = (reference, frame) => {
-  if (!(reference instanceof OuterRef)) return reference
-
-  const value = frame.references[reference[0]]
-  return value instanceof Lambda ? internFn(value, ...frame.references) : value
-}
+const resolveOuter = (reference, frame) => match(reference)(
+  $ => $(OuterRef.kind)(reference => {
+    const value = frame.references[reference[0]]
+    return match(value)(
+      $ => $(Lambda.kind)(value => internFn(value, ...frame.references)),
+      ($, [value]) => $(value)(value => value)
+    )
+  }),
+  ($, [value]) => $(value)(value => value)
+)
 
 const materialize = (value, frame) => {
   value = resolveOuter(value, frame)
-  if (value instanceof FunctionRef) return value
-  if (value instanceof Lambda) return internFn(value, ...frame.references)
-  throw new TypeError(`Not a canonical function: ${value}`)
+  return match(value)(
+    $ => $(FunctionRef.kind)(value => value),
+    $ => $(Lambda.kind)(value => internFn(value, ...frame.references)),
+    $ => $(_)(() => {
+      throw new TypeError(`Not a canonical function: ${value}`)
+    })
+  )
 }
 
 const callArgument = (tree, frame, context) => {
@@ -59,31 +72,34 @@ const callArgument = (tree, frame, context) => {
 }
 
 const rebuild = (tree, visit, mapped = mapEnum(tree, visit)) =>
-  mapped ?? (tree instanceof Tuple ? Tuple(...Array.from(tree, visit)) : tree)
+  mapped ?? (instanceOf(tree, Tuple) ? Tuple(...Array.from(tree, visit)) : tree)
 
-const instantiatePattern = (tree, frame, genericAt) => {
-  if (tree instanceof MatchArgument) return genericAt(tree[0])
-  if (tree instanceof OuterRef) return resolveOuter(tree, frame)
-  if (tree instanceof Lambda || tree instanceof FunctionRef) return tree
-  return rebuild(tree, value => instantiatePattern(value, frame, genericAt))
-}
+const instantiatePattern = (tree, frame, genericAt) => match(tree)(
+  $ => $(MatchArgument.kind)(tree => genericAt(tree[0])),
+  $ => $(OuterRef.kind)(tree => resolveOuter(tree, frame)),
+  $ => $(Lambda.kind)(tree => tree),
+  $ => $(FunctionRef.kind)(tree => tree),
+  ($, [value]) => $(value)(value =>
+    rebuild(value, child => instantiatePattern(child, frame, genericAt)))
+)
 
-const containsCall = tree => {
-  if (tree instanceof Apply) return true
-  if (tree instanceof Lambda || tree instanceof FunctionRef) return false
-  return Array.isArray(tree) && tree.some(containsCall)
-}
+const containsCall = tree => match(tree)(
+  $ => $(Apply.kind)(() => true),
+  $ => $(Lambda.kind)(() => false),
+  $ => $(FunctionRef.kind)(() => false),
+  ($, [value]) => $(value)(value =>
+    instanceOf(value, Array) && value.some(containsCall))
+)
 
-const evaluate = (tree, frame, context, execute = true) => {
-  if (tree instanceof OuterRef) return resolveOuter(tree, frame)
-  if (tree instanceof CallArgument) return callArgument(tree, frame, context)
-  if (tree instanceof MatchArgument) {
+const evaluate = (tree, frame, context, execute = true) => match(tree)(
+  $ => $(OuterRef.kind)(tree => resolveOuter(tree, frame)),
+  $ => $(CallArgument.kind)(tree => callArgument(tree, frame, context)),
+  $ => $(MatchArgument.kind)(tree => {
     if (!execute) return tree
     const bindings = context.matches.at(-1)
     return bindings[tree[0]]
-  }
-
-  if (tree instanceof Apply) {
+  }),
+  $ => $(Apply.kind)(tree => {
     const target = materialize(tree[0], frame)
     const arguments_ = Array.from(
       tree[1],
@@ -92,9 +108,8 @@ const evaluate = (tree, frame, context, execute = true) => {
     return execute
       ? invoke(target, arguments_, context)
       : Apply(target, Tuple(...arguments_))
-  }
-
-  if (tree instanceof Match) {
+  }),
+  $ => $(Match.kind)(tree => {
     const value = evaluate(tree[0], frame, context, execute)
     if (!execute || containsCall(value)) return Match(
       value,
@@ -124,11 +139,12 @@ const evaluate = (tree, frame, context, execute = true) => {
         finally { context.matches.pop() }
       })
     }))
-  }
-
-  if (tree instanceof Lambda || tree instanceof FunctionRef) return tree
-  return rebuild(tree, value => evaluate(value, frame, context, execute))
-}
+  }),
+  $ => $(Lambda.kind)(tree => tree),
+  $ => $(FunctionRef.kind)(tree => tree),
+  ($, [value]) => $(value)(value =>
+    rebuild(value, child => evaluate(child, frame, context, execute)))
+)
 
 const invoke = (fn, arguments_, context) => {
   const [form, references] = fn

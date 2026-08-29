@@ -3,8 +3,12 @@
 // ==========================================
 
 import { fact, Produces } from './facts.mjs'
+import { Kinds } from './kinds.mjs'
 
 export const instanceOf = (value, Contract) =>
+  (!Contract?.generic &&
+    Kinds.CallArgument &&
+    value?.constructor === Kinds.CallArgument) ||
   value?.valueOf() instanceof Contract
 
 // What a value stands for: the declared result of the constructor that made

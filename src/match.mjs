@@ -14,6 +14,9 @@ const fits = (pattern, value) => {
   if (pattern === _)
     return true
 
+  if (pattern?.prototype instanceof Enum)
+    return value instanceof pattern
+
   if (isContract(pattern))
     return pattern.generic
       ? value instanceof pattern
