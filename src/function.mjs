@@ -28,7 +28,7 @@ const {
   // References are holes in a canonical form. Their values are supplied
   // only when that form is applied to an ordered reference environment.
   OuterRef = Enum($ => $(Number)(index => () => true))
-  CallArgument = Enum($ => $(Number, _)(Numeric))
+  CallArgument = Enum($ => $(Number, _)(CallArgument))
   MatchArgument = Enum($ => $(Number)(index => () => true))
   Apply = Enum($ => $(_, Tuple)(Numeric))
   Arm = Enum($ => $(_, _)())

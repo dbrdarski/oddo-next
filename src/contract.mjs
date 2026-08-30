@@ -4,15 +4,20 @@
 
 import { fact, Produces } from './facts.mjs'
 import { Kinds } from './kinds.mjs'
+import {
+  Canonical, isCanonicalCtx
+} from './canonical.mjs'
 
 export const isInstance = (value, Constructor) =>
   value instanceof Constructor
 
 export const fulfills = (value, Contract) =>
-  (!Contract?.generic &&
-    Kinds.CallArgument &&
-    value?.constructor === Kinds.CallArgument) ||
-  isInstance(value?.valueOf(), Contract)
+  value?.constructor === Kinds.CallArgument || isInstance(valueContext(value)?.valueOf(), Contract)
+
+export const valueContext = value =>
+  isCanonicalCtx && isInstance(value, Kinds.Enum)
+    ? value[Canonical]
+    : value
 
 // What a value stands for: the declared result of the constructor that made
 // it. A stored generic is a thunk - it answers for the node it is asked about.
@@ -23,8 +28,7 @@ export const producedOf = (v, p = fact(v?.constructor, Produces)) =>
 // rule table (ranges, unions, singletons) and the three verdicts grow.
 export const sub = (a, b) => a === b
 
-export const isContract = (value) =>
-  value != null && typeof value[Symbol.hasInstance] === 'function'
+export const isContract = (value) => typeof value?.[Symbol.hasInstance] === 'function'
 
 // Membership is "stands at": the base test, or the value was admitted as
 // something that satisfies the demanded contract.

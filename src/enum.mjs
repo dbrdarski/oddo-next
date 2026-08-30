@@ -9,8 +9,10 @@ import {
 import {
   fact, learn, Resolve, Consumes, Produces, Transparent
 } from './facts.mjs'
+import { Canonical } from './canonical.mjs'
+import { Kinds } from './kinds.mjs'
 
-export const Canonical = Symbol('Canonical')
+export { Canonical }
 
 const once = (fn, cached = false, cache) => (...args) => (
   cached || (cache = fn(...args), cached = true), cache
@@ -89,6 +91,8 @@ export const Enum = (build, input) => {
 Object.defineProperty(Enum, Symbol.hasInstance, {
   value: value => enumFactories.has(value?.constructor)
 })
+
+Kinds.Enum = Enum
 
 const lazyEnumFactory = (name, fn) => {
   const constructor = class extends Array { }

@@ -1,12 +1,11 @@
-// ==========================================
-// Enum Canonicalization Rules
-// ==========================================
+export const Canonical = Symbol('Canonical')
 
-import { Canonical } from './enum.mjs'
-import { match } from './match.mjs'
+export let isCanonicalCtx = false
 
-export { Canonical }
+export const canonicalContext = operation => {
+  const previous = isCanonicalCtx
+  isCanonicalCtx = true
 
-export const registerCanonical = (EnumType, rule) =>
-  EnumType.kind[Canonical] = candidate =>
-    rule(match(candidate))
+  try { return operation() }
+  finally { isCanonicalCtx = previous }
+}

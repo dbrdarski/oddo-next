@@ -113,8 +113,8 @@ export const suites = [
       learn(subject, first, 3)
       return fact(subject, first) === 1 && fact(subject, second) === 2
     }),
-    test('a missing fact is null', () =>
-      fact(Tuple('missing fact'), Symbol('Missing')) === null),
+    test('a missing fact is nullish', () =>
+      fact(Tuple('missing fact'), Symbol('Missing')) == null),
     test('declared results are stored under the shared Produces key', () => {
       const node = Add(1, 2)
       return fact(node.constructor, Produces) === Numeric
@@ -363,12 +363,12 @@ export const suites = [
     }),
     test('different contract values still fail a repeated generic seat', () =>
       throws(() => Twin(Number, Numeric))),
-    test('CallArgument still follows repeated generic identity', () => {
+    test('CallArgument placeholders defer repeated-value constraints', () => {
       const owner = OuterRef(0)
       const argument = CallArgument(0, owner)
       const other = CallArgument(1, owner)
       return Twin(argument, argument) === Twin(argument, argument)
-        && throws(() => Twin(argument, other))
+        && Twin(argument, other) === Twin(argument, other)
     }),
   ]),
 
@@ -1131,10 +1131,10 @@ export const suites = [
         Tuple(Arm(_, Add(arrived, 1)))
       )
     }),
-    test('CallArgument and Apply temporarily stand at Numeric seats', () => {
+    test('CallArgument produces itself while Apply produces Numeric', () => {
       const form = countDownForm()
       const fn = internFn(form, form)
-      return producedOf(CallArgument(0, fn)) === Numeric
+      return producedOf(CallArgument(0, fn)) === CallArgument
         && producedOf(Apply(fn, Tuple(CallArgument(0, fn)))) === Numeric
     }),
     test('an empty result slot produces null', () =>

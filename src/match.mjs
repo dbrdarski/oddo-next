@@ -1,4 +1,6 @@
-import { contractCheck, fulfills, isContract, isInstance } from './contract.mjs'
+import {
+  contractCheck, fulfills, isContract, isInstance, valueContext
+} from './contract.mjs'
 import { Enum, generic, generics } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 
@@ -52,8 +54,9 @@ const combineFits = (patterns, values, genericState) => {
       if (used[valueIndex]) continue
 
       const checkpoint = genericState().slice()
-      if (fits(patterns[patternIndex], values[valueIndex])) {
-        assigned[patternIndex] = values[valueIndex]
+      const value = valueContext(values[valueIndex])
+      if (fits(patterns[patternIndex], value)) {
+        assigned[patternIndex] = value
         used[valueIndex] = true
         if (search(patternIndex + 1)) return true
         used[valueIndex] = false

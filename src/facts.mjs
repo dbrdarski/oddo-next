@@ -15,7 +15,7 @@ export const Produces = Symbol('Produces')
 export const Transparent = Symbol('Transparent')
 export const Callable = Symbol('Callable')
 
-export const fact = (subject, key) => store.get(subject)?.[key] ?? null
+export const fact = (subject, key) => store.get(subject)?.[key]
 
 export const learn = (subject, key, value, facts = store.get(subject)) => (
   facts ?? store.set(subject, facts = Object.create(null)),

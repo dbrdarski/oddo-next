@@ -7,7 +7,13 @@ import { Enum, createEnums } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { match, matchDomain, Combine, _ } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
-import { registerCanonical } from './canonical.mjs'
+import { Canonical, canonicalContext } from './canonical.mjs'
+
+
+export const registerCanonical = (EnumType, rule) =>
+  EnumType.kind[Canonical] = candidate =>
+    canonicalContext(() => rule(match(candidate)))
+
 
 // `_` implements matching through the contract protocol, but remains wildcard
 // syntax; persistent region operands use the named Top contract instead.
