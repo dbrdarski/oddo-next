@@ -9,4 +9,4 @@ export { Canonical }
 
 export const registerCanonical = (EnumType, rule) =>
   EnumType.kind[Canonical] = candidate =>
-    rule(match(candidate, Canonical))
+    rule(match(candidate))

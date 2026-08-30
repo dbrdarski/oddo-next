@@ -36,16 +36,10 @@ const fits = (pattern, value) => {
   return value === pattern
 }
 
-const combineFits = (patterns, values, genericState, representation) => {
+const combineFits = (patterns, values, genericState) => {
   if (!isInstance(values, Tuple)) {
     values = Tuple(...values)
   }
-
-  if (representation != null)
-    values = Tuple(...Array.from(
-      values,
-      value => value?.[representation] ?? value
-    ))
 
   if (patterns.length !== values.length) return
 
@@ -72,7 +66,7 @@ const combineFits = (patterns, values, genericState, representation) => {
   return search(0) ? assigned : null
 }
 
-export const match = (value, representation = null) => (...cases) => {
+export const match = (value) => (...cases) => {
   for (const define of cases) {
     const [genericState, createGeneric] = generic()
     const [pattern, handler, kind] = define(caseOf, generics(createGeneric))
@@ -80,7 +74,7 @@ export const match = (value, representation = null) => (...cases) => {
     genericState(() => [])
 
     if (kind === combined) {
-      const assigned = combineFits(pattern, value, genericState, representation)
+      const assigned = combineFits(pattern, value, genericState)
       if (assigned != null) return handler(...assigned)
       continue
     }
