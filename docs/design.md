@@ -10,7 +10,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **160 passing, 0 failing**.
+Current verification: **191 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -67,9 +67,9 @@ model has no signed zero.
 System-side metadata lives in one store (`fact(subject, key)` /
 `learn(subject, key, value)`, first-write-wins), keyed by the relevant reference:
 Enum validators and hidden classes today, nodes and contract pairs later.
-Nothing is attached as a property of a value or class—a value remains pure
-structure, indistinguishable fresh or analyzed, and facts never participate in
-identity.
+Facts are not attached as properties of values or classes and never participate
+in identity. The `Canonical` property described in §3 is semantic form retained
+by Enum construction, not an entry from the facts store.
 
 Current entries are:
 
@@ -180,16 +180,49 @@ returns `null` for values that are not registered Enums. Recursive
 traversal is the caller's job—canonical-function expansion handles Tuples
 separately and otherwise leaves non-Enum values atomic.
 
+### Expanded candidate and canonical form (initial context-free slice landed)
+
+An Enum factory always returns its validated, structurally interned candidate
+`E`. After construction it also writes the candidate's context-free canonical
+form `C` under the shared `Canonical` Symbol:
+
+```js
+candidate[Canonical] =
+  constructor[Canonical]?.(candidate) ?? candidate
+```
+
+`registerCanonical(EnumType, rule)` installs the rule on
+`EnumType.kind[Canonical]`. The rule receives a matcher already bound to the
+candidate; it does not receive the candidate separately. During that canonical
+match, `Combine` reads each immediate operand through
+`operand?.[Canonical] ?? operand`, so an outer rule sees the canonical result of
+an already-constructed child without a recursive normalization pass. An
+unmatched rule returns the original candidate, which consequently stores itself
+as `C`.
+
+The first registered `Add` rules fold two direct `Number.kind` values to an
+`Equals` value, shift a `Range` by a Number, and add two Ranges endpoint-wise.
+`Number` remains the semantic fulfilment contract used by Enum validation;
+`Number.kind` is direct known-number matching and therefore does not admit a
+symbolic `CallArgument` merely because that argument is allowed through contract
+seats.
+
+These factory rules are intentionally context-free. They do not replace
+contract-sensitive Preparation: for example, whether a symbolic multiplication
+can erase an operand still depends on the inferred incoming region. Function
+formation also does not yet select a body's stored `Canonical` property for
+function identity; that integration is the next separate slice.
+
 That same registry defines the nominal relation `isInstance(value, Enum)`.
 Registered Enum values satisfy it; Tuple and Record values do not. Runtime
 structural matching uses this relation rather than treating every Array subclass
 as an Enum.
 
 `mapEnum` reconstruction checks declared seats and structurally interns the
-rebuilt Enum through that same front door. It is phase-blind and does not by
-itself transform expanded `E` into canonical `C`: it has no incoming semantic
-context. A later explicit preparation stage uses the matcher to derive and retain
-`C`. `expand` produces `E`; preparation is general machinery rather than an
+rebuilt Enum through that same front door, so the rebuilt candidate receives its
+context-free `Canonical` property normally. `mapEnum` supplies no incoming
+semantic context and therefore cannot perform context-sensitive Preparation.
+`expand` produces `E`; preparation remains general machinery rather than an
 `expand`-specific pass.
 
 ## 4. Membership
@@ -450,13 +483,15 @@ original value unchanged.
 `fits(pattern, value)` has one small decision chain:
 
 1. `_` matches anything and captures nothing.
-2. A contract pattern uses `fulfills(value, pattern)`. A generic capture uses
+2. A direct kind pattern such as `Number.kind` uses `isInstance` and does not
+   inherit symbolic contract admission.
+3. A contract pattern uses `fulfills(value, pattern)`. A generic capture uses
    `isInstance(value, pattern)` instead, because capture is structural and must
    retain the original value rather than forward it.
-3. A structural Enum pattern and value must both satisfy the registered nominal
+4. A structural Enum pattern and value must both satisfy the registered nominal
    `isInstance(value, Enum)` relation, then have the same hidden kind and arity; their
    corresponding seats are fitted recursively.
-4. Everything else matches by canonical identity (`===`).
+5. Everything else matches by canonical identity (`===`).
 
 Pattern construction and pattern mismatch are not the same event. A case
 declaration must first produce a valid pattern. If its declaration or Enum
@@ -483,9 +518,10 @@ passes nothing.
 ### Combine
 
 `Combine(...patterns)(handler)` is a separate case combinator for unordered
-occurrence assignment. Its matched value must satisfy `isInstance(value, Tuple)`,
-and tuple cardinality must equal pattern cardinality. Tuple itself is the carrier;
-there is no parallel Tuple-recognition contract. It searches for a
+occurrence assignment. A non-Tuple iterable candidate, including an Enum, is
+converted locally with `Tuple(...candidate)`; there is no parallel
+Tuple-recognition contract. Occurrence cardinality must equal pattern cardinality.
+It searches for a
 one-to-one assignment from pattern positions to tuple occurrence indexes:
 
 - duplicate values remain separate occurrences;
@@ -497,7 +533,10 @@ one-to-one assignment from pattern positions to tuple occurrence indexes:
 On success the handler receives every assigned occurrence in pattern order,
 including positions whose patterns are contracts or wildcards. This is
 deliberately different from an ordinary arm, whose handler receives only its
-generic bindings. `Combine` is available in lowercase `match`; the canonical
+generic bindings. Ordinary matching retains the occurrences as supplied. A
+matcher bound by `registerCanonical` instead reads each occurrence's stored
+`Canonical` form before fitting and passes that form to the handler. `Combine`
+is available in lowercase `match`; the canonical
 function `Match`/`Arm` syntax described next does not encode its private case
 marker.
 

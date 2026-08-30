@@ -19,12 +19,13 @@ import * as enums from './src/enum.mjs'
 import * as numeric from './src/numeric.mjs'
 import * as domain from './src/domain.mjs'
 import * as matching from './src/match.mjs'
+import * as canonicalization from './src/canonical.mjs'
 import * as functions from './src/function.mjs'
 import * as preparation from './src/prepare.mjs'
 
 const api = {
   ...intern, ...contract, ...facts, ...enums, ...numeric,
-  ...domain, ...matching, ...functions, ...preparation,
+  ...domain, ...matching, ...canonicalization, ...functions, ...preparation,
 }
 
 // Keep the complete language API available to the browser console without
@@ -51,6 +52,16 @@ log(n)
 log('interned:', n === Add(Numeric(1), Add(Numeric(2), Numeric(3))))
 log('stands at Numeric seats:', fulfills(n, Numeric))
 log('at a strict Number seat:', fulfills(n, Number))`,
+  },
+  {
+    name: 'Enum canonical forms',
+    code: `const inner = Add(1, 2)
+const expression = Add(inner, 3)
+
+log('expanded E:', expression)
+log('inner C:', inner[Canonical])
+log('outer C:', expression[Canonical])
+log('Range C:', Add(Range(1, 3), Range(10, 20))[Canonical])`,
   },
   {
     name: 'Function form & recursion',

@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**180 passing, 0 failing**.
+**191 passing, 0 failing**.
 
 The additive nonrecursive `Function(bodyForm, ...outerRefs)` formation slice is
 recorded in the 2026-08-26 ruling and its 2026-08-29 implementation status in
@@ -29,6 +29,10 @@ flag, cleanup protocol, or construction residue in the current design.
   Enums.
 - `mapEnum(value, map)` rebuilds a registered Enum through its original factory, so
   declared-seat checking and interning remain the one construction path.
+- Every Enum factory returns its expanded candidate `E` and stores its
+  context-free canonical form at `E[Canonical]`. With no registered or matching
+  rule the property points back to `E`; construction never replaces the returned
+  candidate with `C`.
 
 Internal form factories are not linter boundaries. Lowering, expansion, and
 canonicalization control the forms they produce, so their reusable constructors do
@@ -39,15 +43,16 @@ behavior they implement.
 
 ## 2. Structural pattern matching
 
-`match(value)(...cases)` uses four rules, in this order:
+`match(value)(...cases)` uses five rules, in this order:
 
 1. `_` matches anything.
-2. A contract pattern uses semantic membership:
+2. A direct kind pattern such as `Number.kind` uses direct `isInstance`.
+3. A contract pattern uses semantic membership:
    `fulfills(value, pattern)`, which forwards `value?.valueOf()` before applying
    the direct `isInstance` relation.
-3. A registered Enum pattern and value require the same node constructor and
+4. A registered Enum pattern and value require the same node constructor and
    length, then recursively fit their parts.
-4. Every other pattern uses canonical identity: `value === pattern`.
+5. Every other pattern uses canonical identity: `value === pattern`.
 
 Cases are tried in declaration order and the first fit wins. If no case fits,
 `match` returns its original value unchanged.
@@ -100,8 +105,8 @@ match(Add(1, 2))(
 
 Its current contract is exact and deterministic:
 
-- the candidate pool must satisfy `isInstance(value, Tuple)` directly; there is no
-  separate Tuple-recognition contract;
+- a non-Tuple iterable candidate, including an Enum, is converted to a Tuple at
+  the Combine boundary; there is no separate Tuple-recognition contract;
 - pattern count and occurrence count must be equal;
 - patterns are not tied to corresponding source positions;
 - each candidate occurrence index is used exactly once;
@@ -124,6 +129,16 @@ match(Tuple(Add(1, 2), 3))(
 Every Combine pattern contributes one handler argument, including contracts and
 wildcards. Generics inside Combine still provide repeated-value and backtracking
 constraints.
+
+`registerCanonical(EnumType, rule)` installs the rule at
+`EnumType.kind[Canonical]` and binds it to the candidate's matcher. Only this
+canonical matcher reads immediate occurrences through
+`occurrence?.[Canonical] ?? occurrence`; ordinary runtime matching retains the
+written occurrences. The initial `Add` rules use `Number.kind`, never the broader
+`Number` contract, and cover literal addition, Range shifting, and endpoint-wise
+Range addition. These are context-free rules; contract-sensitive multiplication
+remains in Preparation, and function identity does not yet select a body's stored
+canonical form.
 
 ## 5. Construction failure is not mismatch
 

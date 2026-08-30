@@ -5,6 +5,38 @@ therefore postdate a following topic's original entry. `design.md` stays the
 settled specification; entries here capture what was decided, on what grounds,
 and what remains open before the specification absorbs it.
 
+## 2026-08-30 — Enum construction retains E and writes context-free C
+
+**Ruling (Dane), landed in the current slice.** An Enum factory validates and
+structurally interns its candidate `E`, writes its context-free canonical form at
+`E[Canonical]`, and returns `E`. It never replaces the published expanded
+candidate with its canonical result:
+
+```js
+candidate[Canonical] =
+  constructor[Canonical]?.(candidate) ?? candidate
+
+return candidate
+```
+
+`registerCanonical(EnumType, rule)` installs the rule directly on
+`EnumType.kind[Canonical]` and supplies a matcher already bound to the candidate.
+There is no recursive `canonicalize` function and rules do not receive a second
+candidate argument. During a registered canonical match, `Combine` reads each
+immediate operand's already-written `Canonical` form; ordinary runtime matching
+continues to receive written values. An unmatched rule preserves the candidate.
+
+`Number` and `Number.kind` express different relations. `Number` remains the
+semantic contract used for seat fulfilment, including symbolic `CallArgument`
+admission. `Number.kind` means a direct known Number and excludes that symbolic
+admission. The initial `Add` rules use `Number.kind` to fold two known numbers to
+`Equals(left + right)`, shift either side of a `Range` by a known Number, and add
+two Ranges endpoint-wise.
+
+These rules are context-free. They do not decide contract-dependent annihilation,
+replace Preparation, implement full polynomial normalization, or yet make a
+Function select its body's stored `Canonical` form for identity.
+
 ## 2026-08-29 — symbolic formation and concrete application are separate
 
 **Legacy implementation status.** The Lambda-based expansion path invokes its
