@@ -469,8 +469,8 @@ prepare(E)(Difference(Top, Number))
               Indeterminate, Indeterminate, Tuple(), E)
 ```
 
-Unsupported expressions and contexts throw instead of acquiring an invented
-judgment. In particular, production does not accept `Top`
+Unsupported expressions and contexts remain unprepared instead of acquiring an
+invented judgment. In particular, production does not accept `Top`
 and does not compose those two rows into an unconstrained result. That composition
 remains blocked by inaccurate blanket `Numeric` bounds on symbolic function forms
 and `Numeric`'s own wrapper membership. Current `Numeric` is therefore wider than
@@ -590,6 +590,15 @@ whose widest result is `Bottom` or `Null` stands at that atom, although no curre
 domain constructor declares either result. Inaccurate blanket `Numeric` bounds on
 symbolic function forms and current Numeric wrapper membership still block sound
 production preparation from an unconstrained `Top` context.
+
+## 2026-08-30 — match exhaustion preserves the input
+
+If no successfully constructed case fits, `match(value)` returns `value` unchanged.
+Exhaustion is ordinary identity passthrough, not an error and not an implicit
+exhaustiveness assertion.
+
+This does not catch errors raised while constructing a case pattern. Pattern
+construction failure retains the separate behavior below.
 
 ## 2026-08-22 — pattern construction failure propagates (current behavior)
 

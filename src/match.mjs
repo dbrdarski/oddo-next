@@ -83,7 +83,7 @@ export const match = (value) => (...cases) => {
     }
   }
 
-  throw new TypeError('No pattern matched')
+  return value
 }
 
 export const matchDomain = (domain, handler) => value =>

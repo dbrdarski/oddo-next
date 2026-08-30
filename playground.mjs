@@ -170,7 +170,7 @@ log(match(expression)(
 ))`,
   },
   {
-    name: 'Match order & failure',
+    name: 'Match order & passthrough',
     code: `const chosen = match(3)(
   $ => $(Number)(value => 'first Number case: ' + value),
   $ => $(Number)(() => 'second Number case'),
@@ -178,13 +178,10 @@ log(match(expression)(
 )
 log(chosen)
 
-try {
-  match(Mul(1, 2))(
-    ($, [a, b]) => $(Add(a, b))(() => 'Add')
-  )
-} catch (error) {
-  log('no match:', String(error))
-}`,
+const unmatched = Mul(1, 2)
+log(match(unmatched)(
+  ($, [a, b]) => $(Add(a, b))(() => 'Add')
+) === unmatched)`,
   },
   {
     name: 'Combine: declared order',

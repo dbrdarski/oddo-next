@@ -50,7 +50,7 @@ behavior they implement.
 4. Every other pattern uses canonical identity: `value === pattern`.
 
 Cases are tried in declaration order and the first fit wins. If no case fits,
-`match` throws `No pattern matched`.
+`match` returns its original value unchanged.
 
 Patterns are ordinary canonical values, not a second pattern hierarchy. Admission
 is decided by the Enum being constructed:
@@ -202,7 +202,7 @@ prepare(E)(Difference(Top, Number))
 ```
 
 Unsupported expressions, wrapped contexts, `_`, `Top`, and all other contexts
-throw. The two rows are not composed under `Top`: blanket
+remain unprepared. The two rows are not composed under `Top`: blanket
 `Numeric` bounds on function forms and `Numeric`'s own wrapper membership make
 current `Numeric` wider than the exact Number-or-Indeterminate result region. The
 production slice does not implement general region canonicalization,

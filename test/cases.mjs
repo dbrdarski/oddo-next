@@ -269,18 +269,20 @@ export const suites = [
         && !fulfills(Numeric(1), accepted)
         && !fulfills(Add(1, 2), accepted)
     }),
-    test('the first slice rejects contexts it has not ruled', () => {
+    test('the first slice leaves unruled contexts unprepared', () => {
       const expanded = expandedZeroMul()
-      return throws(() => prepareProduction(expanded)(Tuple(Number)))
-        && throws(() => prepareProduction(expanded)(_))
-        && throws(() => prepareProduction(expanded)(Indeterminate))
-        && throws(() => prepareProduction(expanded)(DomainTop))
+      return [Tuple(Number), _, Indeterminate, DomainTop]
+        .every(context =>
+          !isInstance(prepareProduction(expanded)(context), Preparation))
     }),
     test('unsupported expressions do not acquire invented judgments', () => {
       const dependency = expandedZeroMul()[1]
-      return throws(() => prepareProduction(Mul(0, 0))(Number))
-        && throws(() => prepareProduction(Mul(dependency, dependency))(Number))
-        && throws(() => prepareProduction(Add(0, dependency))(Number))
+      return [
+        Mul(0, 0),
+        Mul(dependency, dependency),
+        Add(0, dependency),
+      ].every(expression =>
+        !isInstance(prepareProduction(expression)(Number), Preparation))
     }),
   ]),
 
@@ -732,10 +734,12 @@ export const suites = [
         ($, [a]) => $(Add(a, a))(() => false),
         ($, [a, b]) => $(Add(a, b))((a, b) => a === 2 && b === 3)
       )),
-    test('no successful case throws', () =>
-      throws(() => match(Mul(1, 2))(
+    test('no successful case returns the original value', () => {
+      const value = Mul(1, 2)
+      return match(value)(
         ($, [a, b]) => $(Add(a, b))(() => false)
-      ))),
+      ) === value
+    }),
     test('a structural node can hold a contract part', () => Add(Number, 2)[0] === Number),
     test('the same shape is legal as a pattern', () =>
       match(Add(1, 9))(

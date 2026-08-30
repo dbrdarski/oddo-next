@@ -444,8 +444,8 @@ through membership, nodes enter through their recorded facts.
 `match(value)(...caseDeclarations)` is an ordered eliminator. Each case
 declaration receives the ordinary `caseOf` constructor (`$`) and a fresh
 iterator of generics. Cases are tried in source order; the first successful
-case returns its handler result. If no case matches, `match` throws a
-`TypeError`.
+case returns its handler result. If no case matches, `match` returns its
+original value unchanged.
 
 `fits(pattern, value)` has one small decision chain:
 
@@ -573,8 +573,8 @@ expanded form `E`.
 Concrete `apply` does not implement a second pattern engine. It instantiates
 `MatchArgument(i)` as the corresponding generic, resolves `OuterRef` patterns,
 and delegates the ordered arms to lowercase `match`. Arm order, contract
-fulfilment, structural matching, identity, construction failures, and no-match
-errors consequently retain the semantics from §7.
+fulfilment, structural matching, identity, construction failures, and unmatched
+value passthrough consequently retain the semantics from §7.
 
 The selected continuation reads its `MatchArgument` bindings. A nested Match
 extends a copy of the prior binding vector rather than replacing it, including
@@ -659,8 +659,8 @@ prepare(E)(Difference(Top, Number))
 The Number row retains expanded `E` while contextual `C` collapses to zero. The
 non-Number row retains the Indeterminate judgment and leaves `C` equal to `E` until
 the broader consuming algebra is ruled. Unsupported expressions, wrapped
-contexts, `_`, `Top`, and every other context throw; production does not invent a
-default judgment.
+contexts, `_`, `Top`, and every other context remain unprepared; production does
+not invent a default judgment.
 
 The two rows are not yet composed into a result for incoming `Top`. That work is
 blocked by inaccurate blanket `Numeric` bounds on symbolic function forms and
