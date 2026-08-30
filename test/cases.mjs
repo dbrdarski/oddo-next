@@ -13,6 +13,7 @@ import {
 } from '../src/facts.mjs'
 import { Enum, createEnums, mapEnum } from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
+import { Canonical as CanonicalForm } from '../src/canonical.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import {
   Add, Sub, Mul, Div, LL, Numeric, Union, Intersection, Difference, Equals, Range,
@@ -506,6 +507,54 @@ export const suites = [
     test('a primitive remains itself', () => canonicalizeDomain(3) === 3),
   ]),
 
+  suite('Enum form canonicalization', [
+    test('Add owns its canonical rule', () =>
+      typeof Add.kind[CanonicalForm] === 'function'),
+    test('an Enum retains E and stores C', () => {
+      const E = Add(1, 2)
+      return isInstance(E, Add)
+        && E[CanonicalForm] === Equals(3)
+        && producedOf(E) === Numeric
+    }),
+    test('a node without a rule stores itself as C', () => {
+      const E = Mul(2, 3)
+      return E[CanonicalForm] === E
+    }),
+    test('a parent rule reads its child C', () => {
+      const inner = Add(1, 2)
+      const outer = Add(inner, 3)
+      return inner[CanonicalForm] === Equals(3)
+        && outer[0] === inner
+        && outer[CanonicalForm] === Equals(6)
+    }),
+    test('Number.kind excludes symbolic contract admission', () => {
+      const argument = CallArgument(0)
+      return fulfills(argument, Number)
+        && match(argument)(
+          $ => $(Number.kind)(() => false),
+          $ => $(_)(() => true)
+        )
+        && match(Equals(6))(
+          $ => $(Number.kind)(value => value === Equals(6)),
+          $ => $(_)(() => false)
+        )
+    }),
+    test('a symbolic Add remains its own C', () => {
+      const E = Add(CallArgument(0), 1)
+      return E[CanonicalForm] === E
+    }),
+    test('an Indeterminate Add remains its own C', () => {
+      const E = Add(new ZeroDivision(1), 1)
+      return E[CanonicalForm] === E
+    }),
+    test('Range addition combines both endpoints', () =>
+      Add(Range(1, 3), Range(10, 20))[CanonicalForm]
+        === Range(11, 23)),
+    test('Number addition shifts a Range in either order', () =>
+      Add(Range(1, 3), 10)[CanonicalForm] === Range(11, 13)
+        && Add(10, Range(1, 3))[CanonicalForm] === Range(11, 13)),
+  ]),
+
   suite('Contextual preparation reference model', [
     test('one expanded expression can occupy two arm contexts', () => {
       const self = OuterRef(0)
@@ -771,13 +820,20 @@ export const suites = [
       )
       return run(Tuple(1)) && run(Tuple(1, 2, 3))
     }),
-    test('the occurrence pool must be a canonical Tuple', () => {
-      const run = values => match(values)(
-        $ => Combine(Number, Number)(() => false),
-        $ => $(_)(() => true)
-      )
-      return run([1, 2])
-    }),
+    test('a non-Tuple occurrence pool is converted locally', () =>
+      match([1, 2])(
+        $ => Combine(1, 2)((first, second) =>
+          first === 1 && second === 2)
+      )),
+    test('a non-iterable value is not an occurrence pool', () =>
+      match(3)(
+        $ => Combine(Number.kind)(() => false)
+      ) === 3),
+    test('an Enum candidate supplies its seats directly', () =>
+      match(Add(1, 2))(
+        $ => Combine(Number.kind, Number.kind)((first, second) =>
+          first === 1 && second === 2)
+      )),
     test('ambiguous assignments use occurrence order', () => {
       const add = Add(1, 2)
       return match(Tuple(1, add))(

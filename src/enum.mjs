@@ -10,6 +10,8 @@ import {
   fact, learn, Resolve, Consumes, Produces, Transparent
 } from './facts.mjs'
 
+export const Canonical = Symbol('Canonical')
+
 const once = (fn, cached = false, cache) => (...args) => (
   cached || (cache = fn(...args), cached = true), cache
 )
@@ -114,7 +116,9 @@ const lazyEnumFactory = (name, fn) => {
       // The gate constructs; the interner only caches. A duplicate
       // construction is discarded in favor of the canonical instance.
       const instance = constructor.from(validate(...args))
-      return canonical(constructor, instance, instance)
+      const candidate = canonical(constructor, instance, instance)
+      candidate[Canonical] = constructor[Canonical]?.(candidate) ?? candidate
+      return candidate
     },
     { kind: constructor }
   )

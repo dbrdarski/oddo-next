@@ -7,6 +7,7 @@ import { Enum, createEnums } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { match, matchDomain, Combine, _ } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
+import { registerCanonical } from './canonical.mjs'
 
 // `_` implements matching through the contract protocol, but remains wildcard
 // syntax; persistent region operands use the named Top contract instead.
@@ -60,6 +61,21 @@ export const {
 Object.defineProperty(Equals.kind.prototype, 'valueOf', {
   value() { return this[0] }
 })
+
+registerCanonical(Add, matches => matches(
+  $ => Combine(Range.kind, Range.kind)((left, right) =>
+    Range(
+      left[0] + right[0],
+      left[1] + right[1]
+    )),
+  $ => Combine(Range.kind, Number.kind)((range, value) =>
+    Range(
+      range[0] + value,
+      range[1] + value
+    )),
+  $ => Combine(Number.kind, Number.kind)((left, right) =>
+    Equals(left + right))
+))
 
 const canonicalCommutative = (candidate, absorbing, identity) =>
   match(Tuple(...candidate))(

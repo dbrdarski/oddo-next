@@ -23,9 +23,15 @@ Function
 Note: So Number is not an Enum, but a separate type.
 */
 
+const NumberKind = contractCheck(
+  value => typeof value?.valueOf() === "number"
+)
+NumberKind.kind = NumberKind
+
 export const Number = contractCheck(
   value => typeof value === "number",
-  globalThis.Number.bind(null)
+  globalThis.Number.bind(null),
+  { kind: NumberKind }
 )
 
 export class Indeterminate extends globalThis.Number {
