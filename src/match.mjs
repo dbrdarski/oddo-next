@@ -38,7 +38,6 @@ const fits = (pattern, value) => {
 
 const combineFits = (patterns, values, genericState, representation) => {
   if (!isInstance(values, Tuple)) {
-    if (values?.[Symbol.iterator] == null) return
     values = Tuple(...values)
   }
 

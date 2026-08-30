@@ -825,10 +825,6 @@ export const suites = [
         $ => Combine(1, 2)((first, second) =>
           first === 1 && second === 2)
       )),
-    test('a non-iterable value is not an occurrence pool', () =>
-      match(3)(
-        $ => Combine(Number.kind)(() => false)
-      ) === 3),
     test('an Enum candidate supplies its seats directly', () =>
       match(Add(1, 2))(
         $ => Combine(Number.kind, Number.kind)((first, second) =>

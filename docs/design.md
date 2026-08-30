@@ -10,7 +10,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **191 passing, 0 failing**.
+Current verification: **190 passing, 0 failing**.
 
 ## 1. The interner (landed)
 

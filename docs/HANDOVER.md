@@ -3,7 +3,7 @@
 This document describes committed behavior beginning with `cf99272` and separates
 the first landed preparation slice from the broader canonicalization target.
 `design.md` and `decisions.md` remain the design authority. `npm test` reports
-**191 passing, 0 failing**.
+**190 passing, 0 failing**.
 
 The additive nonrecursive `Function(bodyForm, ...outerRefs)` formation slice is
 recorded in the 2026-08-26 ruling and its 2026-08-29 implementation status in
