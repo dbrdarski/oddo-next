@@ -46,14 +46,18 @@ const isUnionOf = (candidate, left, right) =>
 const armFor = (candidate, region) =>
   candidate[1].find(arm => arm[0] === region)
 
-const { Twin, PureValue, ImpureValue, PurityPair } = createEnums(() => class {
+const {
+  Twin, PureValue, ImpureValue, ImpureNumericValue, PurityPair
+} = createEnums(() => class {
   Twin = Enum(($, [E]) => $(E, E)(E))
   PureValue = Enum($ => $()())
   ImpureValue = Enum($ => $()())
+  ImpureNumericValue = Enum($ => $()(Numeric))
   PurityPair = Enum($ => $(_, _)())
 })
 
 registerPure(ImpureValue, () => false)
+registerPure(ImpureNumericValue, () => false)
 
 const loopForm = () => {
   const self = OuterRef(0)
@@ -577,6 +581,24 @@ export const suites = [
     test('Number addition shifts a Range in either order', () =>
       Add(Range(1, 3), 10)[CanonicalForm] === Range(11, 13)
         && Add(10, Range(1, 3))[CanonicalForm] === Range(11, 13)),
+    test('Mul folds a pure known Number through zero', () =>
+      Mul(0, 2)[CanonicalForm] === Equals(0)
+        && Mul(2, 0)[CanonicalForm] === Equals(0)),
+    test('Mul orders a residual zero without reordering it again', () => {
+      const argument = CallArgument(0)
+      const ordered = Mul(0, argument)
+      return Mul(argument, 0)[CanonicalForm] === ordered
+        && ordered[CanonicalForm] === ordered
+    }),
+    test('Mul retains zero products that cannot be erased', () => {
+      const indeterminate = new ZeroDivision(1)
+      const impure = ImpureNumericValue()
+      const indeterminateMul = Mul(0, indeterminate)
+      const impureMul = Mul(0, impure)
+      return indeterminateMul[CanonicalForm] === indeterminateMul
+        && impureMul[Pure] === false
+        && impureMul[CanonicalForm] === impureMul
+    }),
   ]),
 
   suite('Contextual preparation reference model', [

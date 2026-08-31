@@ -7,11 +7,12 @@ import { Tuple } from './intern.mjs'
 import { Kinds } from './kinds.mjs'
 import { contractCheck, isInstance } from './contract.mjs'
 import { fact, learn, Consumes, Callable } from './facts.mjs'
-import { match, Combine, _ } from './match.mjs'
+import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import {
-  Top, Numeric, Intersection, Equals, Mul, canonicalizeDomain
+  Top, Numeric, Intersection, canonicalizeDomain
 } from './domain.mjs'
+import { Canonical } from './canonical.mjs'
 
 const {
   Function: FunctionEnum,
@@ -76,27 +77,12 @@ const inputDemandsOf = (E, arity) => {
   return Tuple(...demands)
 }
 
-const canonicalExpression = (candidate, contract) => match(candidate)(
-  $ => $(Mul.kind)(candidate => match(Tuple(...candidate))(
-    $ => Combine(0, CallArgument.kind)((_zero, argument) =>
-      match(contract[argument[0]])(
-        $ => $(Equals(Number))(() => 0),
-        $ => $(_)(() => Mul(0, argument))
-      )),
-    $ => $(_)(() => candidate)
-  )),
-  $ => $(_)(() => candidate)
-)
-
-// this needs to be replaced and deleted:
-const canonicalBody = (E, contract) => match(E)(
+const canonicalBody = E => match(E)(
   $ => $(FunctionEnum.kind)(() => E),
-  $ => $(Enum)(candidate => canonicalExpression(
-    mapEnum(candidate, part => canonicalBody(part, contract)),
-    contract
-  )),
+  $ => $(Enum)(candidate =>
+    mapEnum(candidate, canonicalBody)[Canonical]),
   $ => $(Tuple)(tuple => Tuple(...Array.from(tuple, part =>
-    canonicalBody(part, contract)))),
+    canonicalBody(part)))),
   $ => $(_)(() => E)
 )
 
@@ -109,7 +95,7 @@ const formFunction = (bodyForm, ...outerRefs) => {
   )
   const E = callable(...arguments_)
   const contract = inputDemandsOf(E, arguments_.length)
-  const C = canonicalBody(E, contract)
+  const C = canonicalBody(E)
   const fn = FunctionEnum(C, references, contract)
   learn(fn, Callable, callable)
   return fn

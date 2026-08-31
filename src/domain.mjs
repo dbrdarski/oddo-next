@@ -13,7 +13,9 @@ import { Pure } from './purity.mjs'
 
 export const registerCanonical = (EnumType, rule) =>
   EnumType.kind[Canonical] = candidate =>
-    canonicalContext(() => rule(match(candidate)))
+    candidate[Pure]
+      ? canonicalContext(() => rule(match(candidate)))
+      : candidate
 
 export const registerPure = (EnumType, rule) =>
   EnumType.kind[Pure] = candidate =>
@@ -79,6 +81,17 @@ registerCanonical(Add, matches => matches(
   $ => Combine(Range.kind, Number.kind)(([rangeLeft, rangeRight], value) =>
     Range(rangeLeft + value, rangeRight + value)),
   $ => Combine(Number.kind, Number.kind)((left, right) => Equals(left + right))
+))
+
+registerCanonical(Mul, matches => matches(
+  $ => Combine(0, Number.kind)(() => Equals(0)),
+  ($, [form]) => $(form)(form => {
+    const [left, right] = form
+    return match(right)(
+      $ => $(0)(() => Mul(0, left)),
+      $ => $(_)(() => form)
+    )
+  })
 ))
 
 const canonicalCommutative = (candidate, absorbing, identity) =>
