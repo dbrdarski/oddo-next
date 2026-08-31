@@ -12,7 +12,7 @@ import { fact, learn, Consumes, Produces, Callable } from './facts.mjs'
 import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import {
-  Top, Numeric, Intersection, Equals, canonicalizeDomain
+  Top, Numeric, Intersection, Equals, canonicalizeDomain, registerCanonical
 } from './domain.mjs'
 import { Canonical } from './canonical.mjs'
 
@@ -92,6 +92,27 @@ const canonicalBody = E => match(E)(
     canonicalBody(part)))),
   $ => $(_)(() => E)
 )
+
+const containsCallArgument = value => match(value)(
+  $ => $(CallArgument.kind)(() => true),
+  $ => $(FunctionEnum.kind)(() => false),
+  $ => $(Enum)(candidate => candidate.some(containsCallArgument)),
+  $ => $(Tuple)(tuple => tuple.some(containsCallArgument)),
+  $ => $(_)(() => false)
+)
+
+registerCanonical(Apply, matches => matches(
+  ($, [candidate]) => $(candidate)(candidate => {
+    const [target, arguments_] = candidate
+    return match(target)(
+      $ => $(FunctionEnum.kind)(target =>
+        containsCallArgument(arguments_)
+          ? candidate
+          : canonicalBody(fact(target, Callable)(...arguments_))),
+      $ => $(_)(() => candidate)
+    )
+  })
+))
 
 const resultContractOf = value => match(value)(
   $ => $(FunctionEnum.kind)(() => Function),

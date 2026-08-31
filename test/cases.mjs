@@ -1113,6 +1113,27 @@ export const suites = [
       return fact(fn, Produces) === Function
         && producedOf(Apply(fn, Tuple())) === Function
     }),
+    test('Apply retains E and stores the concrete call result as C', () => {
+      const increment = Function(() => x => Add(x, 1))
+      const E = Apply(increment, Tuple(2))
+      return E === Apply(increment, Tuple(2))
+        && E[CanonicalForm] === Equals(3)
+        && producedOf(E) === Numeric
+    }),
+    test('a literal call result is already its canonical value', () => {
+      const six = Function(() => () => 6)
+      return Apply(six, Tuple())[CanonicalForm] === 6
+    }),
+    test('a Function-valued call result remains that Function', () => {
+      const returned = Function(() => () => 6)
+      const fn = Function(returned => () => returned, returned)
+      return Apply(fn, Tuple())[CanonicalForm] === returned
+    }),
+    test('concrete Apply canonicalizes nested argument values', () => {
+      const increment = Function(() => x => Add(x, 1))
+      return Apply(increment, Tuple(Add(1, 1)))[CanonicalForm]
+        === Equals(3)
+    }),
     test('nested Apply remains in the canonical body', () => {
       const helper = Function(() => x => Add(x, 1))
       const wrapper = Function(
@@ -1120,7 +1141,16 @@ export const suites = [
         helper
       )
       return wrapper[0] === Apply(helper, Tuple(CallArgument(0)))
+        && wrapper[0][CanonicalForm] === wrapper[0]
         && wrapper[2] === Tuple(Numeric)
+    }),
+    test('a fully concrete call in a formed body contributes its C', () => {
+      const helper = Function(() => () => Add(1, 1))
+      const wrapper = Function(
+        helper => () => Apply(helper, Tuple()),
+        helper
+      )
+      return wrapper[0] === Equals(2)
     }),
     test('a symbolic Apply target demands Function', () => {
       const caller = Function(() => fn => Apply(fn, Tuple(1)))

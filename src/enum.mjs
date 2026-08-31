@@ -93,6 +93,7 @@ Object.defineProperty(Enum, Symbol.hasInstance, {
   value: value => enumFactories.has(value?.constructor)
 })
 
+Enum.kind = Enum
 Kinds.Enum = Enum
 
 const lazyEnumFactory = (name, fn) => {
