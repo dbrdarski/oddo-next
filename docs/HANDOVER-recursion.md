@@ -1,12 +1,11 @@
 # Handover — canonical functions and recursive expansion
 
-This document describes committed behavior beginning with `cf99272` and separates
-the first landed contextual-preparation slice from its broader target. `design.md`
-and `decisions.md` remain the design authority. `npm test` reports **180 passing,
-0 failing**.
+This document covers the retained legacy recursive evaluator. The former
+production contextual-preparation prototype has been removed; `design.md` and
+`decisions.md` remain the design authority. `npm test` reports **187 passing, 0
+failing**.
 
-This document covers the retained legacy recursive evaluator. The additive
-nonrecursive callable-formation path is specified by the later ruling in
+The additive nonrecursive callable-formation path is specified by the later ruling in
 `decisions.md`; recursion for that representation remains deferred.
 
 Semantic contract fulfilment uses
@@ -87,42 +86,22 @@ At the current commit the residual call stays in durable expanded form `E`.
 Every recursive call reached through the supported Enum/Tuple traversal is
 preserved there; a body with two such calls yields a tree containing both.
 Completed helper calls leave the stack, so later independent calls are not mistaken
-for recursion. This is not a permanent canonical-form rule: later contextual
-preparation may combine or erase an admitted pure call from `C` while retaining
-`E` and the demands/admission obligations derived from it.
+for recursion. This is not a permanent canonical-form rule: a future contextual
+judgment may combine or erase an admitted pure call from `C` after deriving its
+demands and admission obligations from `E`.
 
 `expand` extracts the resulting structural formula `E` along the evaluated symbolic
 path. It does not execute recursion to completion, prove termination, derive an
 input domain, or simplify arithmetic itself. It still preserves a value such as
-`Sub(Sub(n, 1), 1)` rather than rewriting it to `Sub(n, 2)`. The separate explicit
-preparation stage has one production zero-multiplication rule; it is not integrated
-into `expand`.
+`Sub(Sub(n, 1), 1)` rather than rewriting it to `Sub(n, 2)`.
 
-Factories continue to check declared seats, construct, and structurally intern
-their nodes; the complete expansion result is durable `E`. The landed call is
-`prepare(E)(incomingContract)`, where the context is the direct region contract—not
-a context Enum or Tuple wrapper. It returns the canonical structural value
-`Preparation(E, context, accepted, resultContract, obligations, C)` in exactly that
-field order. The same `E` can produce different local `C` under different incoming
-regions. `mapEnum` is phase-blind structural rebuilding and has no incoming context,
-so it cannot by itself transform `E` into `C`. `expand` does not own a special
-normalizer; an explicit caller invokes preparation.
-
-The Preparation value retains `E` beside contextual `C`; there is no dedicated
-`(E, context)` lookup cache, facts-side association, solved-`S` integration,
-FunctionBody integration, or multi-argument support. Ordinary Enum interning still
-canonicalizes equal Preparation values. Production currently recognizes only
-literal zero multiplied, in either order, by a `CallArgument`. `Number` context
-emits accepted `Number`, result contract `Equals(0)`,
-empty obligations, and `C = 0`. `Difference(Top, Number)` emits accepted/result
-`Indeterminate`, empty obligations, and `C = E`. Every other expression or context
-throws.
-
-Incoming `Top` is deliberately unsupported. Blanket `Numeric` bounds on function
-forms and `Numeric`'s own wrapper membership make current `Numeric` wider than the
-exact Number-or-Indeterminate result region, so the two landed rows cannot yet be
-composed into a general result. `Produces` remains the ruled widest-result
-relation; the declarations using it must become accurate.
+The former `prepare(E)(incomingContract)`/`Preparation` implementation handled
+only two symbolic zero-multiplication contexts and had no caller in Function
+formation. It has been removed. `test/contextual-prepare.model.mjs` retains the
+Number/Indeterminate examples as a test-only reference. No production contextual
+preparation API, cache, solved-`S` integration, or multi-argument judgment exists.
+`Produces` remains the ruled widest-result relation; its temporary function-form
+declarations still need to become accurate.
 
 ## 4. Function-level Match
 
@@ -189,7 +168,7 @@ The committed suite covers:
 - canonical zero-seat Top/Bottom/Null contract Enum values and binary region
   membership Enums;
 - local, nonrecursive region deduplication and Top/Bottom reduction laws;
-- the six-field Preparation value and both zero-multiplication contexts.
+- test-only contextual Number/Indeterminate reference judgments.
 
 ## 7. Current boundaries
 
@@ -198,12 +177,11 @@ The following are not landed:
 1. Replacement of the temporary blanket `Numeric` declarations on function
    expressions without a FunctionRef return theorem: consumer-derived argument
    demand, effective Match handling, and residual-call obligations.
-2. Generalization of the landed matcher-driven, direct-context Preparation beyond
-   its two zero-multiplication judgments. `Preparation` already retains durable `E`
-   and contextual `C` in its ruled six-field shape; no dedicated lookup cache or
-   separate storage exists beyond ordinary Enum interning. Incoming `Top`, every
-   other expression/context rule, and correlated multi-argument contexts are
-   unsupported. The target `Number` polynomial form
+2. Explicit incoming-region canonicalization at the function/body boundary. The
+   removed Preparation prototype must not be restored as a parallel path; its
+   six-field shape and Number/Indeterminate rows remain only in the retained test
+   model. Every production expression/context rule and correlated multi-argument
+   context remains unimplemented. The target `Number` polynomial form
    still requires distribution,
    coefficient collection/cancellation, identities/annihilation, stable ordering,
    left-associated output, retained `Sub`, and `Pow`. `Geo` remains a separate
@@ -221,15 +199,12 @@ The following are not landed:
    remainders, Pure exact region-to-result logical normalization, guard/`~`
    lowering, and host ingress remain open. `Rest` is only the running remainder
    calculation, not a node.
-5. General retained evidence and obligations. The landed Preparation value already
-   retains durable `E` alongside accepted region, result contract, empty
-   obligations, and contextual `C` for its supported slice.
-   Branch-local Match regions can encode the correlated partial mapping without an
-   always-present function-domain field. The Number algebra may erase a call from
-   `C`; known calls may discharge during preparation, while unresolved outer
-   references retain obligations for a later boundary. Failure never selects a
-   different canonical form. FunctionBody association and later solved `S` remain
-   unimplemented.
+5. General retained evidence and obligations. Branch-local Match regions can
+   encode the correlated partial mapping without an always-present function-domain
+   field. The Number algebra may erase a call from `C`; known calls may discharge
+   at the proper future judgment boundary, while unresolved outer references retain
+   obligations. Failure never selects a different canonical form. Later solved
+   `S` remains unimplemented.
 6. Source-to-form lowering above the canonical `Lambda` API.
 7. Recursive environments whose members require different reference layouts or
    projections.
@@ -241,10 +216,9 @@ Do not infer the probe's `Term`/`Poly` representation, `Landing` node, two-form
 older probe documents. The probe's particular node representation is not part of
 the landed design.
 
-The existing matcher is the settled rule engine. Preparation rules structurally
-inspect durable `E`; runtime bare contract patterns retain fulfilment semantics. A
-runtime match given `C` never recovers erased source operands from retained `E`.
-The precise source data/pattern preparation boundary remains to be pinned with
-lowering.
+The existing matcher is the settled rule engine. Future contextual rules may
+structurally inspect complete `E`; runtime bare contract patterns retain fulfilment
+semantics. A runtime match given `C` never recovers erased source operands. The
+precise source data/pattern boundary remains to be pinned with lowering.
 
 *End of handover.*

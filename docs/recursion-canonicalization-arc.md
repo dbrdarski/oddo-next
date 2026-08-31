@@ -3,15 +3,17 @@
 This file records the useful direction changes from the 2026-08-20/21
 investigation. It is **not** the current API or design authority.
 
-The committed implementation is described in `docs/HANDOVER-recursion.md` and
-`src/function.mjs`. The current test suite reports **166 passing, 0 failing**.
+The then-committed implementation is described in this historical record's
+handover references. Its snapshot reported **166 passing, 0 failing**.
 
-**Later supersession (2026-08-25).** This history originally concluded that
-canonicalization belonged inside factory formation and that the expanded candidate
-was transient. That placement did not survive. The current ruling retains expanded
-`E`, derives contextual canonical `C` from explicit semantic context, and keeps
-later solved `S` separate. Polynomial, region, recursion, and matcher-reuse conclusions
-remain valid unless explicitly tied below to the old factory placement.
+**Later supersession (through 2026-08-31).** This history originally concluded
+that canonicalization replaced a transient factory candidate. The current Enum
+surface instead returns expanded `E` and stores context-free `E[Canonical]`;
+Function formation derives demands from `E` before selecting canonical body `C`.
+The short-lived production Preparation prototype was removed. Explicit-context
+canonicalization and later solved `S` remain separate future work. Polynomial,
+region, recursion, and matcher-reuse conclusions remain valid unless explicitly
+tied below to an older placement.
 
 ## 1. Durable conclusions from the investigation
 

@@ -21,11 +21,10 @@ import * as domain from './src/domain.mjs'
 import * as matching from './src/match.mjs'
 import * as canonicalization from './src/canonical.mjs'
 import * as functions from './src/function.mjs'
-import * as preparation from './src/prepare.mjs'
 
 const api = {
   ...intern, ...contract, ...facts, ...enums, ...numeric,
-  ...domain, ...matching, ...canonicalization, ...functions, ...preparation,
+  ...domain, ...matching, ...canonicalization, ...functions,
 }
 
 // Keep the complete language API available to the browser console without

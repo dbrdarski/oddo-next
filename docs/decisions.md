@@ -5,6 +5,25 @@ therefore postdate a following topic's original entry. `design.md` stays the
 settled specification; entries here capture what was decided, on what grounds,
 and what remains open before the specification absorbs it.
 
+## 2026-08-31 — retire the production Preparation scaffold
+
+**Implementation status.** The isolated `prepareZeroMul` experiment, its
+six-field `Preparation` Enum, and their direct production tests have been removed.
+No production `prepare(E)(incomingContract)` API remains. The separate
+`test/contextual-prepare.model.mjs` reference model stays as specification
+pressure; it is not imported by production code.
+
+The live path now derives a Function's ordered input demands from its complete
+expanded body `E`, recursively rebuilds that body through Enum doors, and uses the
+stored child `Canonical` forms for function identity. `Mul` owns its ordinary
+Pure/context-free zero rule. The removed scaffold had no caller in this path.
+
+This removal does not reverse the semantic ruling that an actual enclosing
+`Number` restriction can permit `Mul(0, x) → 0` while retaining the `Number`
+demand. That explicit incoming-region case is currently unimplemented. It must be
+integrated at the proper function/body canonicalization boundary rather than by
+restoring the orphaned `Preparation` API.
+
 ## 2026-08-30 — Enum construction retains E and writes context-free C
 
 **Ruling (Dane), landed in the current slice.** An Enum factory validates and
@@ -33,9 +52,10 @@ admission. The initial `Add` rules use `Number.kind` to fold two known numbers t
 `Equals(left + right)`, shift either side of a `Range` by a known Number, and add
 two Ranges endpoint-wise.
 
-These rules are context-free. They do not decide contract-dependent annihilation,
-replace Preparation, implement full polynomial normalization, or yet make a
-Function select its body's stored `Canonical` form for identity.
+These rules are context-free. They do not decide explicit incoming-region
+annihilation or implement full polynomial normalization. Function formation now
+selects stored `Canonical` forms for identity; the later 2026-08-31 status removes
+the old production `Preparation` scaffold.
 
 ## 2026-08-29 — symbolic formation and concrete application are separate
 
@@ -59,8 +79,8 @@ re-entry still returns the same residual `Apply` form.
 ## 2026-08-20 — declared result bounds (corrected 2026-08-26)
 
 **Final ruling (Dane).** `Produces` is retained. A contract in an Enum's result
-slot is the widest possible result contract for that form. Facts and contextual
-Preparation may prove a narrower result for a particular value and context, but
+slot is the widest possible result contract for that form. Facts and later
+contextual judgments may prove a narrower result for a particular value and context, but
 that refinement must remain within the declared bound. For example:
 
 ```text
@@ -94,10 +114,10 @@ Correcting these declarations does not remove `Produces` from ordinary
 result-bearing forms.
 
 **Legacy implementation status.** Static `Produces` and node-anchored generic
-results are landed. Commit `ffb474f` retained contextual refinements in
-`Preparation`; the callable-function ruling below supersedes that as the target
-formation boundary. General refinement, containment, and replacement of the
-temporary function-form declarations remain future work.
+results are landed. Commit `ffb474f` had retained contextual refinements in the
+later-removed `Preparation` prototype; the callable-function ruling below
+supersedes that as the target formation boundary. General refinement, containment,
+and replacement of the temporary function-form declarations remain future work.
 
 ## 2026-08-25 — nominal Tuple, Record, and Enum recognition landed
 
@@ -144,7 +164,7 @@ producer.
 Declared Enum seats, generic binding, construction, and interning remain the form
 mechanics. Enum's optional cross-argument validator remains an available language
 facility, but it is not a default hardening layer and none of the current internal
-Domain, function-form, or Preparation declarations needs it. Source validity and
+Domain or function-form declarations needs it. Source validity and
 producer invariants belong in lowering, a linter, or the semantic judgment that
 actually needs them.
 
@@ -160,7 +180,8 @@ Accordingly, the following constructor/helper checks were removed:
 - `internFn`, symbolic argument substitution, invocation, and `expand` no longer
   duplicate producer checks for reference counts, indexes, call arity, or nominal
   entry type;
-- `Preparation` no longer repeats constraints already stated by its seats.
+- the now-removed `Preparation` prototype did not repeat constraints already
+  stated by its seats.
 
 This is not a ruling that malformed source is valid. It is a ruling about where
 validity is established. Operational rejection remains where it selects an actual
@@ -361,7 +382,7 @@ the still-missing work belongs to callable function formation as described below
 
 **Historical ruling.** The 2026-08-26 callable-function section below reverses
 durable `E` retention and replaces this section's proposed function-identity
-integration. The landed `Preparation` code described here remains legacy
+integration. The removed `Preparation` code described here remains historical
 implementation evidence, not the target representation.
 
 **Ruling (Dane).** Canonicalization is not immediate Enum formation. Ordinary
@@ -470,8 +491,11 @@ caching or choosing semantic result shapes. `canonicalizeDomain` was an explicit
 manually invoked root matcher with one `Union(C, C) → C` rule and no production
 caller. Contextual preparation existed only as test pressure scaffolding.
 
-**Later implementation ruling and status (2026-08-25; overrides
-the representation-open language above).** Preparation is invoked as
+**Historical implementation ruling and status (2026-08-25; prototype removed
+2026-08-31).** The following describes the removed prototype and is retained as
+implementation evidence. There is now no production `prepare` function or
+`Preparation` Enum; `test/contextual-prepare.model.mjs` remains only a test model.
+The prototype invoked Preparation as
 `prepare(E)(incomingContract)`. `incomingContract` is the direct canonical region
 contract—not a `Context` Enum and not a one-element `Tuple` wrapper. The canonical
 structural result is, in this exact field order:
@@ -488,7 +512,7 @@ with later solved `S`. Ordinary Enum interning still canonicalizes equal
 `Preparation` values; there is no dedicated `(E, context)` lookup cache. Correlated
 multi-argument contexts and FunctionBody identity integration remain unimplemented.
 
-The only production preparation rule currently recognizes zero multiplied, in
+The prototype's only production rule recognized zero multiplied, in
 either operand order, by a `CallArgument`. Its two admitted contexts and exact
 results are:
 
@@ -715,9 +739,8 @@ complete expanded/pre-normal body E
 `E` is an input to this formation transaction, not retained function provenance.
 Once it has supplied the demands and canonical key, it may be discarded. In
 particular, source operand order is not retained: the arithmetic canonicalizer
-decides it. The earlier `Preparation(E, ...)` implementation remains historical
-scaffolding until function formation replaces that boundary; it does not prescribe
-the final function representation.
+decides it. The earlier `Preparation(E, ...)` implementation has been removed; it
+does not prescribe the final function representation.
 
 Canonicalization does not manufacture `Match` arms for an unbranched function.
 It canonicalizes the body over the function's complete admitted input contract.

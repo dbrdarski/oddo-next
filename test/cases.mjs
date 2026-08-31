@@ -25,7 +25,6 @@ import {
   OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda,
   Function, argumentCountOf, internFn, apply, expand
 } from '../src/function.mjs'
-import { Preparation, prepare as prepareProduction } from '../src/prepare.mjs'
 import {
   Expanded,
   Accepted,
@@ -71,14 +70,6 @@ const countDownForm = () => {
     Arm(Equals(0), 0),
     Arm(_, Apply(self, Tuple(Sub(argument, 2))))
   )))
-}
-
-const expandedZeroMul = (zeroFirst = true) => {
-  const self = OuterRef(0)
-  const dependency = CallArgument(0, self)
-  const body = zeroFirst ? Mul(0, dependency) : Mul(dependency, 0)
-  const form = Lambda(1, 1, body)
-  return expand(internFn(form, form))
 }
 
 export const suites = [
@@ -176,142 +167,6 @@ export const suites = [
         ($, [value]) => $(value)(value => Tuple(context, value))
       ))
       return prepare(7)('context') === Tuple('context', 7)
-    }),
-  ]),
-
-  suite('Preparation judgments', [
-    test('Preparation retains its six ruled fields canonically', () => {
-      const self = OuterRef(0)
-      const expanded = Mul(0, CallArgument(0, self))
-      const obligations = Tuple()
-      const prepared = Preparation(
-        expanded,
-        Number,
-        Number,
-        Equals(0),
-        obligations,
-        0
-      )
-      return prepared === Preparation(
-        expanded,
-        Number,
-        Number,
-        Equals(0),
-        obligations,
-        0
-      )
-        && isInstance(prepared, Preparation)
-        && prepared[0] === expanded
-        && prepared[1] === Number
-        && prepared[2] === Number
-        && prepared[3] === Equals(0)
-        && prepared[4] === obligations
-        && prepared[5] === 0
-    }),
-    test('Preparation uses the ordinary structural matcher', () => {
-      const expanded = Mul(0, CallArgument(0, OuterRef(0)))
-      const prepared = Preparation(
-        expanded,
-        Number,
-        Number,
-        Equals(0),
-        Tuple(),
-        0
-      )
-      return match(prepared)(
-        ($, [E, context, accepted, result, obligations, C]) =>
-          $(Preparation(E, context, accepted, result, obligations, C))(
-            (matchedE, matchedContext, matchedAccepted, matchedResult, matchedObligations, matchedC) =>
-              matchedE === expanded
-                && matchedContext === Number
-                && matchedAccepted === Number
-                && matchedResult === Equals(0)
-                && matchedObligations === Tuple()
-                && matchedC === 0
-          )
-      )
-    }),
-  ]),
-
-  suite('Contextual preparation', [
-    test('Number preparation retains E and collapses C to zero', () => {
-      const expanded = expandedZeroMul()
-      const prepared = prepareProduction(expanded)(Number)
-      return prepared === prepareProduction(expanded)(Number)
-        && prepared[0] === expanded
-        && prepared[1] === Number
-        && prepared[2] === Number
-        && prepared[3] === Equals(0)
-        && prepared[4] === Tuple()
-        && prepared[5] === 0
-    }),
-    test('a nonrecursive call expands into retained E before C is derived', () => {
-      const helperSelf = OuterRef(0)
-      const helperForm = Lambda(1, 1, CallArgument(0, helperSelf))
-      const helper = internFn(helperForm, helperForm)
-
-      const rootSelf = OuterRef(0)
-      const rootForm = Lambda(1, 1, Mul(
-        0,
-        Apply(helper, Tuple(CallArgument(0, rootSelf)))
-      ))
-      const root = internFn(rootForm, rootForm)
-      const E = expand(root)
-      const prepared = prepareProduction(E)(Number)
-
-      return E === Mul(0, CallArgument(0, root))
-        && prepared === Preparation(
-          E,
-          Number,
-          Number,
-          Equals(0),
-          Tuple(),
-          0
-        )
-    }),
-    test('zero multiplication uses Combine across operand order', () => {
-      const zeroFirst = expandedZeroMul()
-      const zeroLast = expandedZeroMul(false)
-      const first = prepareProduction(zeroFirst)(Number)
-      const last = prepareProduction(zeroLast)(Number)
-      return first[0] === zeroFirst
-        && last[0] === zeroLast
-        && first[5] === 0
-        && last[5] === 0
-        && first !== last
-    }),
-    test('the non-Number remainder preserves the Indeterminate operation', () => {
-      const expanded = expandedZeroMul()
-      const context = Difference(DomainTop, Number)
-      const prepared = prepareProduction(expanded)(context)
-      return prepared[0] === expanded
-        && prepared[1] === context
-        && prepared[2] === Indeterminate
-        && prepared[3] === Indeterminate
-        && prepared[4] === Tuple()
-        && prepared[5] === expanded
-    }),
-    test('the non-Number judgment admits only Indeterminate values', () => {
-      const context = Difference(DomainTop, Number)
-      const accepted = prepareProduction(expandedZeroMul())(context)[2]
-      return fulfills(new ZeroDivision(1), accepted)
-        && !fulfills(Numeric(1), accepted)
-        && !fulfills(Add(1, 2), accepted)
-    }),
-    test('the first slice leaves unruled contexts unprepared', () => {
-      const expanded = expandedZeroMul()
-      return [Tuple(Number), _, Indeterminate, DomainTop]
-        .every(context =>
-          !isInstance(prepareProduction(expanded)(context), Preparation))
-    }),
-    test('unsupported expressions do not acquire invented judgments', () => {
-      const dependency = expandedZeroMul()[1]
-      return [
-        Mul(0, 0),
-        Mul(dependency, dependency),
-        Add(0, dependency),
-      ].every(expression =>
-        !isInstance(prepareProduction(expression)(Number), Preparation))
     }),
   ]),
 
