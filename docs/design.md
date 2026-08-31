@@ -97,11 +97,13 @@ from its target Function; `producedOf` itself remains unchanged. Thus
 a Function-valued result contributes `Function` without invoking that returned
 Function.
 
-The remaining blanket bounds are temporary: `Match` and unresolved/legacy Apply
-retain `Numeric` so their symbolic nodes can occupy existing Numeric seats. Those
-fallbacks are formation scaffolding, not a per-function signature.
-`CallArgument` instead produces its own symbolic kind; its demand follows from
-its consumer.
+`Arm` uses its result seat as its generic `Produces` value. `Match` derives its
+result contract by taking the canonical `Union` of those arm-result contracts,
+with `Bottom` for no arms. `Apply` has no blanket fallback: a formed target
+supplies its retained result bound, while an unresolved legacy target supplies
+no constructor-level result bound. Higher-order result inference is outside this
+slice. `CallArgument` produces its own symbolic kind; its demand follows from its
+consumer.
 Concrete application may select a `Match` body; symbolic formation retains the
 complete Match. Residual calls and effective Match regions require later
 obligations. This correction does not remove `Produces` from ordinary
@@ -139,8 +141,8 @@ Name = Enum(
     by the machinery **with the node's elements as arguments**, it returns
     the value-check. Records nothing as a fact.
   - **empty** — `()` — no meaningful declared result. Canonical function
-    syntax uses this for structural nodes such as `Arm`, `Lambda`, and
-    `FunctionRef`; the current machinery receives `null`, which provides
+    syntax uses this for structural nodes such as `Lambda` and `FunctionRef`;
+    the current machinery receives `null`, which provides
     no usable `Produces` fact. A `FunctionRef` is nevertheless the canonical
     function value by nominal Enum identity; the empty result slot merely avoids
     inventing a theorem about the result of applying that function.
@@ -832,14 +834,14 @@ Tuples through their respective doors. Pending-call detection scans Array values
 both operations leave
 Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
 ordinary ordered Arms only—no function-AST `Combine` or guards.
-`Match` and unresolved/legacy Apply retain provisional Numeric fallbacks.
 `CallArgument` produces its own symbolic kind and receives demands from its
-consumers. Formed Apply reads the result bound derived from its target
-Function's pre-canonical `E`; concrete formed calls also retain their invoked
-canonical result while symbolic calls remain residual. Replacing the remaining
-fallbacks requires consumer-derived argument demands, effective Match handling,
-and residual-call obligations. This does not add an accepted-domain or result
-field to functions.
+consumers. Formed Apply reads the result bound derived from its target Function's
+pre-canonical `E`; unresolved legacy Apply has no invented result theorem.
+`Arm` forwards its result generic, and `Match` derives the canonical Union of its
+arm-result contracts. Concrete formed calls also retain their invoked canonical
+result while symbolic calls remain residual. Effective Match regions and
+residual-call obligations remain future work. This does not add an
+accepted-domain or result field to functions.
 
 Expansion is synchronous recursive descent and has no fixed-point engine. No
 production explicit-context preparation stage is present. Internal form
@@ -848,9 +850,8 @@ malformed lowering output; a future parser/linter owns those diagnostics.
 
 ## 9. Implementation backlog and separate future work
 
-- Replace the temporary `Numeric` declarations on `Match` and unresolved/legacy
-  Apply without introducing a FunctionRef return theorem; retain effective Match
-  results and represent obligations for residual calls. Complete generic
+- Retain effective Match regions and represent obligations for residual calls
+  without introducing a FunctionRef return theorem. Complete generic
   correlations for symbolic `CallArgument` results remain separate. Prototype
   inheritance remains only an optional implementation refactor for static
   factory-shaped bounds; it is not separate language work.

@@ -145,12 +145,13 @@ source has not become valid. A future parser/linter owns its diagnostics. Runtim
 checks remain only where the current evaluator must select an implemented semantic
 path, such as materializing a supported callee.
 
-Legacy/unresolved `Apply` and `Match` currently retain temporary `Numeric` results
-so they can occupy existing Numeric seats. `CallArgument` produces its own
-symbolic kind. The callable Function path gives formed Apply nodes their target
-Function's derived result bound and canonicalizes concrete formed calls. That does
-not infer a result theorem for `FunctionRef`; residual recursive calls require
-later obligation machinery.
+`CallArgument` produces its own symbolic kind. The callable Function path gives
+formed Apply nodes their target Function's derived result bound and canonicalizes
+concrete formed calls. Unresolved legacy Apply has no constructor-level result
+bound; higher-order result inference is outside this slice. `Arm` forwards its
+result generic and `Match` derives the canonical Union of its arm-result contracts.
+This does not infer a result theorem for `FunctionRef`; residual recursive calls
+require later obligation machinery.
 
 ## 6. Current test surface
 
@@ -176,10 +177,9 @@ The committed suite covers:
 
 The following are not landed:
 
-1. Replacement of the remaining temporary `Numeric` declarations on `Match` and
-   unresolved/legacy Apply without a FunctionRef return theorem: effective Match
-   handling and residual-call obligations. Complete symbolic `CallArgument`
-   result correlations remain separate.
+1. Effective Match-region handling and residual-call obligations without a
+   FunctionRef return theorem. Complete symbolic `CallArgument` result
+   correlations remain separate.
 2. Explicit incoming-region canonicalization at the function/body boundary. The
    removed Preparation prototype must not be restored as a parallel path; its
    six-field shape and Number/Indeterminate rows remain only in the retained test

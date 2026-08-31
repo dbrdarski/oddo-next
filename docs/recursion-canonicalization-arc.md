@@ -147,10 +147,11 @@ and DNF are internal techniques, not public logical nodes.
 
 ## 5. Current implementation work
 
-- Replace the temporary blanket `Numeric` declarations on `CallArgument`, `Apply`,
-  and `Match` through consumer-derived argument demand, effective Match handling,
-  and residual-call obligations. Do not infer a result theorem from FunctionRef;
-  retain `Produces` for ordinary result-bearing forms.
+- Infer effective Match regions and residual-call obligations. `CallArgument`
+  already produces its symbolic kind, `Apply` reads a formed target's retained
+  result bound without a fallback, and `Arm`/`Match` derive their results through
+  generics. Do not infer a result theorem from FunctionRef; retain `Produces`
+  for ordinary result-bearing forms.
 - Implement the ruled matcher-driven contextual preparation of durable `E`,
   contextual `C` retention, later `S` association, Number polynomial form/Pow,
   canonical contract regions, effective Match remainders, Pure logical

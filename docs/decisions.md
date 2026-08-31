@@ -103,22 +103,23 @@ that implementation level.
 
 The previous diagnosis in this entry incorrectly called `Produces` imported
 machinery and promoted prototype chaining into a semantic alternative. That
-diagnosis is superseded. The remaining function-layer defect is narrower:
-`Match` and unresolved/legacy Apply use temporary `Numeric` bounds.
-`CallArgument` produces its own symbolic kind and acquires demands from its
-consumers. Formed Apply derives its bound from the target Function as recorded
-in the 2026-08-31 implementation status below. Input demands are inferred from
-the complete pre-normal candidate before canonicalization; the Function's result
-bound is derived rather than stored as an independent identity field. Residual
-recursive calls and symbolic Matches require later obligation machinery.
-Correcting these declarations does not remove `Produces` from ordinary
-result-bearing forms.
+diagnosis is superseded. `CallArgument` produces its own symbolic kind and
+acquires demands from its consumers. Formed Apply derives its bound from the
+target Function as recorded in the 2026-08-31 implementation status below;
+unresolved legacy Apply has no constructor-level result bound. Higher-order
+result inference is outside this slice. `Arm` forwards its result generic and
+`Match` derives the Union of its arm-result contracts. Input demands are inferred
+from the complete pre-normal candidate before canonicalization; the Function's
+result bound is derived rather than stored as an independent identity field.
+Residual recursive calls and effective Match regions require later obligation
+machinery. These corrections do not remove `Produces` from ordinary result-bearing
+forms.
 
 **Legacy implementation status.** Static `Produces` and node-anchored generic
 results are landed. Commit `ffb474f` had retained contextual refinements in the
 later-removed `Preparation` prototype; the callable-function ruling below
-supersedes that as the target formation boundary. General refinement, containment,
-and replacement of the temporary function-form declarations remain future work.
+supersedes that as the target formation boundary. General refinement and
+containment remain future work.
 
 ## 2026-08-25 — nominal Tuple, Record, and Enum recognition landed
 
@@ -529,9 +530,10 @@ prepare(E)(Difference(Top, Number))
 Unsupported expressions and contexts remain unprepared instead of acquiring an
 invented judgment. In particular, production does not accept `Top`
 and does not compose those two rows into an unconstrained result. That composition
-remains blocked by inaccurate blanket `Numeric` bounds on symbolic function forms
-and `Numeric`'s own wrapper membership. Current `Numeric` is therefore wider than
-the exact Number-or-Indeterminate result region. This slice does not implement general region
+was blocked at this stage by inaccurate blanket `Numeric` bounds on symbolic
+function forms and `Numeric`'s own wrapper membership. The later generic-result
+slice removed those blanket bounds. Current `Numeric` is still wider than the
+exact Number-or-Indeterminate result region. This slice does not implement general region
 normalization, full polynomial normal form, obligations, a dedicated preparation
 cache, `S`, or multi-argument preparation.
 
@@ -644,9 +646,11 @@ remain unimplemented. Host-nullish ingress normalization is also not
 landed.
 Ordinary `Produces` semantics apply to these contract atoms: a hypothetical node
 whose widest result is `Bottom` or `Null` stands at that atom, although no current
-domain constructor declares either result. Inaccurate blanket `Numeric` bounds on
-symbolic function forms and current Numeric wrapper membership still block sound
-production preparation from an unconstrained `Top` context.
+domain constructor declares either result. At this stage, inaccurate blanket
+`Numeric` bounds on symbolic function forms and current Numeric wrapper membership
+blocked sound production preparation from an unconstrained `Top` context. The
+later generic-result slice removed the blanket function-form bounds; contextual
+preparation itself remains future work.
 
 ## 2026-08-30 — match exhaustion preserves the input
 
@@ -819,8 +823,14 @@ E = Apply(fn, Tuple(...arguments))
 
 Its constructor-level `Produces` fact is the existing node-dependent generic
 carrier. For a formed target it reads the bound retained on `fn`; `producedOf`
-itself is unchanged. The carrier keeps `Numeric` only as the compatibility
-fallback for the separate legacy recursive evaluator and unresolved targets.
+itself is unchanged. There is no compatibility fallback: an unresolved legacy
+target has no constructor-level result bound. Higher-order result inference is
+outside this slice.
+
+`Arm(pattern, result)` uses its result-seat generic as its `Produces` value.
+`Match(value, arms)` derives its result contract as the canonical `Union` of
+the arm-result contracts, starting from `Bottom`. It therefore has no blanket
+`Numeric` declaration.
 
 When the target is a formed Function and no `CallArgument` occurs anywhere in
 the argument tree, Apply invokes the retained callable and writes the complete

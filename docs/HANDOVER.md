@@ -221,8 +221,10 @@ If the target is a formed Function and the argument tree contains no
 `CallArgument`, Apply invokes the retained callable and stores the complete
 canonical result at `E[Canonical]`. A symbolic call remains its own `C`. This
 does not invoke a Function returned by the call, infer recursive results, or
-change the legacy evaluator; unresolved/legacy calls retain its temporary
-`Numeric` fallback.
+change the legacy evaluator. Unresolved legacy calls have no constructor-level
+result bound; higher-order result inference is outside this slice. `Arm` forwards
+its result-seat generic, and `Match` produces the canonical Union of its arm-result
+contracts, with `Bottom` for no arms.
 
 `Top`, `Bottom`, and the one language `Null` are canonical zero-seat contract Enum
 values; binary `Union`, `Intersection`, and relative `Difference` are the canonical
@@ -247,11 +249,10 @@ zero is truthy.
 
 ## 8. Implementation backlog
 
-- Replace the temporary `Numeric` declarations on `Match` and unresolved/legacy
-  Apply without inferring a FunctionRef return theorem: effective Match handling
-  and residual-call obligations. `CallArgument` already produces its symbolic
-  kind and receives demands from consumers; formed Apply derives its bound from
-  its target Function.
+- Implement effective Match regions and residual-call obligations without
+  inferring a FunctionRef return theorem. `CallArgument` already produces its
+  symbolic kind, formed Apply derives its bound from its target Function, Arm
+  forwards its result generic, and Match derives the Union of its arm results.
 - Implement explicit incoming-region canonicalization at the function/body
   boundary without restoring the removed Preparation prototype. The retained test
   model covers the Number/Indeterminate distinction but is not integrated. Number
