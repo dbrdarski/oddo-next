@@ -5,12 +5,14 @@
 import { Enum, createEnums, mapEnum } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { Kinds } from './kinds.mjs'
-import { contractCheck, isInstance } from './contract.mjs'
-import { fact, learn, Consumes, Callable } from './facts.mjs'
+import {
+  contractCheck, isContract, isInstance, producedOf
+} from './contract.mjs'
+import { fact, learn, Consumes, Produces, Callable } from './facts.mjs'
 import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import {
-  Top, Numeric, Intersection, canonicalizeDomain
+  Top, Numeric, Intersection, Equals, canonicalizeDomain
 } from './domain.mjs'
 import { Canonical } from './canonical.mjs'
 
@@ -31,7 +33,7 @@ const {
   OuterRef = Enum($ => $(Number)(index => () => true))
   CallArgument = Enum($ => $(Number, _)(CallArgument))
   MatchArgument = Enum($ => $(Number)(index => () => true))
-  Apply = Enum($ => $(_, Tuple)(Numeric))
+  Apply = Enum($ => $(_, Tuple)())
   Arm = Enum($ => $(_, _)())
   Match = Enum($ => $(_, Tuple)(Numeric))
   Lambda = Enum($ => $(Number, Number, _)())
@@ -39,6 +41,11 @@ const {
 })
 
 Kinds.CallArgument = CallArgument.kind
+
+learn(Apply.kind, Produces, Object.assign(
+  application => fact(application[0], Produces) ?? Numeric,
+  { generic: true }
+))
 
 const demandedContract = contract =>
   contract === _ || contract?.generic ? Top : contract
@@ -86,6 +93,13 @@ const canonicalBody = E => match(E)(
   $ => $(_)(() => E)
 )
 
+const resultContractOf = value => match(value)(
+  $ => $(FunctionEnum.kind)(() => Function),
+  $ => $(_)(() => isContract(value)
+    ? value
+    : producedOf(value) ?? Equals(value))
+)
+
 const formFunction = (bodyForm, ...outerRefs) => {
   const references = Tuple(...outerRefs)
   const callable = bodyForm(...references)
@@ -98,6 +112,7 @@ const formFunction = (bodyForm, ...outerRefs) => {
   const C = canonicalBody(E)
   const fn = FunctionEnum(C, references, contract)
   learn(fn, Callable, callable)
+  learn(fn, Produces, resultContractOf(E))
   return fn
 }
 

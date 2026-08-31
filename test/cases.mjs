@@ -1032,7 +1032,7 @@ export const suites = [
         Tuple(Arm(_, Add(arrived, 1)))
       )
     }),
-    test('CallArgument produces itself while Apply produces Numeric', () => {
+    test('CallArgument produces itself while legacy Apply retains Numeric', () => {
       const form = countDownForm()
       const fn = internFn(form, form)
       return producedOf(CallArgument(0, fn)) === CallArgument
@@ -1094,6 +1094,24 @@ export const suites = [
       return a === b
         && fact(a, Callable) === first
         && fact(b, Callable) === first
+    }),
+    test('a formed Apply derives the widest result from E, not C', () => {
+      const fn = Function(() => () => Add(1, 1))
+      const application = Apply(fn, Tuple())
+      return fn[0] === Equals(2)
+        && fact(fn, Produces) === Numeric
+        && producedOf(application) === Numeric
+    }),
+    test('a literal function result retains its exact contract', () => {
+      const fn = Function(() => () => 6)
+      return fact(fn, Produces) === Equals(6)
+        && producedOf(Apply(fn, Tuple())) === Equals(6)
+    }),
+    test('a returned Function has the Function result contract', () => {
+      const returned = Function(() => () => 6)
+      const fn = Function(returned => () => returned, returned)
+      return fact(fn, Produces) === Function
+        && producedOf(Apply(fn, Tuple())) === Function
     }),
     test('nested Apply remains in the canonical body', () => {
       const helper = Function(() => x => Add(x, 1))
