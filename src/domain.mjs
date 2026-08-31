@@ -8,11 +8,16 @@ import { Tuple } from './intern.mjs'
 import { match, matchDomain, Combine, _ } from './match.mjs'
 import { Number, Indeterminate } from './numeric.mjs'
 import { Canonical, canonicalContext } from './canonical.mjs'
+import { Pure } from './purity.mjs'
 
 
 export const registerCanonical = (EnumType, rule) =>
   EnumType.kind[Canonical] = candidate =>
     canonicalContext(() => rule(match(candidate)))
+
+export const registerPure = (EnumType, rule) =>
+  EnumType.kind[Pure] = candidate =>
+    rule(match(candidate))
 
 
 // `_` implements matching through the contract protocol, but remains wildcard
@@ -69,18 +74,11 @@ Object.defineProperty(Equals.kind.prototype, 'valueOf', {
 })
 
 registerCanonical(Add, matches => matches(
-  $ => Combine(Range.kind, Range.kind)((left, right) =>
-    Range(
-      left[0] + right[0],
-      left[1] + right[1]
-    )),
-  $ => Combine(Range.kind, Number.kind)((range, value) =>
-    Range(
-      range[0] + value,
-      range[1] + value
-    )),
-  $ => Combine(Number.kind, Number.kind)((left, right) =>
-    Equals(left + right))
+  $ => Combine(Range.kind, Range.kind)(([leftFrom, leftTo], [rightFrom, rightTo]) =>
+    Range(leftFrom + rightFrom, leftTo + rightTo)),
+  $ => Combine(Range.kind, Number.kind)(([rangeLeft, rangeRight], value) =>
+    Range(rangeLeft + value, rangeRight + value)),
+  $ => Combine(Number.kind, Number.kind)((left, right) => Equals(left + right))
 ))
 
 const canonicalCommutative = (candidate, absorbing, identity) =>

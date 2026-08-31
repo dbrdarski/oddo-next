@@ -46,8 +46,7 @@ const mergeDemand = (current, demanded) =>
   canonicalizeDomain(Intersection(current, demanded))
 
 const visitDemands = (value, demanded, demands) => match(value)(
-  $ => $(CallArgument.kind)(argument => {
-    const index = argument[0]
+  $ => $(CallArgument.kind)(([index]) => {
     demands[index] = mergeDemand(demands[index], demanded)
   }),
   $ => $(Apply.kind)(application => {
@@ -89,6 +88,7 @@ const canonicalExpression = (candidate, contract) => match(candidate)(
   $ => $(_)(() => candidate)
 )
 
+// this needs to be replaced and deleted:
 const canonicalBody = (E, contract) => match(E)(
   $ => $(FunctionEnum.kind)(() => E),
   $ => $(Enum)(candidate => canonicalExpression(

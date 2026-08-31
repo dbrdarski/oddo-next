@@ -11,13 +11,15 @@ import { fulfills, isInstance, producedOf } from '../src/contract.mjs'
 import {
   fact, learn, Resolve, Consumes, Produces, Transparent, Callable
 } from '../src/facts.mjs'
-import { Enum, createEnums, mapEnum } from '../src/enum.mjs'
+import {
+  Enum, createEnums, mapEnum, Pure, purityOf
+} from '../src/enum.mjs'
 import { match, matchDomain, Combine, _ } from '../src/match.mjs'
 import { Canonical as CanonicalForm } from '../src/canonical.mjs'
 import { Number, Indeterminate, ZeroDivision, ZeroMod } from '../src/numeric.mjs'
 import {
   Add, Sub, Mul, Div, LL, Numeric, Union, Intersection, Difference, Equals, Range,
-  Top as DomainTop, Bottom, Null, canonicalizeDomain
+  Top as DomainTop, Bottom, Null, canonicalizeDomain, registerPure
 } from '../src/domain.mjs'
 import {
   OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda,
@@ -44,9 +46,14 @@ const isUnionOf = (candidate, left, right) =>
 const armFor = (candidate, region) =>
   candidate[1].find(arm => arm[0] === region)
 
-const { Twin } = createEnums(() => class {
+const { Twin, PureValue, ImpureValue, PurityPair } = createEnums(() => class {
   Twin = Enum(($, [E]) => $(E, E)(E))
+  PureValue = Enum($ => $()())
+  ImpureValue = Enum($ => $()())
+  PurityPair = Enum($ => $(_, _)())
 })
+
+registerPure(ImpureValue, () => false)
 
 const loopForm = () => {
   const self = OuterRef(0)
@@ -98,6 +105,23 @@ export const suites = [
     test('empty record is canonical', () => Record({}) === Record({})),
     test('children pass through untouched', () => { const t = Tuple(1, 2); return Record({ x: t }).x === t }),
     test('deep nesting is canonical', () => Record({ x: Tuple(1, Tuple(2, 3)) }) === Record({ x: Tuple(1, Tuple(2, 3)) })),
+  ]),
+
+  suite('Purity', [
+    test('non-Enum data is pure by default', () =>
+      purityOf(1)
+        && purityOf(new ZeroDivision(1))
+        && purityOf(Tuple(ImpureValue()))
+        && purityOf(Record({ value: ImpureValue() }))),
+    test('every Enum instance retains its derived purity', () => {
+      const pure = PureValue()
+      const impure = ImpureValue()
+      return pure[Pure] === true
+        && impure[Pure] === false
+        && PurityPair(pure, impure)[Pure] === false
+    }),
+    test('purity rules live on the Enum kind', () =>
+      typeof ImpureValue.kind[Pure] === 'function'),
   ]),
 
   suite('Facts store', [

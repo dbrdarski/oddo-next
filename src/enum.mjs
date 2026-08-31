@@ -10,9 +10,10 @@ import {
   fact, learn, Resolve, Consumes, Produces, Transparent
 } from './facts.mjs'
 import { Canonical } from './canonical.mjs'
+import { Pure, purityOf } from './purity.mjs'
 import { Kinds } from './kinds.mjs'
 
-export { Canonical }
+export { Canonical, Pure, purityOf }
 
 const once = (fn, cached = false, cache) => (...args) => (
   cached || (cache = fn(...args), cached = true), cache
@@ -121,6 +122,8 @@ const lazyEnumFactory = (name, fn) => {
       // construction is discarded in favor of the canonical instance.
       const instance = constructor.from(validate(...args))
       const candidate = canonical(constructor, instance, instance)
+      candidate[Pure] = constructor[Pure]?.(candidate)
+        ?? candidate.every(purityOf)
       candidate[Canonical] = constructor[Canonical]?.(candidate) ?? candidate
       return candidate
     },
