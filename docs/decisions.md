@@ -103,13 +103,14 @@ that implementation level.
 
 The previous diagnosis in this entry incorrectly called `Produces` imported
 machinery and promoted prototype chaining into a semantic alternative. That
-diagnosis is superseded. The actual function-layer defect is narrower:
-`CallArgument`, `Apply`, and `Match` currently use blanket `Numeric` bounds.
-Those declarations are temporary formation scaffolding, not inferred function
-return contracts. In the target function-formation pipeline, input demands are
-inferred from the complete pre-normal candidate before canonicalization and the
-result contract is derived rather than stored as an independent identity field.
-Residual recursive calls and symbolic Matches require later obligation machinery.
+diagnosis is superseded. The remaining function-layer defect is narrower:
+`Match` and unresolved/legacy Apply use temporary `Numeric` bounds.
+`CallArgument` produces its own symbolic kind and acquires demands from its
+consumers. Formed Apply derives its bound from the target Function as recorded
+in the 2026-08-31 implementation status below. Input demands are inferred from
+the complete pre-normal candidate before canonicalization; the Function's result
+bound is derived rather than stored as an independent identity field. Residual
+recursive calls and symbolic Matches require later obligation machinery.
 Correcting these declarations does not remove `Produces` from ordinary
 result-bearing forms.
 
@@ -798,3 +799,47 @@ read a known callee Function's input contract but does not invoke or expand that
 callee. The first callable for an identity is retained as a fact for later
 concrete application. Apply-result refinement, Match-effective regions, generic
 correlations, captured nested-function scopes, and recursion are later slices.
+
+## 2026-08-31 — formed Apply result bounds and canonical results landed
+
+**Implementation status; no new language ruling.** Function formation now derives
+the callable's widest result bound from complete pre-canonical body `E`, before
+`E` is discarded. It retains that bound as a `Produces` fact on the canonical
+Function alongside the already-retained `Callable` fact. Neither fact is a fourth
+Function identity field. Derivation uses the expression's declared result: for
+example, `Add(1, 1)` contributes `Numeric` even though its `C` is `Equals(2)`.
+A raw literal contributes `Equals(value)`, and a returned Function contributes
+`Function` without invoking that returned Function.
+
+`Apply` retains its ordinary structural form:
+
+```text
+E = Apply(fn, Tuple(...arguments))
+```
+
+Its constructor-level `Produces` fact is the existing node-dependent generic
+carrier. For a formed target it reads the bound retained on `fn`; `producedOf`
+itself is unchanged. The carrier keeps `Numeric` only as the compatibility
+fallback for the separate legacy recursive evaluator and unresolved targets.
+
+When the target is a formed Function and no `CallArgument` occurs anywhere in
+the argument tree, Apply invokes the retained callable and writes the complete
+canonical result to `E[Canonical]`. For example:
+
+```text
+Apply(Function(() => x => Add(x, 1)), Tuple(2))
+  E = Apply(..., Tuple(2))
+  Produces(E) = Numeric
+  C = Equals(3)
+```
+
+A literal returned by the callable is already its canonical value. A returned
+Function remains that Function. If any argument remains symbolic, the Apply node
+stores itself as `C`; the call is not invoked during Function formation. This
+slice neither adds recursive callable Functions nor infers a `FunctionRef` return
+theorem.
+
+The base Enum relation now exposes `Enum.kind === Enum`. Consequently `$(Enum)`
+uses the matcher's existing nominal-kind path, just like `$(Add.kind)`, and keeps
+structural traversal independent of ambient canonical child reading. No matcher
+algorithm changed.

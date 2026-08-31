@@ -10,7 +10,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **187 passing, 0 failing**.
+Current verification: **195 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -78,21 +78,34 @@ Current entries are:
   resolution: a contract, or the declaration's own generic, stored as itself
   and answering per node (§5);
 - `constructor → Transparent` — the identical one-seat/result contract for a
-  transparent Enum.
+  transparent Enum;
+- `canonical Function → Callable` — the first callable retained for that
+  canonical identity;
+- `canonical Function → Produces` — the callable's widest result bound derived
+  from its complete pre-canonical body `E`. This fact is not a Function identity
+  field.
 
 `Resolve`, `Produces`, and `Transparent` are shared module-exported Symbols. Fact
 identity never depends on repeating a string spelling.
 
-`Produces` is the retained upper result bound. The canonical-function layer's
-current blanket bounds are temporary: `CallArgument`, `Apply`, and `Match`
-declare `Numeric` so their symbolic nodes can occupy existing Numeric seats.
-Those declarations are formation scaffolding, not a per-function input/result
-signature. `CallArgument` demand follows from its consumer. Nonrecursive Function
-formation derives those demands from complete expanded `E`, then rebuilds the body
-through Enum doors and selects stored `Canonical` forms for identity. Concrete
-application may select a `Match` body; symbolic formation retains the complete
-Match. Residual calls and effective Match regions require later obligations. This
-correction does not remove `Produces` from ordinary result-bearing forms.
+`Produces` is the retained upper result bound. Nonrecursive Function formation
+derives its return bound from complete expanded `E`, before selecting `C`. A
+formed Apply constructor has a generic `Produces` carrier which reads that fact
+from its target Function; `producedOf` itself remains unchanged. Thus
+`Add(1, 1)` contributes the declared `Numeric` bound even though its `C` is
+`Equals(2)`. A literal result contributes its exact `Equals(value)` contract, and
+a Function-valued result contributes `Function` without invoking that returned
+Function.
+
+The remaining blanket bounds are temporary: `Match` and unresolved/legacy Apply
+retain `Numeric` so their symbolic nodes can occupy existing Numeric seats. Those
+fallbacks are formation scaffolding, not a per-function signature.
+`CallArgument` instead produces its own symbolic kind; its demand follows from
+its consumer.
+Concrete application may select a `Match` body; symbolic formation retains the
+complete Match. Residual calls and effective Match regions require later
+obligations. This correction does not remove `Produces` from ordinary
+result-bearing forms.
 
 There is no production `Preparation` Enum or `prepare` API. The removed prototype
 was never integrated with Function formation. The separate
@@ -175,6 +188,12 @@ the once-resolved declaration and facts. It does not bypass the front door. It
 returns `null` for values that are not registered Enums. Recursive
 traversal is the caller's job—canonical-function expansion handles Tuples
 separately and otherwise leaves non-Enum values atomic.
+
+Each factory exposes its hidden constructor as `.kind`. The base `Enum` relation
+likewise exposes `Enum.kind === Enum`, so `$(Enum)` follows the matcher's nominal
+kind path instead of semantic fulfilment. Ambient canonical child reading can
+therefore never turn a structural “any Enum” test into a test of that Enum's
+canonical result.
 
 ### Expanded candidate and canonical form (initial context-free slice landed)
 
@@ -726,10 +745,13 @@ This avoids an always-present accepted-contract parameter, a Top filler, and a
 separate Demand node. Conditional requirements remain correlated with their arm,
 without making the expanded evidence disposable.
 
-In the broader target, a known nonrecursive call may contribute its instantiated
-body to analysis; a residual `Apply` supplies obligations that later recursion and
-termination machinery must discharge. Failure rejects the program; it never picks
-a noncanonical fallback or triggers another normalization.
+For a formed Function with no `CallArgument` anywhere in its argument tree, Apply
+now invokes the retained callable during Enum canonicalization. The Apply node
+remains expanded `E`; the invoked body's recursively selected canonical form is
+stored at `E[Canonical]`. A symbolic formed call remains its own `C`. A residual
+Apply supplies obligations that later recursion and termination machinery must
+discharge. Failure rejects the program; it never picks a noncanonical fallback or
+triggers another normalization.
 
 The current nonrecursive Function identity is canonical body `C`, its complete
 ordered outer-reference Tuple, and the ordered input-demand contract Tuple. The
@@ -810,12 +832,14 @@ Tuples through their respective doors. Pending-call detection scans Array values
 both operations leave
 Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
 ordinary ordered Arms only—no function-AST `Combine` or guards.
-`CallArgument`, `Apply`, and `Match` are provisionally Numeric through inaccurate
-blanket `Produces` declarations. They remain formation scaffolding, not inferred
-function results. Replacing them requires consumer-derived argument demands,
-effective Match handling, and residual-call obligations; known nonrecursive calls
-already expand operationally. This does not add an accepted-domain or result field
-to functions.
+`Match` and unresolved/legacy Apply retain provisional Numeric fallbacks.
+`CallArgument` produces its own symbolic kind and receives demands from its
+consumers. Formed Apply reads the result bound derived from its target
+Function's pre-canonical `E`; concrete formed calls also retain their invoked
+canonical result while symbolic calls remain residual. Replacing the remaining
+fallbacks requires consumer-derived argument demands, effective Match handling,
+and residual-call obligations. This does not add an accepted-domain or result
+field to functions.
 
 Expansion is synchronous recursive descent and has no fixed-point engine. No
 production explicit-context preparation stage is present. Internal form
@@ -824,11 +848,12 @@ malformed lowering output; a future parser/linter owns those diagnostics.
 
 ## 9. Implementation backlog and separate future work
 
-- Replace the temporary `Numeric` declarations on `CallArgument`, `Apply`, and
-  `Match` without introducing a FunctionRef return theorem: derive argument demand
-  from consumers, retain effective Match results, and represent obligations for
-  residual calls. Prototype inheritance remains only an optional implementation
-  refactor for static factory-shaped bounds; it is not separate language work.
+- Replace the temporary `Numeric` declarations on `Match` and unresolved/legacy
+  Apply without introducing a FunctionRef return theorem; retain effective Match
+  results and represent obligations for residual calls. Complete generic
+  correlations for symbolic `CallArgument` results remain separate. Prototype
+  inheritance remains only an optional implementation refactor for static
+  factory-shaped bounds; it is not separate language work.
 - Implement explicit incoming-region canonicalization at the function/body
   boundary without restoring the removed `Preparation` prototype. The retained
   test model covers the Number/Indeterminate distinction but is not integrated.

@@ -2,13 +2,13 @@
 
 This document describes the current matching and canonical-value surface.
 `design.md` and `decisions.md` remain the design authority. The former production
-Preparation prototype has been removed. `npm test` reports **187 passing, 0
+Preparation prototype has been removed. `npm test` reports **195 passing, 0
 failing**.
 
-The additive nonrecursive `Function(bodyForm, ...outerRefs)` formation slice is
-recorded in the 2026-08-26 ruling and its 2026-08-29 implementation status in
-`decisions.md`. The retained Lambda/FunctionRef material below describes the
-legacy recursive demonstrator, not the target nonrecursive representation.
+The nonrecursive `Function(bodyForm, ...outerRefs)` formation and formed-`Apply`
+slices are recorded in the 2026-08-26 ruling and their later implementation
+statuses in `decisions.md`. The retained Lambda/FunctionRef material below
+describes the legacy recursive demonstrator, not the target representation.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -23,7 +23,9 @@ flag, cleanup protocol, or construction residue in the current design.
   their form class and operand.
 - Equal live constructions return the same canonical reference.
 - Enum identity is its hidden node class. Factories expose that class as `.kind`;
-  the ordinary JavaScript `.constructor` remains the node's constructor.
+  the base `Enum` relation exposes itself as `Enum.kind`, so `$(Enum)` is nominal
+  like every other kind pattern. The ordinary JavaScript `.constructor` remains
+  the node's constructor.
 - `isInstance(value, Enum)` recognizes only values whose hidden constructor is in
   the Enum registry. Tuple and Record therefore cannot be mistaken for structural
   Enums.
@@ -207,6 +209,21 @@ Tuple. The result contract is derived rather than added as another identity
 component. The legacy `FunctionRef(form, orderedReferences)` evaluator remains
 separate recursion evidence.
 
+Function formation also derives the callable's widest result contract from
+pre-canonical `E` and retains it as a fact on the canonical Function. A formed
+`Apply(fn, Tuple(...arguments))` keeps that call node as `E`; its generic
+`Produces` relation reads the Function fact without changing `producedOf`.
+Literal results retain an exact `Equals(value)` contract, while an expression
+such as `Add(1, 1)` retains its declared `Numeric` bound even though its `C` is
+`Equals(2)`.
+
+If the target is a formed Function and the argument tree contains no
+`CallArgument`, Apply invokes the retained callable and stores the complete
+canonical result at `E[Canonical]`. A symbolic call remains its own `C`. This
+does not invoke a Function returned by the call, infer recursive results, or
+change the legacy evaluator; unresolved/legacy calls retain its temporary
+`Numeric` fallback.
+
 `Top`, `Bottom`, and the one language `Null` are canonical zero-seat contract Enum
 values; binary `Union`, `Intersection`, and relative `Difference` are the canonical
 contract vocabulary. Their reusable factories do not lint branch validity; that is
@@ -230,10 +247,11 @@ zero is truthy.
 
 ## 8. Implementation backlog
 
-- Replace the temporary blanket `Numeric` declarations on `CallArgument`, `Apply`,
-  and `Match` without inferring a FunctionRef return theorem: consumer-derived
-  argument demand, effective Match handling, and residual-call obligations.
-  `Produces` itself remains available to ordinary result-bearing forms.
+- Replace the temporary `Numeric` declarations on `Match` and unresolved/legacy
+  Apply without inferring a FunctionRef return theorem: effective Match handling
+  and residual-call obligations. `CallArgument` already produces its symbolic
+  kind and receives demands from consumers; formed Apply derives its bound from
+  its target Function.
 - Implement explicit incoming-region canonicalization at the function/body
   boundary without restoring the removed Preparation prototype. The retained test
   model covers the Number/Indeterminate distinction but is not integrated. Number

@@ -2,7 +2,7 @@
 
 This document covers the retained legacy recursive evaluator. The former
 production contextual-preparation prototype has been removed; `design.md` and
-`decisions.md` remain the design authority. `npm test` reports **187 passing, 0
+`decisions.md` remain the design authority. `npm test` reports **195 passing, 0
 failing**.
 
 The additive nonrecursive callable-formation path is specified by the later ruling in
@@ -100,8 +100,9 @@ only two symbolic zero-multiplication contexts and had no caller in Function
 formation. It has been removed. `test/contextual-prepare.model.mjs` retains the
 Number/Indeterminate examples as a test-only reference. No production contextual
 preparation API, cache, solved-`S` integration, or multi-argument judgment exists.
-`Produces` remains the ruled widest-result relation; its temporary function-form
-declarations still need to become accurate.
+`Produces` remains the ruled widest-result relation. The separate formed-Function
+path now derives its return bound from pre-canonical `E`; this legacy evaluator
+still has no recursive return theorem.
 
 ## 4. Function-level Match
 
@@ -144,11 +145,12 @@ source has not become valid. A future parser/linter owns its diagnostics. Runtim
 checks remain only where the current evaluator must select an implemented semantic
 path, such as materializing a supported callee.
 
-`CallArgument`, `Apply`, and `Match` currently declare `Numeric` as a temporary
-result so they can occupy existing Numeric seats. This relies on the repository's
-retained `Produces` machinery, but the blanket declarations are formation
-scaffolding, not inferred function return contracts. A known nonrecursive Apply is
-invoked during expansion; residual calls require later obligation machinery.
+Legacy/unresolved `Apply` and `Match` currently retain temporary `Numeric` results
+so they can occupy existing Numeric seats. `CallArgument` produces its own
+symbolic kind. The callable Function path gives formed Apply nodes their target
+Function's derived result bound and canonicalizes concrete formed calls. That does
+not infer a result theorem for `FunctionRef`; residual recursive calls require
+later obligation machinery.
 
 ## 6. Current test surface
 
@@ -174,9 +176,10 @@ The committed suite covers:
 
 The following are not landed:
 
-1. Replacement of the temporary blanket `Numeric` declarations on function
-   expressions without a FunctionRef return theorem: consumer-derived argument
-   demand, effective Match handling, and residual-call obligations.
+1. Replacement of the remaining temporary `Numeric` declarations on `Match` and
+   unresolved/legacy Apply without a FunctionRef return theorem: effective Match
+   handling and residual-call obligations. Complete symbolic `CallArgument`
+   result correlations remain separate.
 2. Explicit incoming-region canonicalization at the function/body boundary. The
    removed Preparation prototype must not be restored as a parallel path; its
    six-field shape and Number/Indeterminate rows remain only in the retained test
