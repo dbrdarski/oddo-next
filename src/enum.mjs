@@ -36,6 +36,9 @@ const isCheck = (x) => typeof x === 'function' && !x.prototype && !Object.hasOwn
 
 const membership = (check) => function (v) { return check(...this)(v) || sub(producedOf(v), this) }
 
+export const genericResult = result =>
+  Object.assign(contractCheck(() => false, result), { generic: true })
+
 export const argContracts = (constructor) => (...argContracts) => (result = null) => (
   argContracts.forEach((c, i) => c?.generic && (c.seat ??= i)),
   learn(constructor, Consumes, argContracts),

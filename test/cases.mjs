@@ -831,13 +831,13 @@ export const suites = [
     test('every recursive call remains in the complete tree', () => {
       const self = OuterRef(0)
       const argument = CallArgument(0, self)
-      const form = Lambda(1, 1, Add(
+      const form = Lambda(1, 1, Tuple(
         Apply(self, Tuple(Sub(argument, 1))),
         Apply(self, Tuple(Sub(argument, 2)))
       ))
       const fn = internFn(form, form)
       const arrived = CallArgument(0, fn)
-      return expand(fn) === Add(
+      return expand(fn) === Tuple(
         Apply(fn, Tuple(Sub(arrived, 1))),
         Apply(fn, Tuple(Sub(arrived, 2)))
       )
@@ -912,13 +912,13 @@ export const suites = [
       const helper = internFn(helperForm, helperForm)
 
       const rootSelf = OuterRef(0)
-      const rootForm = Lambda(2, 1, Add(
+      const rootForm = Lambda(2, 1, Tuple(
         Apply(OuterRef(1), Tuple(CallArgument(0, rootSelf))),
         Apply(OuterRef(1), Tuple(CallArgument(0, rootSelf)))
       ))
       const root = internFn(rootForm, rootForm, helper)
       const argument = CallArgument(0, root)
-      return expand(root) === Add(Add(argument, 1), Add(argument, 1))
+      return expand(root) === Tuple(Add(argument, 1), Add(argument, 1))
     }),
     test('expansion rebuilds arbitrary existing Enum trees', () => {
       const self = OuterRef(0)
@@ -1032,14 +1032,29 @@ export const suites = [
         Tuple(Arm(_, Add(arrived, 1)))
       )
     }),
-    test('CallArgument produces itself while legacy Apply retains Numeric', () => {
+    test('symbolic forms do not invent Numeric results', () => {
       const form = countDownForm()
       const fn = internFn(form, form)
       return producedOf(CallArgument(0, fn)) === CallArgument
-        && producedOf(Apply(fn, Tuple(CallArgument(0, fn)))) === Numeric
+        && producedOf(Apply(fn, Tuple(CallArgument(0, fn)))) == null
     }),
-    test('an empty result slot produces null', () =>
-      producedOf(Arm(_, 0)) === null),
+    test('Arm forwards its result through its positional generic', () =>
+      producedOf(Arm(_, 0)) === 0
+        && producedOf(Arm(_, Add(1, 1))) === Add(1, 1)),
+    test('Match derives the union of its Arm result contracts', () => {
+      const result = producedOf(Match(0, Tuple(
+        Arm(Equals(0), Add(1, 1)),
+        Arm(_, 6)
+      )))
+      return isUnionOf(result, Numeric, Equals(6))
+        && producedOf(Match(0, Tuple())) === Bottom
+    }),
+    test('Match reads a formed Apply result through its Arm generic', () => {
+      const six = Function(() => () => 6)
+      return producedOf(Match(0, Tuple(
+        Arm(_, Apply(six, Tuple()))
+      ))) === Equals(6)
+    }),
   ]),
 
   suite('Nonrecursive Function formation', [

@@ -2,7 +2,7 @@
 // Canonical Functions
 // ==========================================
 
-import { Enum, createEnums, mapEnum } from './enum.mjs'
+import { Enum, createEnums, genericResult, mapEnum } from './enum.mjs'
 import { Tuple } from './intern.mjs'
 import { Kinds } from './kinds.mjs'
 import {
@@ -12,7 +12,8 @@ import { fact, learn, Consumes, Produces, Callable } from './facts.mjs'
 import { match, _ } from './match.mjs'
 import { Number } from './numeric.mjs'
 import {
-  Top, Numeric, Intersection, Equals, canonicalizeDomain, registerCanonical
+  Top, Bottom, Intersection, Union, Equals,
+  canonicalizeDomain, registerCanonical
 } from './domain.mjs'
 import { Canonical } from './canonical.mjs'
 
@@ -33,19 +34,22 @@ const {
   OuterRef = Enum($ => $(Number)(index => () => true))
   CallArgument = Enum($ => $(Number, _)(CallArgument))
   MatchArgument = Enum($ => $(Number)(index => () => true))
-  Apply = Enum($ => $(_, Tuple)())
-  Arm = Enum($ => $(_, _)())
-  Match = Enum($ => $(_, Tuple)(Numeric))
+  Apply = Enum($ => $(_, Tuple)(genericResult(
+    application => fact(application[0], Produces)
+  )))
+  Arm = Enum(($, [Pattern, Result]) =>
+    $(Pattern, Result)(Result))
+  Match = Enum($ => $(_, Tuple)(genericResult(
+    ([, arms]) => Array.from(arms, arm =>
+      resultContractOf(producedOf(arm)))
+      .reduce((results, result) =>
+        canonicalizeDomain(Union(results, result)), Bottom)
+  )))
   Lambda = Enum($ => $(Number, Number, _)())
   FunctionRef = Enum($ => $(Lambda, Tuple)())
 })
 
 Kinds.CallArgument = CallArgument.kind
-
-learn(Apply.kind, Produces, Object.assign(
-  application => fact(application[0], Produces) ?? Numeric,
-  { generic: true }
-))
 
 const demandedContract = contract =>
   contract === _ || contract?.generic ? Top : contract
