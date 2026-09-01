@@ -63,58 +63,15 @@ log('outer C:', expression[Canonical])
 log('Range C:', Add(Range(1, 3), Range(10, 20))[Canonical])`,
   },
   {
-    name: 'Function form & recursion',
-    code: `const countDownForm = () => {
-  const self = OuterRef(0)
-  const n = CallArgument(0, self)
+    name: 'Function formation',
+    code: `const increment = Function(() => n => Add(n, 1))
+const same = Function(() => n => Add(1, n))
+const call = Apply(increment, Tuple(2))
 
-  return Lambda(1, 1, Match(n, Tuple(
-    Arm(Equals(0), 0),
-    Arm(_, Apply(self, Tuple(Sub(n, 2))))
-  )))
-}
-
-const form = countDownForm()
-const countDown = internFn(form, form)
-const formula = expand(countDown)
-const argument = CallArgument(0, countDown)
-
-const forkSelf = OuterRef(0)
-const forkArgument = CallArgument(0, forkSelf)
-const forkForm = Lambda(1, 1, Add(
-  Apply(forkSelf, Tuple(Sub(forkArgument, 1))),
-  Apply(forkSelf, Tuple(Sub(forkArgument, 2)))
-))
-const fork = internFn(forkForm, forkForm)
-const forkFormula = expand(fork)
-
-log('form canonical:', form === countDownForm())
-log('function canonical:', countDown === internFn(countDownForm(), countDownForm()))
-log('recursive formula:', formula)
-log('complete symbolic Match:', formula === Match(
-  argument,
-  Tuple(
-    Arm(Equals(0), 0),
-    Arm(_, Apply(countDown, Tuple(Sub(argument, 2))))
-  )
-))
-log('concrete zero:', apply(countDown, 0))
-log('both recursive calls survive:', forkFormula)`,
-  },
-  {
-    name: 'Contextual preparation',
-    code: `const self = OuterRef(0)
-const n = CallArgument(0, self)
-const form = Lambda(1, 1, Mul(0, n))
-const fn = internFn(form, form)
-const E = expand(fn)
-
-const overNumber = prepare(E)(Number)
-const overNonNumber = prepare(E)(Difference(Top, Number))
-
-log('expanded E:', E)
-log('Number judgment:', overNumber)
-log('non-Number judgment:', overNonNumber)`,
+log('function canonical:', increment === same)
+log('input demands:', increment[2])
+log('expanded call:', call)
+log('canonical result:', call[Canonical])`,
   },
   {
     name: 'Match structural Enums',

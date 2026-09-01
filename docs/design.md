@@ -2,7 +2,7 @@
 
 Agreed 2026-08-19, before the enum/contract implementation (revised the same
 day: the result slot merges C2 and V2), and updated through the author rulings of
-2026-08-31. Sections 1–6 preserve the core
+2026-09-01. Sections 1–6 preserve the core
 enum/contract implementation; sections
 7–8 describe matching, canonical functions, and the ruled canonicalization layer.
 The former production contextual-preparation prototype has been removed. This file
@@ -10,7 +10,7 @@ and `decisions.md` remain the authority for the surfaces they describe. A
 subsection explicitly says when it documents current code rather than the ruled
 target.
 
-Current verification: **195 passing, 0 failing**.
+Current verification: **173 passing, 0 failing**.
 
 ## 1. The interner (landed)
 
@@ -28,7 +28,7 @@ recurses, nothing is copied, and no caller's object is ever rewritten.
   entries), `Tuple` (keyed by elements), the Enum factories, and canonical
   Indeterminate-form constructors such as `ZeroDivision`/`ZeroMod`. Expansion
   results are not memoized by a separate call cache. Canonical function and
-  call syntax such as `FunctionRef` and `Apply` are still ordinary Enum
+  call syntax such as `Function` and `Apply` are still ordinary Enum
   constructions, so equal nodes deduplicate normally.
 - `Tuple` and `Record` are nominal peer doors, not Enums. Their values answer
   `isInstance(value, Tuple)` and `isInstance(value, Record)` while retaining Array
@@ -80,34 +80,21 @@ Current entries are:
 - `constructor → Transparent` — the identical one-seat/result contract for a
   transparent Enum;
 - `canonical Function → Callable` — the first callable retained for that
-  canonical identity;
-- `canonical Function → Produces` — the callable's widest result bound derived
-  from its complete pre-canonical body `E`. This fact is not a Function identity
-  field.
+  canonical identity.
 
 `Resolve`, `Produces`, and `Transparent` are shared module-exported Symbols. Fact
 identity never depends on repeating a string spelling.
 
-`Produces` is the retained upper result bound. Nonrecursive Function formation
-derives its return bound from complete expanded `E`, before selecting `C`. A
-formed Apply constructor has a generic `Produces` carrier which reads that fact
-from its target Function; `producedOf` itself remains unchanged. Thus
-`Add(1, 1)` contributes the declared `Numeric` bound even though its `C` is
-`Equals(2)`. A literal result contributes its exact `Equals(value)` contract, and
-a Function-valued result contributes `Function` without invoking that returned
-Function.
+`Produces` states what a particular form returns. Ordinary expression Enums keep
+their declared constructor result. `Arm` forwards its result seat. A concrete
+`Apply` invokes its Function and forwards the actual returned value or expression;
+if that invocation executes a `Match`, only the selected arm result is forwarded.
+The returned value already carries its own declared result and canonical form.
 
-`Arm` uses its result seat as its generic `Produces` value. `Match` derives its
-result contract by taking the canonical `Union` of those arm-result contracts,
-with `Bottom` for no arms. `Apply` has no blanket fallback: a formed target
-supplies its retained result bound, while an unresolved legacy target supplies
-no constructor-level result bound. Higher-order result inference is outside this
-slice. `CallArgument` produces its own symbolic kind; its demand follows from its
-consumer.
-Concrete application may select a `Match` body; symbolic formation retains the
-complete Match. Residual calls and effective Match regions require later
-obligations. This correction does not remove `Produces` from ordinary
-result-bearing forms.
+A Function stores no precomputed output theorem, a symbolic Apply or Match invents
+no result, and Match never approximates execution by taking a Union of every arm.
+`CallArgument` produces its own symbolic kind; its demand follows from its
+consumer. Residual calls and effective Match regions require later obligations.
 
 There is no production `Preparation` Enum or `prepare` API. The removed prototype
 was never integrated with Function formation. The separate
@@ -140,12 +127,8 @@ Name = Enum(
     definition: how a value is checked against nodes of this enum. Called
     by the machinery **with the node's elements as arguments**, it returns
     the value-check. Records nothing as a fact.
-  - **empty** — `()` — no meaningful declared result. Canonical function
-    syntax uses this for structural nodes such as `Lambda` and `FunctionRef`;
-    the current machinery receives `null`, which provides
-    no usable `Produces` fact. A `FunctionRef` is nevertheless the canonical
-    function value by nominal Enum identity; the empty result slot merely avoids
-    inventing a theorem about the result of applying that function.
+  - **empty** — `()` — no meaningful declared result. The current machinery
+    receives `null`, which provides no usable `Produces` fact.
   A multi-entry result cannot exist. "Produces A or B" is written explicitly:
   `(Union(A, B))`.
 - **Input validation** (Enum's optional second argument) — an available way for
@@ -238,8 +221,7 @@ as an Enum.
 `mapEnum` reconstruction checks declared seats and structurally interns the
 rebuilt Enum through that same front door, so the rebuilt candidate receives its
 context-free `Canonical` property normally. `mapEnum` supplies no incoming
-semantic context. `expand` produces structural `E`; it does not own another
-normalizer.
+semantic context. No separate traversal owns another normalizer.
 
 ## 4. Membership
 
@@ -556,92 +538,19 @@ is available in lowercase `match`; the canonical
 function `Match`/`Arm` syntax described next does not encode its private case
 marker.
 
-## 8. Canonical functions and symbolic expansion (landed)
+## 8. Function formation and canonicalization
 
-Functions are represented as canonical Enum values, not opaque host
-functions:
+`Function(bodyForm, ...outerRefs)` forms a canonical Function Enum from the
+canonical body, ordered outer references, and ordered input demands. Formation
+invokes the body with ownerless `CallArgument(index)` values; concrete `Apply`
+invokes the retained callable with actual values. `Apply`, `Match`, and `Arm` are
+ordinary Enum forms.
 
-```js
-Lambda(referenceCount, callArity, formula)
-OuterRef(index)
-CallArgument(index, owner)
-Apply(owner, Tuple(...arguments))
-Match(value, Tuple(Arm(pattern, continuation), ...))
-MatchArgument(index)
-
-internFn(form, ...orderedReferences) // canonical FunctionRef
-expand(functionRef)                  // residual structural formula
-```
-
-`Lambda` is an already-lowered function form. `OuterRef(i)` names position
-`i` in its ordered reference environment. The lowering producer supplies the
-form's complete ordered references; `internFn` does not duplicate that source
-check and returns a canonical `FunctionRef(form, Tuple(...references))`.
-Form plus the complete ordered environment is function identity: equal inputs
-reintern, while changing or reordering references produces a different function
-value. No source parser, closure inspection, or JavaScript-source canonicalizer is
-implied by this API.
-
-The same boundary applies to the lowered syntax Enums: their factories state
-seats and preserve structure but do not lint whole indexes/counts, reference
-bounds, owner kinds, arm collections, host functions, or call arity. Those are
-producer/source rules. Expansion retains only operational rejection needed by
-the semantics it currently implements.
-
-An internal reference can be stored as a canonical `Lambda` form in the
-environment. When its `OuterRef` is resolved—including in value, pattern, or
-callee position—the form is lazily materialized with the owning function's
-complete ordered environment. This is the same form-first/lazy-resolution
-pattern used by Enum factories. It supports self recursion and different-form
-mutual recursion when the forms share one complete reference layout; the
-construction does not create cyclic JS objects or a separate function-group
-value.
-
-`expand(fn)` is symbolic invocation. It creates one owner-qualified
-`CallArgument(index, fn)` for each declared call argument, then evaluates the
-form by resolving outer references, substituting active call arguments,
-invoking helper function values, and rebuilding registered Enums and canonical
-Tuples through their normal factories. It does not accept concrete call
-arguments, select `Match` arms, or make `FunctionRef` a callable host function.
-
-`apply(fn, ...arguments)` is the separate concrete operation. It uses the same
-reference resolution, call stack, and Enum/Tuple rebuilding, but concrete Match
-selection is enabled.
-
-The active call stack is keyed by the exact canonical `FunctionRef`—not just
-its `Lambda` form, and not `(function, arguments)`. Re-entering a function
-already on that stack returns the residual call
-`Apply(functionRef, Tuple(...evaluatedArguments))`. The frame remains active
-through the complete body and is removed in `finally`, so every sibling
-recursive call reached through supported Enum/Tuple traversal survives in the
-formula and completed helpers leave no stale recursion marker. A body containing
-two such calls therefore produces a tree containing both occurrences rather than
-selecting one representative.
-
-### Function Match separates formation from concrete application
-
-Symbolic `expand` never selects a `Match` arm. It rebuilds and preserves the
-complete Match, resolving outer references and symbolic call arguments throughout
-its scrutinee, patterns, and continuations. This complete Enum tree is durable
-expanded form `E`.
-
-Concrete `apply` does not implement a second pattern engine. It instantiates
-`MatchArgument(i)` as the corresponding generic, resolves `OuterRef` patterns,
-and delegates the ordered arms to lowercase `match`. Arm order, contract
-fulfilment, structural matching, identity, construction failures, and unmatched
-value passthrough consequently retain the semantics from §7.
-
-The selected continuation reads its `MatchArgument` bindings. A nested Match
-extends a copy of the prior binding vector rather than replacing it, including
-sparse generic positions. A contract-only arm appends its forwarded matched
-value. Pattern instantiation does not rewrite inside `Lambda` forms or closed
-`FunctionRef` values; after that, lowercase `fits` may still match their Enum
-structure normally.
-
-If a concrete Match scrutinee still contains a residual `Apply`, application does
-not guess an arm and preserves the complete continuation. A later contextual
-preparation may combine or erase an admitted pure call from canonical `C`, after
-deriving and retaining the call's demands and admission obligations from `E`.
+The obsolete positional recursive evaluator has been removed. There are no
+`Lambda`, `OuterRef`, `FunctionRef`, or positional Match-binding forms. Actual
+pattern captures are ordinary lowercase-matcher handler arguments. Retaining a
+capture-dependent arm in a symbolic function body still needs a continuation or
+lowering design; no positional binding representation is implied.
 
 ### Explicit-context canonicalization (ruled target; prototype removed)
 
@@ -715,7 +624,7 @@ Where consuming behavior is deferred, no Number-only rule decides that region.
 
 #### Retained demands and calls
 
-Current nonrecursive Function formation derives ordered input demands from `E`
+Current Function formation derives ordered input demands from `E`
 before selecting canonical body `C`. The broader target also derives safety,
 purity, result, and completion obligations before algebra erases their originating
 syntax. Canonical `Match` regions can retain conditional requirements where they
@@ -749,16 +658,15 @@ without making the expanded evidence disposable.
 
 For a formed Function with no `CallArgument` anywhere in its argument tree, Apply
 now invokes the retained callable during Enum canonicalization. The Apply node
-remains expanded `E`; the invoked body's recursively selected canonical form is
+remains expanded `E`; the invoked body's complete canonical form is
 stored at `E[Canonical]`. A symbolic formed call remains its own `C`. A residual
 Apply supplies obligations that later recursion and termination machinery must
 discharge. Failure rejects the program; it never picks a noncanonical fallback or
 triggers another normalization.
 
-The current nonrecursive Function identity is canonical body `C`, its complete
+The current Function identity is canonical body `C`, its complete
 ordered outer-reference Tuple, and the ordered input-demand contract Tuple. The
-result contract is derived and is not another identity component. The legacy
-Lambda/FunctionRef evaluator remains separate recursion evidence.
+result contract is derived and is not another identity component.
 
 #### Canonical regions, Match, and logic
 
@@ -794,7 +702,7 @@ Strict Match guards, ternary conditions, `!`, and the tested left seats of `&&` 
 `||` demand Boolean. `~` is legal only at a conditional seat and loosens that seat;
 it does not Booleanize. `!` produces Boolean. A grouped `~(...)` scopes through
 nested conditional seats inside that group, including `~(consume(a && b))`, and
-stops at a Lambda or explicit Match-arm boundary. `~consume(a && b)` does not
+stops at a function or explicit Match-arm boundary. `~consume(a && b)` does not
 loosen the inner group. Loose falsity is exactly `{false, Null}`; zero is truthy.
 
 Pure exact De Morgan/DNF-equivalent spellings collapse to the same region/result
@@ -816,43 +724,37 @@ current `Add` rules fold known Number/Range cases; the current Pure `Mul` rule f
 known Number zero products, orders a residual zero first, and preserves unresolved
 or Indeterminate products.
 
-The landed `expand` currently produces pre-normalization structural `E`.
-`mapEnum` reconstruction is phase-blind; there is no production explicit-context
-stage. Solving, domain judgment, and termination stay separate.
+Function formation produces pre-normalization structural `E` by invoking the
+retained callable with ownerless `CallArgument` values. `mapEnum` reconstruction
+is phase-blind; there is no production explicit-context stage. Solving, domain
+judgment, termination, and recursion stay separate.
 
 ### Current boundary
 
-This layer performs first-order structural unfolding, not concrete execution,
-termination proof, or algebraic solving. Re-entry of the same function
-residualizes immediately even when its arguments changed. Computed callees
-such as Apply-of-Apply or a Match-produced function and per-form projections of
-heterogeneous reference layouts are not implemented. Lazy mutually recursive forms
-currently share one complete ordered reference ABI.
+This layer forms and applies callable Functions. It does not prove termination,
+solve algebra, or currently provide recursive references. Recursion remains a
+future extension of the same Function representation; there is no parallel
+function-form interpreter.
 
-Recursive rebuilding traverses registered Enum values and nominal canonical
-Tuples through their respective doors. Pending-call detection scans Array values;
-both operations leave
-Records, Maps/Sets, and arbitrary object graphs atomic. Function patterns have
-ordinary ordered Arms only—no function-AST `Combine` or guards.
 `CallArgument` produces its own symbolic kind and receives demands from its
-consumers. Formed Apply reads the result bound derived from its target Function's
-pre-canonical `E`; unresolved legacy Apply has no invented result theorem.
-`Arm` forwards its result generic, and `Match` derives the canonical Union of its
-arm-result contracts. Concrete formed calls also retain their invoked canonical
-result while symbolic calls remain residual. Effective Match regions and
-residual-call obligations remain future work. This does not add an
-accepted-domain or result field to functions.
+consumers. A symbolic `Apply` remains residual. A concrete `Apply` invokes its
+retained callable with actual arguments; ordinary `match()` inside that invocation
+selects actual arms and supplies captures directly to their handlers. The call
+forwards the actual returned value and that value's existing canonical form. It
+does not read a precomputed Function return theorem, derive a Union from every
+Match arm, or use positional Match bindings.
 
-Expansion is synchronous recursive descent and has no fixed-point engine. No
+Effective Match regions, capture-dependent symbolic arm continuations,
+residual-call obligations, and recursive Functions remain future work. No
 production explicit-context preparation stage is present. Internal form
 constructors deliberately do not harden this controlled demonstrator against
 malformed lowering output; a future parser/linter owns those diagnostics.
 
 ## 9. Implementation backlog and separate future work
 
-- Retain effective Match regions and represent obligations for residual calls
-  without introducing a FunctionRef return theorem. Complete generic
-  correlations for symbolic `CallArgument` results remain separate. Prototype
+- Retain effective Match regions and represent obligations for residual calls.
+  Capture-dependent symbolic arms need an explicit continuation/binder design;
+  ordinary concrete matcher handlers do not need positional binding Enums. Prototype
   inheritance remains only an optional implementation refactor for static
   factory-shaped bounds; it is not separate language work.
 - Implement explicit incoming-region canonicalization at the function/body
@@ -877,16 +779,10 @@ malformed lowering output; a future parser/linter owns those diagnostics.
   substitute for Pow or polynomial syntax.
 - Broader Indeterminate-consuming algebra and its exact cause/Kind vocabulary.
 - The solve tier remains separate and may derive retained `S` without merging or
-  replacing `E` or `C`; its exact input/API is unpinned. Landed
-  `expand(FunctionRef)` is not this tier: it unfolds structure until exact
-  function re-entry and currently retains the residual calls in its
-  expanded `E`. That observation is not a rule that admitted pure calls must
-  survive contextual `C`. `expand` does not infer a call domain, prepare `C`, or
-  write solved-form facts.
-- Source-to-`Lambda` lowering and richer function reference layouts. The
-  current API starts with structurally interned lowered forms and one complete
-  ordered reference environment; that does not imply an explicit-context judgment
-  has already run.
+  replacing `E` or `C`; its exact input/API is unpinned.
+- Recursive Functions and their reference formation remain future work. They must
+  extend the one formed-Function representation rather than restore a parallel
+  positional evaluator.
 
 ## 10. Ruled out (do not reintroduce)
 

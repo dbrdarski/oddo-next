@@ -22,8 +22,7 @@ import {
   Top as DomainTop, Bottom, Null, canonicalizeDomain, registerPure
 } from '../src/domain.mjs'
 import {
-  OuterRef, CallArgument, MatchArgument, Apply, Arm, Match, Lambda,
-  Function, argumentCountOf, internFn, apply, expand
+  CallArgument, Apply, Arm, Match, Function
 } from '../src/function.mjs'
 import {
   Expanded,
@@ -57,20 +56,6 @@ const {
 
 registerPure(ImpureValue, () => false)
 registerPure(ImpureNumericValue, () => false)
-
-const loopForm = () => {
-  const self = OuterRef(0)
-  return Lambda(1, 0, Apply(self, Tuple()))
-}
-
-const countDownForm = () => {
-  const self = OuterRef(0)
-  const argument = CallArgument(0, self)
-  return Lambda(1, 1, Match(argument, Tuple(
-    Arm(Equals(0), 0),
-    Arm(_, Apply(self, Tuple(Sub(argument, 2))))
-  )))
-}
 
 export const suites = [
 
@@ -247,9 +232,8 @@ export const suites = [
     test('different contract values still fail a repeated generic seat', () =>
       throws(() => Twin(Number, Numeric))),
     test('CallArgument placeholders defer repeated-value constraints', () => {
-      const owner = OuterRef(0)
-      const argument = CallArgument(0, owner)
-      const other = CallArgument(1, owner)
+      const argument = CallArgument(0)
+      const other = CallArgument(1)
       return Twin(argument, argument) === Twin(argument, argument)
         && Twin(argument, other) === Twin(argument, other)
     }),
@@ -270,7 +254,7 @@ export const suites = [
     test('Equals forwards its value through Range Number seats', () =>
       Range(Equals(1), Equals(2)) === Range(Equals(1), Equals(2))),
     test('CallArgument passes Number seats symbolically', () => {
-      const argument = CallArgument(0, OuterRef(0))
+      const argument = CallArgument(0)
       return fulfills(argument, Number)
         && !isInstance(argument, Number)
         && Range(argument, 10) === Range(argument, 10)
@@ -458,8 +442,7 @@ export const suites = [
 
   suite('Contextual preparation reference model', [
     test('one expanded expression can occupy two arm contexts', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
+      const argument = CallArgument(0)
       const expanded = Mul(0, argument)
       const written = Match(argument, Tuple(
         Arm(Number, expanded),
@@ -468,8 +451,7 @@ export const suites = [
       return written[1][0][1] === expanded && written[1][1][1] === expanded
     }),
     test('Number context produces zero without replacing the expanded form', () => {
-      const self = OuterRef(0)
-      const expanded = Mul(0, CallArgument(0, self))
+      const expanded = Mul(0, CallArgument(0))
       const analysis = prepare(expanded)(Number)
       return analysis[Expanded] === expanded
         && analysis[Accepted] === Number
@@ -477,8 +459,7 @@ export const suites = [
         && analysis[Canonical] === 0
     }),
     test('Indeterminate context preserves the unresolved expanded operation', () => {
-      const self = OuterRef(0)
-      const expanded = Mul(0, CallArgument(0, self))
+      const expanded = Mul(0, CallArgument(0))
       const analysis = prepare(expanded)(Indeterminate)
       return analysis[Expanded] === expanded
         && analysis[Accepted] === Indeterminate
@@ -486,8 +467,7 @@ export const suites = [
         && analysis[Canonical] === expanded
     }),
     test('a guarded arm retains Number while its body becomes zero', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
+      const argument = CallArgument(0)
       const expanded = Mul(0, argument)
       const written = Match(argument, Tuple(Arm(Number, expanded)))
       const analysis = prepare(written)(Top)
@@ -499,8 +479,7 @@ export const suites = [
         && analysis[Canonical][1][0][1] === 0
     }),
     test('an unguarded arm derives Numeric from its body', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
+      const argument = CallArgument(0)
       const expanded = Mul(0, argument)
       const written = Match(argument, Tuple(Arm(_, expanded)))
       const analysis = prepare(written)(Top)
@@ -514,8 +493,7 @@ export const suites = [
         && indeterminateArm?.[1] === expanded
     }),
     test('Match passes its exact remainder to the later arm', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
+      const argument = CallArgument(0)
       const expanded = Mul(0, argument)
       const written = Match(argument, Tuple(
         Arm(Number, expanded),
@@ -529,8 +507,7 @@ export const suites = [
         && indeterminateArm?.[1] === expanded
     }),
     test('a selected wildcard arm does not fall through when its body rejects', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
+      const argument = CallArgument(0)
       const expanded = Mul(0, argument)
       const written = Match(argument, Tuple(
         Arm(_, expanded),
@@ -542,8 +519,7 @@ export const suites = [
         && analysis[Canonical][1].every(arm => arm[1] !== 7)
     }),
     test('a body-derived Numeric function remains distinct from constant zero', () => {
-      const self = OuterRef(0)
-      const expanded = Mul(0, CallArgument(0, self))
+      const expanded = Mul(0, CallArgument(0))
       const multiplied = prepare(expanded)(Top)
       const constant = prepare(0)(Top)
       return multiplied[Accepted] === Numeric
@@ -552,37 +528,30 @@ export const suites = [
         && multiplied[Canonical] !== constant[Canonical]
     }),
     test('call erasure is rejected until obligations are represented', () => {
-      const self = OuterRef(0)
-      const form = Lambda(1, 1, CallArgument(0, self))
-      const fn = internFn(form, form)
-      const call = Apply(fn, Tuple(CallArgument(0, fn)))
+      const fn = Function(() => value => value)
+      const call = Apply(fn, Tuple(CallArgument(0)))
       return throws(() => prepare(Mul(0, call))(Number))
     }),
     test('a call cannot disappear as an unanalyzed Match scrutinee', () => {
-      const self = OuterRef(0)
-      const form = Lambda(1, 1, CallArgument(0, self))
-      const fn = internFn(form, form)
-      const call = Apply(fn, Tuple(CallArgument(0, fn)))
+      const fn = Function(() => value => value)
+      const call = Apply(fn, Tuple(CallArgument(0)))
       const written = Match(call, Tuple(Arm(_, 0)))
       return throws(() => prepare(written)(Top))
     }),
     test('a Match region cannot leak into a different argument dependency', () => {
-      const self = OuterRef(0)
-      const matched = CallArgument(0, self)
-      const other = CallArgument(1, self)
+      const matched = CallArgument(0)
+      const other = CallArgument(1)
       const written = Match(matched, Tuple(Arm(Number, Mul(0, other))))
       return throws(() => prepare(written)(Top))
     }),
     test('the one-argument scaffold rejects wrapped and wildcard contexts', () => {
-      const self = OuterRef(0)
-      const expanded = Mul(0, CallArgument(0, self))
+      const expanded = Mul(0, CallArgument(0))
       return throws(() => prepare(expanded)(Tuple(Top, Number)))
         && throws(() => prepare(expanded)(Tuple(Top)))
         && throws(() => prepare(expanded)(_))
     }),
     test('explicit disjoint arms and the direct expression reach one mapping', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
+      const argument = CallArgument(0)
       const expanded = Mul(0, argument)
       const written = Match(argument, Tuple(
         Arm(Number, expanded),
@@ -592,8 +561,7 @@ export const suites = [
         === prepare(expanded)(Top)[Canonical]
     }),
     test('restricting the same expression agrees with its complete mapping', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
+      const argument = CallArgument(0)
       const expanded = Mul(0, argument)
       const complete = prepare(expanded)(Top)
       const restricted = prepare(expanded)(Number)
@@ -618,9 +586,9 @@ export const suites = [
         $ => $(_)(() => true)
       )),
     test('Enum kind cases use nominal membership', () => {
-      const argument = CallArgument(0, OuterRef(0))
+      const argument = CallArgument(0)
       return match(argument)(
-        $ => $(OuterRef.kind)(() => false),
+        $ => $(Apply.kind)(() => false),
         $ => $(CallArgument.kind)(value => value === argument)
       )
     }),
@@ -778,266 +746,7 @@ export const suites = [
     }),
   ]),
 
-  suite('Canonical functions & recursive expansion', [
-    test('known function owners expose their argument count', () => {
-      const form = Lambda(0, 2, 0)
-      const fn = internFn(form)
-      return argumentCountOf(form) === 2
-        && argumentCountOf(fn) === 2
-        && argumentCountOf(OuterRef(0)) === null
-    }),
-    test('function forms are canonical Enum trees', () =>
-      countDownForm() === countDownForm()),
-    test('a form and its ordered references determine function identity', () => {
-      const form = countDownForm()
-      const fn = internFn(form, form)
-      return fn === internFn(countDownForm(), countDownForm())
-    }),
-    test('one lowered form/self application has one canonical identity', () => {
-      const [a, b, c, d] = Array.from(
-        { length: 4 },
-        () => internFn(loopForm(), loopForm())
-      )
-      return a === b && b === c && c === d
-    }),
-    test('different applied references keep the same form distinct', () => {
-      const form = loopForm()
-      const one = internFn(Lambda(0, 0, 1))
-      const two = internFn(Lambda(0, 0, 2))
-      return internFn(form, one) !== internFn(form, two)
-    }),
-    test('outer-reference order participates in function identity', () => {
-      const form = Lambda(2, 0, Tuple(OuterRef(0), OuterRef(1)))
-      return internFn(form, 1, 2) !== internFn(form, 2, 1)
-    }),
-    test('a nonrecursive function simply produces its formula', () => {
-      const self = OuterRef(0)
-      const form = Lambda(1, 1, Add(CallArgument(0, self), 1))
-      const fn = internFn(form, form)
-      return expand(fn) === Add(CallArgument(0, fn), 1)
-    }),
-    test('symbolic expansion preserves a recursive Match', () => {
-      const form = countDownForm()
-      const fn = internFn(form, form)
-      const argument = CallArgument(0, fn)
-      return expand(fn) === Match(
-        argument,
-        Tuple(
-          Arm(Equals(0), 0),
-          Arm(_, Apply(fn, Tuple(Sub(argument, 2))))
-        )
-      )
-    }),
-    test('every recursive call remains in the complete tree', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
-      const form = Lambda(1, 1, Tuple(
-        Apply(self, Tuple(Sub(argument, 1))),
-        Apply(self, Tuple(Sub(argument, 2)))
-      ))
-      const fn = internFn(form, form)
-      const arrived = CallArgument(0, fn)
-      return expand(fn) === Tuple(
-        Apply(fn, Tuple(Sub(arrived, 1))),
-        Apply(fn, Tuple(Sub(arrived, 2)))
-      )
-    }),
-    test('a wrapper expands through a recursive callee', () => {
-      const recursiveSelf = OuterRef(0)
-      const recursiveForm = Lambda(1, 1, Apply(
-        recursiveSelf,
-        Tuple(Sub(CallArgument(0, recursiveSelf), 1))
-      ))
-      const recursive = internFn(recursiveForm, recursiveForm)
-
-      const wrapperSelf = OuterRef(0)
-      const wrapperForm = Lambda(2, 1, Apply(
-        OuterRef(1),
-        Tuple(Add(CallArgument(0, wrapperSelf), 2))
-      ))
-      const wrapper = internFn(wrapperForm, wrapperForm, recursive)
-      return expand(wrapper) === Apply(
-        recursive,
-        Tuple(Sub(Add(CallArgument(0, wrapper), 2), 1))
-      )
-    }),
-    test('different-form recursive cycles instantiate lazily', () => {
-      const evenForm = Lambda(2, 1, Apply(
-        OuterRef(1),
-        Tuple(Sub(CallArgument(0, OuterRef(0)), 1))
-      ))
-      const oddForm = Lambda(2, 1, Apply(
-        OuterRef(0),
-        Tuple(Sub(CallArgument(0, OuterRef(1)), 1))
-      ))
-      const even = internFn(evenForm, evenForm, oddForm)
-      const odd = internFn(oddForm, evenForm, oddForm)
-      const argument = CallArgument(0, even)
-      return odd === internFn(oddForm, evenForm, oddForm)
-        && expand(even) === Apply(even, Tuple(Sub(Sub(argument, 1), 1)))
-    }),
-    test('mutual functions preserve their shared external bindings', () => {
-      const evenForm = Lambda(4, 1, Apply(
-        OuterRef(1),
-        Tuple(Sub(CallArgument(0, OuterRef(0)), OuterRef(2)))
-      ))
-      const oddForm = Lambda(4, 1, Apply(
-        OuterRef(0),
-        Tuple(Add(CallArgument(0, OuterRef(1)), OuterRef(3)))
-      ))
-      const references = [evenForm, oddForm, 1, 2]
-      const even = internFn(evenForm, ...references)
-      const argument = CallArgument(0, even)
-      return expand(even) === Apply(
-        even,
-        Tuple(Add(Sub(argument, 1), 2))
-      ) && even !== internFn(evenForm, evenForm, oddForm, 1, 3)
-    }),
-    test('the stack keys recursion by function identity, not shared form', () => {
-      const leafSelf = OuterRef(0)
-      const leafForm = Lambda(1, 1, CallArgument(0, leafSelf))
-      const leaf = internFn(leafForm, leafForm)
-
-      const sharedForm = Lambda(2, 1, Apply(
-        OuterRef(1),
-        Tuple(CallArgument(0, OuterRef(0)))
-      ))
-      const inner = internFn(sharedForm, sharedForm, leaf)
-      const outer = internFn(sharedForm, sharedForm, inner)
-      return expand(outer) === CallArgument(0, outer)
-    }),
-    test('completed helper calls leave no stale stack entry', () => {
-      const helperSelf = OuterRef(0)
-      const helperForm = Lambda(1, 1, Add(CallArgument(0, helperSelf), 1))
-      const helper = internFn(helperForm, helperForm)
-
-      const rootSelf = OuterRef(0)
-      const rootForm = Lambda(2, 1, Tuple(
-        Apply(OuterRef(1), Tuple(CallArgument(0, rootSelf))),
-        Apply(OuterRef(1), Tuple(CallArgument(0, rootSelf)))
-      ))
-      const root = internFn(rootForm, rootForm, helper)
-      const argument = CallArgument(0, root)
-      return expand(root) === Tuple(Add(argument, 1), Add(argument, 1))
-    }),
-    test('expansion rebuilds arbitrary existing Enum trees', () => {
-      const self = OuterRef(0)
-      const form = Lambda(1, 1, LL(CallArgument(0, self), Null))
-      const fn = internFn(form, form)
-      return expand(fn) === LL(CallArgument(0, fn), Null)
-    }),
-    test('concrete Match uses its ordinary generic binding order', () => {
-      const first = MatchArgument(0)
-      const second = MatchArgument(1)
-      const form = Lambda(0, 0, Match(
-        Add(1, 2),
-        Tuple(
-          Arm(Add(second, first), Add(first, second)),
-          Arm(_, 0)
-        )
-      ))
-      const fn = internFn(form)
-      return expand(fn) === form[2]
-        && apply(fn) === Add(2, 1)
-    }),
-    test('a concrete nested Match extends the existing handler bindings', () => {
-      const a = MatchArgument(0)
-      const b = MatchArgument(1)
-      const c = MatchArgument(2)
-      const d = MatchArgument(3)
-      const form = Lambda(0, 0, Match(
-        Add(1, 2),
-        Tuple(Arm(Add(a, b), Match(
-          Add(3, 4),
-          Tuple(Arm(Add(c, d), Tuple(a, b, c, d)))
-        )))
-      ))
-      return apply(internFn(form)) === Tuple(1, 2, 3, 4)
-    }),
-    test('a concrete contract-only Match forwards the matched value', () => {
-      const form = Lambda(0, 0, Match(
-        9,
-        Tuple(Arm(Number, MatchArgument(0)))
-      ))
-      return apply(internFn(form)) === 9
-    }),
-    test('a concrete nested contract value follows existing bindings', () => {
-      const a = MatchArgument(0)
-      const b = MatchArgument(1)
-      const value = MatchArgument(2)
-      const form = Lambda(0, 0, Match(
-        Add(1, 2),
-        Tuple(Arm(Add(a, b), Match(
-          9,
-          Tuple(Arm(Number, Tuple(a, b, value)))
-        )))
-      ))
-      return apply(internFn(form)) === Tuple(1, 2, 9)
-    }),
-    test('concrete captured patterns are resolved before matching', () => {
-      const form = Lambda(1, 0, Match(
-        0,
-        Tuple(
-          Arm(OuterRef(0), MatchArgument(0)),
-          Arm(_, -1)
-        )
-      ))
-      return apply(internFn(form, Equals(0))) === 0
-    }),
-    test('closed function values remain atomic concrete patterns', () => {
-      const targetForm = loopForm()
-      const target = internFn(targetForm, targetForm)
-      const form = Lambda(1, 0, Match(
-        target,
-        Tuple(
-          Arm(target, 1),
-          Arm(_, 0)
-        )
-      ))
-      return apply(internFn(form, 7)) === 1
-    }),
-    test('symbolic formation and concrete application keep separate Matches', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
-      const form = Lambda(1, 1, Match(
-        argument,
-        Tuple(
-          Arm(Equals(0), 10),
-          Arm(_, 20)
-        )
-      ))
-      const fn = internFn(form, form)
-      const arrived = CallArgument(0, fn)
-      return expand(fn) === Match(
-        arrived,
-        Tuple(
-          Arm(Equals(0), 10),
-          Arm(_, 20)
-        )
-      )
-        && apply(fn, 0) === 10
-        && apply(fn, 1) === 20
-    }),
-    test('symbolic expansion preserves a Match with a residual call', () => {
-      const self = OuterRef(0)
-      const argument = CallArgument(0, self)
-      const form = Lambda(1, 1, Match(
-        Apply(self, Tuple(Sub(argument, 1))),
-        Tuple(Arm(_, Add(argument, 1)))
-      ))
-      const fn = internFn(form, form)
-      const arrived = CallArgument(0, fn)
-      return expand(fn) === Match(
-        Apply(fn, Tuple(Sub(arrived, 1))),
-        Tuple(Arm(_, Add(arrived, 1)))
-      )
-    }),
-    test('symbolic forms do not invent Numeric results', () => {
-      const form = countDownForm()
-      const fn = internFn(form, form)
-      return producedOf(CallArgument(0, fn)) === CallArgument
-        && producedOf(Apply(fn, Tuple(CallArgument(0, fn)))) == null
-    }),
+  suite('Function result declarations', [
     test('Arm forwards its result through its positional generic', () =>
       producedOf(Arm(_, 0)) === 0
         && producedOf(Arm(_, Add(1, 1))) === Add(1, 1)),
@@ -1057,7 +766,7 @@ export const suites = [
     }),
   ]),
 
-  suite('Nonrecursive Function formation', [
+  suite('Function formation', [
     test('formed functions are canonical Enum values', () => {
       const fn = Function(() => x => x)
       return isInstance(fn, Enum)
@@ -1148,6 +857,15 @@ export const suites = [
       const increment = Function(() => x => Add(x, 1))
       return Apply(increment, Tuple(Add(1, 1)))[CanonicalForm]
         === Equals(3)
+    }),
+    test('concrete Apply passes actual captures to ordinary match', () => {
+      const token = Symbol('concrete Apply match')
+      const fn = Function(token => value => match(value)(
+        ($, [left, right]) =>
+          $(Add(left, right))((left, right) => Tuple(left, right))
+      ), token)
+
+      return Apply(fn, Tuple(Add(1, 2)))[CanonicalForm] === Tuple(1, 2)
     }),
     test('nested Apply remains in the canonical body', () => {
       const helper = Function(() => x => Add(x, 1))

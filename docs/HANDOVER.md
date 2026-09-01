@@ -2,13 +2,12 @@
 
 This document describes the current matching and canonical-value surface.
 `design.md` and `decisions.md` remain the design authority. The former production
-Preparation prototype has been removed. `npm test` reports **195 passing, 0
+Preparation prototype has been removed. `npm test` reports **173 passing, 0
 failing**.
 
-The nonrecursive `Function(bodyForm, ...outerRefs)` formation and formed-`Apply`
-slices are recorded in the 2026-08-26 ruling and their later implementation
-statuses in `decisions.md`. The retained Lambda/FunctionRef material below
-describes the legacy recursive demonstrator, not the target representation.
+The `Function(bodyForm, ...outerRefs)` formation and formed-`Apply` slices are
+recorded in the 2026-08-26 ruling and their later implementation statuses in
+`decisions.md`. The obsolete positional recursive evaluator has been removed.
 
 The old ambient pattern-construction window was reverted. There is no `asPattern`
 flag, cleanup protocol, or construction residue in the current design.
@@ -154,19 +153,19 @@ Pattern construction and fitting are separate phases.
 The matcher does not catch construction errors and reinterpret malformed patterns
 as non-matches.
 
-## 6. Function-level Match
+## 6. Functions and Match
 
-Canonical function forms use `Match(scrutinee, Tuple(...Arm))`. Symbolic
-`expand(fn)` preserves the complete Match and does not select an arm. Concrete
-`apply(fn, ...arguments)` delegates fitting to the same ordered `match()`
-implementation. `MatchArgument(index)` represents handler bindings in the function
-formula; nested concrete matches extend the existing sparse binding vector. A
-residual `Apply` in a concrete scrutinee preserves the complete Match continuation.
+`Function(bodyForm, ...outerRefs)` invokes the produced callable with ownerless
+`CallArgument(index)` values to form its symbolic body. `Apply` invokes the
+retained callable only when its arguments are concrete. `Match` and `Arm` remain
+ordinary Enum forms, and concrete selection must delegate to the same lowercase
+`match()` implementation.
 
-Function forms currently support ordered Arms only. Value-level Combine is landed,
-but no Combine arm exists in the function Enum vocabulary.
-
-See `docs/HANDOVER-recursion.md` for canonical function identity and expansion.
+There is no positional Match-binding Enum and no separate recursive evaluator.
+Pattern captures during an actual call are ordinary matcher-handler arguments.
+How capture-dependent arms are retained in a symbolic function body remains a
+separate lowering/continuation design question; the removed positional encoding
+does not answer it.
 
 ## 7. Explicit-context canonicalization target
 
@@ -203,28 +202,22 @@ in Function identity. Future safety, completion, and call-admission obligations
 must follow the same ordering. Canonical Match rows may encode their correlated
 partial mapping. Failure never selects a fallback canonical body.
 
-Current nonrecursive Function identity consists of canonical body `C`, its
+Current Function identity consists of canonical body `C`, its
 complete ordered outer-reference Tuple, and its ordered input-demand contract
 Tuple. The result contract is derived rather than added as another identity
-component. The legacy `FunctionRef(form, orderedReferences)` evaluator remains
-separate recursion evidence.
+component.
 
-Function formation also derives the callable's widest result contract from
-pre-canonical `E` and retains it as a fact on the canonical Function. A formed
-`Apply(fn, Tuple(...arguments))` keeps that call node as `E`; its generic
-`Produces` relation reads the Function fact without changing `producedOf`.
-Literal results retain an exact `Equals(value)` contract, while an expression
-such as `Add(1, 1)` retains its declared `Numeric` bound even though its `C` is
-`Equals(2)`.
+Function retains its callable but no precomputed output theorem. A concrete
+`Apply(fn, Tuple(...arguments))` invokes that callable with actual arguments and
+forwards the actual returned value or expression together with that result's
+existing canonical form. Ordinary `match()` inside the invocation selects the
+actual arm and supplies captures directly to its handler. `Arm` forwards its
+result seat; Match never substitutes a Union of every arm for execution. A
+symbolic Apply or Match remains unresolved.
 
-If the target is a formed Function and the argument tree contains no
-`CallArgument`, Apply invokes the retained callable and stores the complete
-canonical result at `E[Canonical]`. A symbolic call remains its own `C`. This
-does not invoke a Function returned by the call, infer recursive results, or
-change the legacy evaluator. Unresolved legacy calls have no constructor-level
-result bound; higher-order result inference is outside this slice. `Arm` forwards
-its result-seat generic, and `Match` produces the canonical Union of its arm-result
-contracts, with `Bottom` for no arms.
+The current result-bound/Union code predates this correction and is the next
+implementation slice. It must be replaced without restoring the removed
+positional evaluator.
 
 `Top`, `Bottom`, and the one language `Null` are canonical zero-seat contract Enum
 values; binary `Union`, `Intersection`, and relative `Difference` are the canonical
@@ -244,15 +237,15 @@ Pure exact logical code still canonicalizes to region-to-result Match/Arm rows. 
 Morgan and DNF-style splitting are internal techniques, not public nodes. Strict
 conditional seats require Boolean; `~` is legal only there and loosens the seat
 without Booleanizing it. Grouped `~(...)` scopes through nested conditional seats,
-stopping at Lambda and explicit arm boundaries. Loose falsity is `{false, Null}`;
+stopping at function and explicit arm boundaries. Loose falsity is `{false, Null}`;
 zero is truthy.
 
 ## 8. Implementation backlog
 
-- Implement effective Match regions and residual-call obligations without
-  inferring a FunctionRef return theorem. `CallArgument` already produces its
-  symbolic kind, formed Apply derives its bound from its target Function, Arm
-  forwards its result generic, and Match derives the Union of its arm results.
+- Implement effective Match regions and residual-call obligations.
+  `CallArgument` already produces its symbolic kind. Concrete Apply must invoke
+  the retained callable and let ordinary `match()` select the actual arm, without
+  restoring positional Match bindings.
 - Implement explicit incoming-region canonicalization at the function/body
   boundary without restoring the removed Preparation prototype. The retained test
   model covers the Number/Indeterminate distinction but is not integrated. Number
@@ -271,8 +264,5 @@ zero is truthy.
 
 - `docs/design.md` — current core design and committed surfaces.
 - `docs/decisions.md` — dated rulings and explicitly pending corrections.
-- `docs/HANDOVER-recursion.md` — committed canonical-function behavior.
-- `docs/recursion-canonicalization-arc.md` — historical investigation record;
-  proposals there are not current design unless restated in the files above.
 
 *End of handover.*
