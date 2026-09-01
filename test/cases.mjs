@@ -34,6 +34,7 @@ import {
 } from './contextual-prepare.model.mjs'
 import { parserLexerSuites } from './parser-lexer-cases.mjs'
 import { parserGrammarSuites } from './parser-grammar-cases.mjs'
+import { parserAstSuites } from './parser-ast-cases.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
@@ -895,4 +896,5 @@ export const suites = [
 
   ...parserLexerSuites,
   ...parserGrammarSuites,
+  ...parserAstSuites,
 ]
