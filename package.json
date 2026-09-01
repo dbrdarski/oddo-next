@@ -7,6 +7,9 @@
     "test": "node test.mjs && node test/run.mjs",
     "start": "parcel index.html tests.html --port 3000"
   },
+  "@parcel/resolver-default": {
+    "packageExports": true
+  },
   "devDependencies": {
     "parcel": "^2.16.4"
   },
