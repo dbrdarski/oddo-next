@@ -15,7 +15,7 @@ This document is a reconstruction of the current NEXT language. It is not a new 
 Authority order:
 
 1. **Current `dbrdarski/next` repository (`main`)** — the primary reference implementation and repository source for the current language.
-2. **Later explicit author rulings** where they supersede repository text or an older implementation snapshot. Current known override: **`++` is the concatenation operator; `+` is numeric addition.**
+2. **Later explicit author rulings** where they supersede repository text or an older implementation snapshot. Current overrides are listed in section 0.2.
 3. **Normative NEXT documents in the Rust repository**, in the repository's own order:
    - `next-design-compendium-v1-0.md` — design intent;
    - `next-grammar-specification-v0-1.md` — what parses;
@@ -47,6 +47,9 @@ The following are current:
 - `?.` is one-step total access.
 - Modules are namespace constructs, not Records.
 - `where` is a name-level verified static assertion.
+- The first arm-level `=>` delimits the arm result.
+- Match arms require a pattern; guard-only `when` arms belong to Blocks.
+- Blocks are valid arm and block-exit results.
 - `@effect` means external-world Effect.
 - `@reactive` is the reactive observer.
 - `@mutable` and `@state` are distinct non-reactive/reactive state declarations.
@@ -501,9 +504,12 @@ Statement :=
   / ExportStatement
   / AtDeclaration
   / MutationStatement
-  / ArmStatement
   / WhereClause
+
+BlockStatement := Statement / ArmStatement
 ```
+
+`ArmStatement` is available only inside a Block.
 
 ## 7.2 Immutable binding
 
@@ -1136,7 +1142,11 @@ Rules:
 
 - arms are ordered top-to-bottom,
 - one arm begins per line,
+- every arm requires a pattern,
 - pattern is tested before guard,
+- the first arm-level `=>` delimits the result,
+- an arrow inside a guard must therefore be nested inside a grouped expression,
+- an arm result may be an expression or a Block,
 - guards are pure,
 - match is expression-oriented,
 - coverage is statically analyzed,
@@ -1173,6 +1183,8 @@ when condition => expression
 ```
 
 `_ => expression` is accepted but redundant.
+
+An exit result may be an expression or a Block.
 
 A block can interleave:
 
@@ -1936,8 +1948,9 @@ Statement :=
     / ExportStatement
     / AtDeclaration
     / MutationStatement
-    / ArmStatement
     / WhereClause
+
+BlockStatement := Statement / ArmStatement
 
 Binding             := BindTarget "=" Expression
 BindTarget          := IDENT / TuplePattern / RecordPattern
@@ -1953,8 +1966,8 @@ AtDeclaration :=
     / "@" IDENT ArrowFunction
 
 ArmStatement :=
-      "when" Expression "=>" Expression
-    / "=>" Expression
+      "when" MatchExpr "=>" ArrowBody
+    / [ "_" ] "=>" ArrowBody
 
 WhereClause := IDENT "where" "(" [ ContractList ] ")" "=>" Expression
 ContractList := Expression { "," Expression }
@@ -1977,13 +1990,13 @@ Param        := IDENT
 ArrowBody    := Expression
               / Block
 
-Block        := "{" { Statement } "}"
+Block        := "{" { BlockStatement } "}"
 
 MatchExpr    := PipeExpr { "::" ArmBlock }
 
 ArmBlock     := "{" Arm { Arm } "}"
 
-Arm          := [ Pattern ] [ "when" Expression ] "=>" Expression
+Arm          := Pattern [ "when" MatchExpr ] "=>" ArrowBody
 
 PipeExpr     := HaskExpr { ("|>" / "<|") HaskExpr }
 

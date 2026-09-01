@@ -5,6 +5,29 @@ therefore postdate a following topic's original entry. `design.md` stays the
 settled specification; entries here capture what was decided, on what grounds,
 and what remains open before the specification absorbs it.
 
+## 2026-09-01 — Match delimiters, required patterns, and Block results
+
+**Ruling (Dane).** The first arm-level `=>` is the arm-result delimiter.
+Consequently, in:
+
+```next
+value :: {
+  pattern when x => y => z
+}
+```
+
+the guard is `x` and the result is the function `y => z`. An arrow intended
+inside a guard must be nested inside a grouped expression.
+
+Every Match arm requires a pattern. Guard-only `when condition => result`
+belongs exclusively to Blocks. Because contextual words remain ordinary
+identifiers, `when when(x) => result` in a Match has the pattern binding `when`
+and the grouped guard `x`.
+
+Blocks are valid results after Match-arm and block-exit arrows. The existing
+Record-versus-Block brace classification still applies: Record-shaped braces
+remain Records, while non-Record result braces are Blocks.
+
 ## 2026-09-01 — retire the positional function evaluator
 
 **Ruling and implementation status.** The separate positional recursive
