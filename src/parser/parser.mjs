@@ -496,13 +496,16 @@ export class NextParser extends CstParser {
 
     $.RULE('additiveExpression', () => {
       $.SUBRULE($.multiplicativeExpression, { LABEL: 'operand' })
-      $.MANY(() => {
-        $.OR([
-          { ALT: () => $.CONSUME(Plus, { LABEL: 'operator' }) },
-          { ALT: () => $.CONSUME(Minus, { LABEL: 'operator' }) },
-          { ALT: () => $.CONSUME(Concat, { LABEL: 'operator' }) },
-        ])
-        $.SUBRULE2($.multiplicativeExpression, { LABEL: 'operand' })
+      $.MANY({
+        GATE: () => !$.startsFollowingArm(),
+        DEF: () => {
+          $.OR([
+            { ALT: () => $.CONSUME(Plus, { LABEL: 'operator' }) },
+            { ALT: () => $.CONSUME(Minus, { LABEL: 'operator' }) },
+            { ALT: () => $.CONSUME(Concat, { LABEL: 'operator' }) },
+          ])
+          $.SUBRULE2($.multiplicativeExpression, { LABEL: 'operand' })
+        },
       })
     })
 
@@ -545,7 +548,10 @@ export class NextParser extends CstParser {
 
     $.RULE('postfixExpression', () => {
       $.SUBRULE($.primaryExpression, { LABEL: 'base' })
-      $.MANY(() => $.SUBRULE($.postfixOperation, { LABEL: 'operation' }))
+      $.MANY({
+        GATE: () => !$.startsFollowingArm(),
+        DEF: () => $.SUBRULE($.postfixOperation, { LABEL: 'operation' }),
+      })
     })
 
     $.RULE('postfixOperation', () => {
@@ -1003,6 +1009,12 @@ export class NextParser extends CstParser {
 
   isGuardOnlyArmAhead() {
     return this.is(When) && this.BACKTRACK(this.armStatement).call(this)
+  }
+
+  startsFollowingArm() {
+    return this.startsOnLaterLine() &&
+      (this.is(Minus) || this.is(LBracket)) &&
+      this.BACKTRACK(this.arm).call(this)
   }
 
   isRecordBraceAhead() {
