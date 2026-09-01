@@ -32,6 +32,7 @@ import {
   Top,
   prepare,
 } from './contextual-prepare.model.mjs'
+import { parserLexerSuites } from './parser-lexer-cases.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
@@ -891,4 +892,5 @@ export const suites = [
     }),
   ]),
 
+  ...parserLexerSuites,
 ]
