@@ -1,6 +1,10 @@
 import { NextLexer } from '../src/parser/tokens.mjs'
 import { nextParser } from '../src/parser/parser.mjs'
 import { buildSurfaceAst } from '../src/parser/ast-builder.mjs'
+import {
+  parse as parseSource,
+  parseCst as parseSourceCst,
+} from '../src/parser/index.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
@@ -92,6 +96,21 @@ const everyNodeHasExactCoordinates = (source, value, parentSpan = null) => {
 }
 
 export const parserAstSuites = [
+  suite('NEXT parser — Public pipeline', [
+    test('retains tokens and CST before adding the Surface AST', () => {
+      const cstResult = parseSourceCst('value = 1')
+      const result = parseSource('value = 1')
+      return cstResult.tokens.length === 3
+        && cstResult.cst.name === 'program'
+        && cstResult.lexerErrors.length === 0
+        && cstResult.parserErrors.length === 0
+        && !Object.hasOwn(cstResult, 'ast')
+        && result.cst.name === 'program'
+        && result.ast.type === 'Program'
+        && result.ast.body[0].type === 'BindingStatement'
+    }),
+  ]),
+
   suite('NEXT Surface AST — Programs and declarations', [
     test('builds module, import, where, and export nodes without resolving contracts', () => {
       const source = [
@@ -150,6 +169,11 @@ export const parserAstSuites = [
         && ast.body.map(statement => statement.value.name).join(' ') ===
           'import export when where'
     }),
+
+    test('enforces module export and literal Record-key surface rules', () =>
+      builderRejects('export value = 1')
+      && builderRejects('record = { name: 1, name: 2 }')
+      && !builderRejects('record = { ...base, name: 1, [key]: 2 }')),
   ]),
 
   suite('NEXT Surface AST — Functions, calls, blocks, and exits', [
@@ -461,6 +485,34 @@ export const parserAstSuites = [
       builderRejects('_')
       && builderRejects('# target(_1, _3)')
       && builderRejects('value :: {\n  left | right => null\n}')),
+
+    test('fills hask index gaps with plain holes and protects rest ownership', () =>
+      parseAst('# target(_2, _)').body[0].expression.type === 'HaskExpression'
+      && builderRejects('# target(_3, _)')
+      && builderRejects('# target(_, _, ..._2)')
+      && builderRejects('# 1')),
+
+    test('allows hask escapes only from nested arm patterns', () =>
+      parseAst('#(value :: {\n  ^_ => value\n})')
+        .body[0].expression.type === 'HaskExpression'
+      && builderRejects('value :: {\n  ^_ => value\n}')),
+
+    test('rejects duplicate parameters, parameter pins, and multiple pattern rests', () =>
+      builderRejects('f = (x, x) => x')
+      && builderRejects('f = ([^outer]) => 1')
+      && builderRejects('value :: {\n  [...left, ...right] => 1\n}')
+      && builderRejects('value :: {\n  {...left, ...right} => 1\n}')),
+
+    test('refuses only the two genuinely ambiguous guard families', () =>
+      builderRejects('value :: {\n  pattern when x => y => z\n}')
+      && builderRejects('value :: {\n  when when(x) => 1\n}')
+      && builderRejects('value :: {\n  when when[x] => 1\n}')
+      && builderRejects('value :: {\n  when when[...x] => 1\n}')
+      && !builderRejects('value :: {\n  pattern when [x] => y => z\n}')
+      && !builderRejects('value :: {\n  when when() => 1\n}')
+      && !builderRejects('value :: {\n  when when(x,) => 1\n}')
+      && !builderRejects('value :: {\n  when when(x, y) => 1\n}')
+      && !builderRejects('value :: {\n  when when[x...] => 1\n}')),
   ]),
 
   suite('NEXT Surface AST — Privileged declarations and mutation', [
@@ -556,6 +608,16 @@ export const parserAstSuites = [
       return everyNodeHasExactCoordinates(source, ast)
         && ast.span.startOffset === 0
         && ast.span.endOffset === source.length
+    }),
+
+    test('tracks CRLF and Unicode line separators as single line advances', () => {
+      const source = 'first = 1\r\nsecond = 2\u2028third = 3\u2029fourth = 4'
+      const ast = parseAst(source)
+      return everyNodeHasExactCoordinates(source, ast)
+        && ast.body.map(statement => statement.span.startLine).join(' ') ===
+          '1 2 3 4'
+        && ast.span.endLine === 4
+        && ast.span.endColumn === 11
     }),
   ]),
 ]
