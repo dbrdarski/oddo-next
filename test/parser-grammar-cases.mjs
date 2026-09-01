@@ -65,6 +65,19 @@ export const parserGrammarSuites = [
 
     test('does not admit a module header after the first statement', () =>
       rejected('value = 1\nmodule Later')),
+
+    test('separates line-leading Tuple forms only when postfix cannot complete', () => {
+      const binding = parse('x\n[y] = pair')
+      const emptyTuple = parse('x\n[]')
+      const tuple = parse('x\n[a, b]')
+      const greedyIndex = parse('x\n[y]')
+      return [binding, emptyTuple, tuple, greedyIndex]
+        .every(result => result.parserErrors.length === 0)
+        && (binding.cst.children.statement?.length ?? 0) === 2
+        && (emptyTuple.cst.children.statement?.length ?? 0) === 2
+        && (tuple.cst.children.statement?.length ?? 0) === 2
+        && (greedyIndex.cst.children.statement?.length ?? 0) === 1
+    }),
   ]),
 
   suite('NEXT parser — Functions, calls, blocks, and exits', [
@@ -90,6 +103,17 @@ export const parserGrammarSuites = [
 
     test('treats a split function arrow as a block exit, not a lambda', () =>
       rejected('(left, right)\n=> left + right')),
+
+    test('does not consume a following parenthesized arrow as a call', () => {
+      const empty = parse('x\n() => y')
+      const multiple = parse('x\n(a, b) => a')
+      const greedyCall = parse('x\n(a)')
+      return [empty, multiple, greedyCall]
+        .every(result => result.parserErrors.length === 0)
+        && (empty.cst.children.statement?.length ?? 0) === 2
+        && (multiple.cst.children.statement?.length ?? 0) === 2
+        && (greedyCall.cst.children.statement?.length ?? 0) === 1
+    }),
 
     test('allows block exits only inside a Block', () =>
       rejected('value = 1\n=> value')),

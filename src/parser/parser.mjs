@@ -549,7 +549,7 @@ export class NextParser extends CstParser {
     $.RULE('postfixExpression', () => {
       $.SUBRULE($.primaryExpression, { LABEL: 'base' })
       $.MANY({
-        GATE: () => !$.startsFollowingArm(),
+        GATE: () => $.continuesPostfixExpression(),
         DEF: () => $.SUBRULE($.postfixOperation, { LABEL: 'operation' }),
       })
     })
@@ -1015,6 +1015,14 @@ export class NextParser extends CstParser {
     return this.startsOnLaterLine() &&
       (this.is(Minus) || this.is(LBracket)) &&
       this.BACKTRACK(this.arm).call(this)
+  }
+
+  continuesPostfixExpression() {
+    if (!this.startsOnLaterLine()) return true
+    if (this.is(LParen) && this.isArrowAhead()) return false
+    if (!this.is(LBracket)) return true
+    if (this.startsFollowingArm() || this.isBindingAhead()) return false
+    return this.BACKTRACK(this.postfixOperation).call(this)
   }
 
   isRecordBraceAhead() {
