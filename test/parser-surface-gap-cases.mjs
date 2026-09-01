@@ -121,21 +121,19 @@ export const parserSurfaceGapSuites = [
         && indexedEscape.index === 1
     }),
 
-    test('builds a guard-only Match arm without manufacturing a pattern', () => {
-      const match = expressionValue(astOf([
-        'value :: {',
+    test('requires Match patterns and keeps guard-only exits inside Blocks', () =>
+      rejects('value :: {\n  when allowed => result\n}')
+      && rejects('value :: {\n  => result\n}')
+      && rejects('when allowed => result')
+      && !rejects([
+        'choose = value => {',
         '  when allowed => result',
-        '  _ => fallback',
+        '  => fallback',
         '}',
-      ].join('\n')))
-      const arm = match.arms[0]
+      ].join('\n'))),
 
-      return arm.type === 'MatchArm'
-        && arm.pattern == null
-        && arm.guard.type === 'Identifier'
-        && arm.guard.name === 'allowed'
-        && arm.result.name === 'result'
-    }),
+    test('does not promote Blocks to unrestricted primary expressions', () =>
+      rejects('value = {\n  local = 1\n  => local\n}')),
 
     test('parses import("x") as an ordinary contextual-identifier call', () => {
       const call = bindingValue(astOf('result = import("x")'))

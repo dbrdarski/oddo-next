@@ -280,14 +280,14 @@ export class NextParser extends CstParser {
             $.CONSUME(When)
             $.SUBRULE($.matchExpression, { LABEL: 'guard' })
             $.CONSUME(Arrow)
-            $.SUBRULE($.expression, { LABEL: 'result' })
+            $.SUBRULE($.arrowBody, { LABEL: 'result' })
           },
         },
         {
           ALT: () => {
             $.OPTION(() => $.CONSUME(Wildcard))
             $.CONSUME2(Arrow)
-            $.SUBRULE2($.expression, { LABEL: 'result' })
+            $.SUBRULE2($.arrowBody, { LABEL: 'result' })
           },
         },
       ])
@@ -764,17 +764,13 @@ export class NextParser extends CstParser {
     })
 
     $.RULE('arm', () => {
-      $.OPTION({
-        GATE: () => !$.is(Arrow) &&
-          !$.isGuardOnlyArmAhead(),
-        DEF: () => $.SUBRULE($.pattern),
-      })
-      $.OPTION2(() => {
+      $.SUBRULE($.pattern)
+      $.OPTION(() => {
         $.CONSUME(When)
         $.SUBRULE($.matchExpression, { LABEL: 'guard' })
       })
       $.CONSUME(Arrow)
-      $.SUBRULE($.expression, { LABEL: 'result' })
+      $.SUBRULE($.arrowBody, { LABEL: 'result' })
     })
 
     $.RULE('pattern', () => {
@@ -926,7 +922,7 @@ export class NextParser extends CstParser {
   isBlockExitAhead() {
     return this.is(Arrow) ||
       (this.is(Wildcard) && this.is(Arrow, 2)) ||
-      this.isGuardOnlyArmAhead()
+      (this.is(When) && this.BACKTRACK(this.armStatement).call(this))
   }
 
   isBindingAhead(offset = 1) {
@@ -1005,10 +1001,6 @@ export class NextParser extends CstParser {
         if (depth === 0) return cursor
       }
     }
-  }
-
-  isGuardOnlyArmAhead() {
-    return this.is(When) && this.BACKTRACK(this.armStatement).call(this)
   }
 
   startsFollowingArm() {

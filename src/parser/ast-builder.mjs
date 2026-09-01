@@ -153,80 +153,6 @@ const assertFreshParameters = parameters => {
   }
 }
 
-const isNestedParameterPatternShape = expression => {
-  if (expression?.type === 'NumberLiteral' ||
-    expression?.type === 'StringLiteral' ||
-    expression?.type === 'Identifier' ||
-    expression?.type === 'HoleExpression') return true
-
-  if (expression?.type === 'UnaryExpression') {
-    return expression.operator === '-' && expression.argument.type === 'NumberLiteral'
-  }
-
-  switch (expression?.type) {
-    case 'TupleExpression': {
-      const rests = expression.elements.filter(element => element.type === 'SpreadElement')
-      return rests.length <= 1 && expression.elements.every(element =>
-        element.type === 'SpreadElement'
-          ? element.argument.type === 'Identifier' ||
-            element.argument.type === 'HoleExpression'
-          : isNestedParameterPatternShape(element))
-    }
-    case 'RecordExpression': {
-      const rests = expression.fields.filter(field => field.type === 'SpreadElement')
-      return rests.length <= 1 && expression.fields.every(field => {
-        if (field.type === 'SpreadElement') {
-          return field.argument.type === 'Identifier' ||
-            field.argument.type === 'HoleExpression'
-        }
-        return !field.computed &&
-          (field.shorthand ||
-            isNestedParameterPatternShape(field.value))
-      })
-    }
-    default:
-      return false
-  }
-}
-
-const isSingleParameterShape = expression =>
-  expression?.type === 'Identifier' ||
-  expression?.type === 'TupleExpression' &&
-    isNestedParameterPatternShape(expression) ||
-  expression?.type === 'RecordExpression' &&
-    isNestedParameterPatternShape(expression)
-
-const isAmbiguousGuardParameterShape = expression =>
-  expression.type === 'Identifier' ||
-  expression.type === 'ParenthesizedExpression' &&
-    isSingleParameterShape(expression.expression)
-
-const assertUnambiguousGuard = (guard, result) => {
-  if (isAmbiguousGuardParameterShape(guard) && result.type === 'ArrowFunctionExpression') {
-    syntaxError(
-      'Ambiguous guard/result arrows; parenthesize the intended arrow',
-      { span: spanFrom(guard, result) }
-    )
-  }
-}
-
-const isContextualWhenAmbiguity = guard =>
-  (guard.type === 'CallExpression' &&
-    guard.callee.type === 'Identifier' &&
-    guard.callee.name === 'when' &&
-    guard.arguments.length === 1 &&
-    guard.arguments[0].type !== 'SpreadElement' &&
-    !guard.trailingComma) ||
-  (guard.type === 'IndexExpression' &&
-    !guard.optional &&
-    guard.object.type === 'Identifier' &&
-    guard.object.name === 'when') ||
-  (guard.type === 'SliceExpression' &&
-    guard.object.type === 'Identifier' &&
-    guard.object.name === 'when' &&
-    guard.start == null &&
-    guard.end != null)
-
 const childValues = node => Object.entries(node)
   .filter(([key]) => key !== 'type' && key !== 'span')
   .map(([, value]) => value)
@@ -611,7 +537,6 @@ export class SurfaceAstBuilder extends BaseCstVisitor {
   armStatement(ctx) {
     const guard = ctx.guard ? this.visit(ctx.guard) : null
     const result = this.visit(ctx.result)
-    if (guard) assertUnambiguousGuard(guard, result)
     const first = ctx.When?.[0] ?? ctx.Wildcard?.[0] ?? ctx.Arrow[0]
     return {
       type: 'BlockExitStatement',
@@ -1178,24 +1103,16 @@ export class SurfaceAstBuilder extends BaseCstVisitor {
   }
 
   arm(ctx) {
-    const pattern = ctx.pattern ? this.visit(ctx.pattern) : null
+    const pattern = this.visit(ctx.pattern)
     const guard = ctx.guard ? this.visit(ctx.guard) : null
     const result = this.visit(ctx.result)
-    if (pattern) assertPatternContext(pattern, true)
-    if (guard) assertUnambiguousGuard(guard, result)
-    if (pattern == null && guard && isContextualWhenAmbiguity(guard)) {
-      syntaxError(
-        'Ambiguous contextual when arm; parenthesize the intended guard',
-        guard
-      )
-    }
-    const first = pattern ?? ctx.When?.[0] ?? ctx.Arrow[0]
+    assertPatternContext(pattern, true)
     return {
       type: 'MatchArm',
       pattern,
       guard,
       result,
-      span: spanFrom(first, result),
+      span: spanFrom(pattern, result),
     }
   }
 

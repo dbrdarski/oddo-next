@@ -503,16 +503,74 @@ export const parserAstSuites = [
       && builderRejects('value :: {\n  [...left, ...right] => 1\n}')
       && builderRejects('value :: {\n  {...left, ...right} => 1\n}')),
 
-    test('refuses only the two genuinely ambiguous guard families', () =>
-      builderRejects('value :: {\n  pattern when x => y => z\n}')
-      && builderRejects('value :: {\n  when when(x) => 1\n}')
-      && builderRejects('value :: {\n  when when[x] => 1\n}')
-      && builderRejects('value :: {\n  when when[...x] => 1\n}')
-      && !builderRejects('value :: {\n  pattern when [x] => y => z\n}')
-      && !builderRejects('value :: {\n  when when() => 1\n}')
-      && !builderRejects('value :: {\n  when when(x,) => 1\n}')
-      && !builderRejects('value :: {\n  when when(x, y) => 1\n}')
-      && !builderRejects('value :: {\n  when when[x...] => 1\n}')),
+    test('builds first-delimited results and contextual when patterns', () => {
+      const delimited = expressionValue(parseAst(
+        'value :: {\n  pattern when x => y => z\n}'
+      )).arms[0]
+      const grouped = expressionValue(parseAst(
+        'value :: {\n  pattern when (x => y) => z\n}'
+      )).arms[0]
+      const contextual = expressionValue(parseAst(
+        'value :: {\n  when when(x) => result\n}'
+      )).arms[0]
+      const blockExit = bindingValue(parseAst([
+        'choose = value => {',
+        '  when x => y => z',
+        '}',
+      ].join('\n'))).body.body[0]
+
+      return delimited.pattern.name.name === 'pattern'
+        && delimited.guard.name === 'x'
+        && delimited.result.type === 'ArrowFunctionExpression'
+        && delimited.result.parameters[0].name.name === 'y'
+        && delimited.result.body.name === 'z'
+        && grouped.guard.type === 'ParenthesizedExpression'
+        && grouped.guard.expression.type === 'ArrowFunctionExpression'
+        && grouped.result.name === 'z'
+        && contextual.pattern.type === 'BindingPattern'
+        && contextual.pattern.name.name === 'when'
+        && contextual.guard.type === 'ParenthesizedExpression'
+        && contextual.guard.expression.name === 'x'
+        && contextual.result.name === 'result'
+        && blockExit.guard.name === 'x'
+        && blockExit.result.type === 'ArrowFunctionExpression'
+        && blockExit.result.parameters[0].name.name === 'y'
+        && blockExit.result.body.name === 'z'
+    }),
+
+    test('builds Blocks as Match-arm and block-exit results', () => {
+      const matchSource = [
+        'value :: {',
+        '  0 => { value: 1 }',
+        '  _ => {',
+        '    result = 1',
+        '    => result',
+        '  }',
+        '}',
+      ].join('\n')
+      const exitSource = [
+        'choose = value => {',
+        '  when value => {',
+        '    => selected',
+        '  }',
+        '  => fallback',
+        '}',
+      ].join('\n')
+      const [recordArm, blockArm] = expressionValue(parseAst(matchSource)).arms
+      const matchResult = blockArm.result
+      const block = bindingValue(parseAst(exitSource)).body
+      const exitResult = block.body[0].result
+
+      return recordArm.result.type === 'RecordExpression'
+        && recordArm.result.fields[0].key.name === 'value'
+        && matchResult.type === 'BlockExpression'
+        && matchResult.body[0].type === 'BindingStatement'
+        && matchResult.body[1].type === 'BlockExitStatement'
+        && exitResult.type === 'BlockExpression'
+        && exitResult.body[0].type === 'BlockExitStatement'
+        && everyNodeHasExactCoordinates(matchSource, parseAst(matchSource))
+        && everyNodeHasExactCoordinates(exitSource, parseAst(exitSource))
+    }),
   ]),
 
   suite('NEXT Surface AST — Privileged declarations and mutation', [

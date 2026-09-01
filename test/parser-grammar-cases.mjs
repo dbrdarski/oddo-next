@@ -251,18 +251,37 @@ export const parserGrammarSuites = [
         && arm.children.guard === undefined
     }),
 
+    test('uses the first arm-level arrow as the result delimiter', () =>
+      accepted('value :: {\n  pattern when x => y => z\n}')
+      && accepted('value :: {\n  pattern when (x => y) => z\n}')),
+
+    test('requires a Match pattern while retaining contextual when', () =>
+      rejected('value :: {\n  when allowed => result\n}')
+      && accepted('value :: {\n  when when(x) => result\n}')
+      && accepted('value :: {\n  when when[x] => result\n}')
+      && accepted('value :: {\n  when when[...x] => result\n}')
+      && rejected('value :: {\n  when when() => result\n}')),
+
     test('requires every Match arm to begin on a new line', () =>
       rejected('value :: { _ => 1 }')),
 
     test('requires at least one Match arm', () => rejected('value :: {}')),
 
-    test('leaves block-valued Match results rejected pending a ruling', () =>
-      rejected([
+    test('accepts Block results in Match arms and block exits', () =>
+      accepted([
         'value :: {',
         '  _ => {',
         '    result = 1',
         '    => result',
         '  }',
+        '}',
+      ].join('\n'))
+      && accepted([
+        'choose = value => {',
+        '  when value => {',
+        '    => selected',
+        '  }',
+        '  => fallback',
         '}',
       ].join('\n'))),
   ]),
