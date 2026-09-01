@@ -1,9 +1,9 @@
 # NEXT — Current Surface Language Specification
 ## Reference surface for `oddo.next`
 
-**Status:** Working current-state specification for implementation and review  
-**Date:** 2026-09-01  
-**Purpose:** Define the full NEXT source-language surface for the new JavaScript implementation, **`oddo.next`**, without importing stale analyzer machinery or historical Oddo semantics.  
+**Status:** Working current-state specification for implementation and review
+**Date:** 2026-09-01
+**Purpose:** Define the full NEXT source-language surface for the new JavaScript implementation, **`oddo.next`**, without importing stale analyzer machinery or historical Oddo semantics.
 **Primary language source:** the Rust reference implementation and normative specifications in `dbrdarski/next`.
 
 ---

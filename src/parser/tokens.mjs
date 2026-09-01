@@ -131,7 +131,7 @@ export const InterpolationStart = createToken({
 export const TemplateChunk = createToken({
   name: 'TemplateChunk',
   pattern:
-    /(?:[^\\`$]|\$(?!\{)|\\(?:[ntrbfv\\"'`]|0(?![0-9])|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|u\{0*(?:[0-9a-fA-F]{1,5}|10[0-9a-fA-F]{4})\}|\$\{))+/, 
+    /(?:[^\\`$]|\$(?!\{)|\\(?:[ntrbfv\\"'`]|0(?![0-9])|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|u\{0*(?:[0-9a-fA-F]{1,5}|10[0-9a-fA-F]{4})\}|\$\{))+/,
   line_breaks: true,
 })
 
