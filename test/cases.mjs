@@ -36,6 +36,7 @@ import { parserLexerSuites } from './parser-lexer-cases.mjs'
 import { parserGrammarSuites } from './parser-grammar-cases.mjs'
 import { parserAstSuites } from './parser-ast-cases.mjs'
 import { parserSurfaceGapSuites } from './parser-surface-gap-cases.mjs'
+import { playgroundResolveSuites } from './playground-resolve-cases.mjs'
 
 const suite = (title, cases) => ({ title, cases })
 const test = (label, run) => ({ label, run })
@@ -899,4 +900,5 @@ export const suites = [
   ...parserGrammarSuites,
   ...parserAstSuites,
   ...parserSurfaceGapSuites,
+  ...playgroundResolveSuites,
 ]
