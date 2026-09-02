@@ -6,19 +6,74 @@
   <title>oddo.next playground</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="playground-page">
   <header>
     <h1>oddo.next playground</h1>
     <nav><a href="tests.html">tests →</a></nav>
   </header>
-  <div class="bar">
-    <select id="examples"></select>
-    <button id="run">Run ⌘⏎</button>
-    <button id="clear">Clear</button>
+
+  <div class="playground-tabs" role="tablist" aria-label="Playground view">
+    <button
+      id="runtime-tab"
+      class="playground-tab active"
+      type="button"
+      role="tab"
+      aria-selected="true"
+      aria-controls="runtime-panel"
+    >JavaScript API</button>
+    <button
+      id="language-tab"
+      class="playground-tab"
+      type="button"
+      role="tab"
+      aria-selected="false"
+      aria-controls="language-panel"
+      tabindex="-1"
+    >Language AST</button>
   </div>
-  <div id="editor"></div>
-  <p class="hint" id="scope"></p>
-  <div id="output"></div>
+
+  <section
+    id="runtime-panel"
+    class="playground-panel runtime-panel"
+    role="tabpanel"
+    aria-labelledby="runtime-tab"
+  >
+    <div class="bar">
+      <select id="examples" aria-label="JavaScript API example"></select>
+      <button id="run">Run ⌘⏎</button>
+      <button id="clear">Clear</button>
+    </div>
+    <div id="editor" class="code-editor"></div>
+    <p class="hint" id="scope"></p>
+    <div id="output"></div>
+  </section>
+
+  <section
+    id="language-panel"
+    class="playground-panel"
+    role="tabpanel"
+    aria-labelledby="language-tab"
+    hidden
+  >
+    <div class="language-bar">
+      <div>
+        <strong>NEXT Surface AST</strong>
+        <span id="ast-status" aria-live="polite"></span>
+      </div>
+      <button id="language-example" type="button">Reset example</button>
+    </div>
+    <div class="ast-workspace">
+      <div class="ast-source-pane">
+        <div id="language-editor" class="code-editor"></div>
+        <p class="hint">Edit to parse automatically · select syntax to reveal its smallest AST node</p>
+        <div id="ast-diagnostics" aria-live="polite"></div>
+      </div>
+      <aside class="ast-tree-pane" aria-label="Surface AST tree">
+        <div id="ast-tree"></div>
+      </aside>
+    </div>
+  </section>
+
   <script type="module" src="playground.mjs"></script>
 </body>
 </html>

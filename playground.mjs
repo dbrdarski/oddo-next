@@ -21,6 +21,7 @@ import * as domain from './src/domain.mjs'
 import * as matching from './src/match.mjs'
 import * as canonicalization from './src/canonical.mjs'
 import * as functions from './src/function.mjs'
+import { parseCst, buildSurfaceAst } from './src/parser/index.mjs'
 
 const api = {
   ...intern, ...contract, ...facts, ...enums, ...numeric,
@@ -256,7 +257,7 @@ log('other tuples unaffected:', fact(Tuple(1, 3), Label) === null)`,
   },
 ]
 
-const editorRoot = document.getElementById('editor')
+const runtimeEditorRoot = document.getElementById('editor')
 const output = document.getElementById('output')
 const picker = document.getElementById('examples')
 
@@ -286,7 +287,7 @@ const compile = (code) => {
   catch { return new Function(...names, 'log', code) }
 }
 
-let editor
+let runtimeEditor
 
 const run = () => {
   output.textContent = ''
@@ -294,7 +295,7 @@ const run = () => {
   const original = console.log
   console.log = (...vals) => { log(...vals); original.apply(console, vals) }
   try {
-    const result = compile(editor.state.doc.toString())(...values, log)
+    const result = compile(runtimeEditor.state.doc.toString())(...values, log)
     if (result != null) print(`→ ${show(result)}`)
   } catch (e) {
     print(String(e), 'err')
@@ -331,9 +332,9 @@ const editorTheme = EditorView.theme({
   },
 }, { dark: true })
 
-editor = new EditorView({
+runtimeEditor = new EditorView({
   doc: localStorage.getItem('oddo.playground') ?? examples[0].code,
-  parent: editorRoot,
+  parent: runtimeEditorRoot,
   extensions: [
     minimalSetup,
     javascript(),
@@ -362,13 +363,359 @@ document.getElementById('run').addEventListener('click', run)
 document.getElementById('clear').addEventListener('click', () => { output.textContent = '' })
 
 picker.addEventListener('change', () => {
-  editor.dispatch({
+  runtimeEditor.dispatch({
     changes: {
       from: 0,
-      to: editor.state.doc.length,
+      to: runtimeEditor.state.doc.length,
       insert: examples[picker.selectedIndex].code,
     },
     selection: { anchor: 0 },
     scrollIntoView: true,
   })
 })
+
+// ==========================================
+// NEXT Surface AST Explorer
+// ==========================================
+
+const languageExample = `describe = value => value :: {
+  0 => "zero"
+  Number when value > 10 => {
+    doubled = value * 2
+    => { kind: "large", value: doubled }
+  }
+  Number => { kind: "number", value }
+  _ => { kind: "other", value }
+}`
+
+const languageEditorRoot = document.getElementById('language-editor')
+const astTree = document.getElementById('ast-tree')
+const astStatus = document.getElementById('ast-status')
+const astDiagnostics = document.getElementById('ast-diagnostics')
+
+let languageEditor
+let astEntries = []
+let nodeSummaries = new WeakMap()
+let selectedSummary = null
+let selectingFromTree = false
+
+const isAstNode = value =>
+  value != null &&
+  !Array.isArray(value) &&
+  typeof value === 'object' &&
+  typeof value.type === 'string' &&
+  value.span != null
+
+const indexAst = ast => {
+  const entries = []
+
+  const visit = (value, depth = 0) => {
+    if (value == null || typeof value !== 'object') return
+
+    if (Array.isArray(value)) {
+      value.forEach(child => visit(child, depth))
+      return
+    }
+
+    const node = isAstNode(value)
+    if (node) {
+      entries.push({
+        node: value,
+        depth,
+        width: value.span.endOffset - value.span.startOffset,
+      })
+    }
+
+    for (const [key, child] of Object.entries(value)) {
+      if (key !== 'span' && key !== 'type') visit(child, depth + (node ? 1 : 0))
+    }
+  }
+
+  visit(ast)
+  return entries
+}
+
+const nodeAtOffset = (offset, sourceLength) => {
+  const point = sourceLength > 0 && offset >= sourceLength
+    ? sourceLength - 1
+    : Math.max(0, offset)
+  let selected = null
+
+  for (const entry of astEntries) {
+    const { startOffset, endOffset } = entry.node.span
+    const contains = startOffset === endOffset
+      ? point === startOffset
+      : startOffset <= point && point < endOffset
+
+    if (!contains) continue
+    if (selected == null ||
+      entry.width < selected.width ||
+      entry.width === selected.width && entry.depth > selected.depth) {
+      selected = entry
+    }
+  }
+
+  return selected?.node ?? null
+}
+
+const spanLabel = span =>
+  `${span.startLine}:${span.startColumn}–${span.endLine}:${span.endColumn} · ` +
+  `[${span.startOffset}, ${span.endOffset})`
+
+const scalarLabel = value => {
+  if (typeof value === 'string') return JSON.stringify(value)
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  return String(value)
+}
+
+const appendText = (parent, className, text) => {
+  const span = document.createElement('span')
+  span.className = className
+  span.textContent = text
+  parent.append(span)
+}
+
+const renderAstValue = (value, key) => {
+  if (value == null || typeof value !== 'object') {
+    const leaf = document.createElement('div')
+    leaf.className = 'ast-leaf'
+    appendText(leaf, 'ast-key', `${key}:`)
+    appendText(leaf, 'ast-value', scalarLabel(value))
+    return leaf
+  }
+
+  if (Array.isArray(value)) {
+    const details = document.createElement('details')
+    details.className = 'ast-collection'
+    const summary = document.createElement('summary')
+    appendText(summary, 'ast-key', `${key} `)
+    appendText(summary, 'ast-value', `[${value.length}]`)
+    details.append(summary)
+    const children = document.createElement('div')
+    children.className = 'ast-children'
+    value.forEach((child, index) =>
+      children.append(renderAstValue(child, `[${index}]`)))
+    details.append(children)
+    return details
+  }
+
+  const details = document.createElement('details')
+  const summary = document.createElement('summary')
+  const children = document.createElement('div')
+  children.className = 'ast-children'
+
+  if (isAstNode(value)) {
+    details.className = 'ast-node'
+    if (value.type === 'Program') details.open = true
+    appendText(summary, 'ast-key', `${key}: `)
+    appendText(summary, 'ast-type', value.type)
+    appendText(summary, 'ast-span', spanLabel(value.span))
+    nodeSummaries.set(value, summary)
+    summary.addEventListener('click', () => {
+      selectSourceNode(value)
+      requestAnimationFrame(() => revealNode(value))
+    })
+  } else {
+    details.className = 'ast-collection'
+    appendText(summary, 'ast-key', key)
+  }
+
+  details.append(summary)
+  for (const [childKey, child] of Object.entries(value)) {
+    if (childKey !== 'type' && childKey !== 'span') {
+      children.append(renderAstValue(child, childKey))
+    }
+  }
+  details.append(children)
+  return details
+}
+
+const revealNode = node => {
+  const summary = nodeSummaries.get(node)
+  if (summary == null) return
+
+  selectedSummary?.classList.remove('ast-selected')
+  selectedSummary = summary
+  selectedSummary.classList.add('ast-selected')
+
+  let parent = summary.parentElement
+  while (parent != null && parent !== astTree) {
+    if (parent.tagName === 'DETAILS') parent.open = true
+    parent = parent.parentElement
+  }
+
+  astStatus.textContent =
+    `${astEntries.length} nodes · ${node.type} · ${spanLabel(node.span)}`
+  summary.scrollIntoView({ block: 'nearest' })
+}
+
+const revealOffset = offset => {
+  const sourceLength = languageEditor.state.doc.length
+  const node = nodeAtOffset(offset, sourceLength)
+  if (node != null) revealNode(node)
+}
+
+const selectSourceNode = node => {
+  selectingFromTree = true
+  languageEditor.dispatch({
+    selection: {
+      anchor: node.span.startOffset,
+      head: node.span.endOffset,
+    },
+    scrollIntoView: true,
+  })
+  selectingFromTree = false
+  languageEditor.focus()
+}
+
+const diagnosticPosition = (error, sourceLength) => {
+  if (error.span != null) return error.span
+
+  const token = error.token
+  if (token?.startOffset >= 0) {
+    return {
+      startOffset: token.startOffset,
+      endOffset: Math.min(sourceLength, token.endOffset + 1),
+      startLine: token.startLine,
+      startColumn: token.startColumn,
+    }
+  }
+
+  if (error.offset >= 0) {
+    return {
+      startOffset: error.offset,
+      endOffset: Math.min(sourceLength, error.offset + Math.max(1, error.length ?? 1)),
+      startLine: error.line,
+      startColumn: error.column,
+    }
+  }
+
+  const previous = error.previousToken
+  return {
+    startOffset: previous?.endOffset >= 0 ? previous.endOffset + 1 : sourceLength,
+    endOffset: sourceLength,
+    startLine: previous?.endLine,
+    startColumn: previous?.endColumn >= 0 ? previous.endColumn + 1 : null,
+  }
+}
+
+const showDiagnostics = (errors, sourceLength) => {
+  astDiagnostics.textContent = ''
+  for (const error of errors) {
+    const position = diagnosticPosition(error, sourceLength)
+    const location = position.startLine != null && position.startColumn != null
+      ? `${position.startLine}:${position.startColumn}`
+      : `offset ${position.startOffset}`
+    const row = document.createElement('div')
+    row.className = 'ast-diagnostic'
+    row.textContent = `${location} · ${error.message}`
+    astDiagnostics.append(row)
+  }
+}
+
+const showAstUnavailable = () => {
+  astTree.textContent = ''
+  const empty = document.createElement('div')
+  empty.className = 'ast-empty'
+  empty.textContent = 'Fix the source error to inspect its Surface AST.'
+  astTree.append(empty)
+  astStatus.textContent = 'Parse error'
+  astEntries = []
+  nodeSummaries = new WeakMap()
+  selectedSummary = null
+}
+
+const parseLanguage = () => {
+  const source = languageEditor.state.doc.toString()
+  const result = parseCst(source)
+  const errors = [...result.lexerErrors, ...result.parserErrors]
+
+  if (errors.length > 0) {
+    showDiagnostics(errors, source.length)
+    showAstUnavailable()
+    return
+  }
+
+  let ast
+  try {
+    ast = buildSurfaceAst(result.cst, source)
+  } catch (error) {
+    if (!(error instanceof SyntaxError) || error.span == null) throw error
+    showDiagnostics([error], source.length)
+    showAstUnavailable()
+    return
+  }
+
+  astDiagnostics.textContent = ''
+  astEntries = indexAst(ast)
+  nodeSummaries = new WeakMap()
+  selectedSummary = null
+  astTree.textContent = ''
+  astTree.append(renderAstValue(ast, '$'))
+  astStatus.textContent = `${astEntries.length} nodes · parsed`
+  revealOffset(languageEditor.state.selection.main.head)
+}
+
+languageEditor = new EditorView({
+  doc: localStorage.getItem('oddo.language') ?? languageExample,
+  parent: languageEditorRoot,
+  extensions: [
+    minimalSetup,
+    oneDark,
+    editorTheme,
+    EditorView.lineWrapping,
+    EditorView.contentAttributes.of({
+      'aria-label': 'NEXT language editor',
+      spellcheck: 'false',
+    }),
+    keymap.of([indentWithTab]),
+    EditorView.updateListener.of(update => {
+      if (update.docChanged) {
+        localStorage.setItem('oddo.language', update.state.doc.toString())
+        parseLanguage()
+      } else if (update.selectionSet && !selectingFromTree) {
+        revealOffset(update.state.selection.main.head)
+      }
+    }),
+  ],
+})
+
+document.getElementById('language-example').addEventListener('click', () => {
+  languageEditor.dispatch({
+    changes: {
+      from: 0,
+      to: languageEditor.state.doc.length,
+      insert: languageExample,
+    },
+    selection: { anchor: 0 },
+    scrollIntoView: true,
+  })
+})
+
+const tabButtons = Array.from(document.querySelectorAll('[role="tab"]'))
+const activateTab = selected => {
+  for (const button of tabButtons) {
+    const active = button === selected
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-selected', String(active))
+    button.tabIndex = active ? 0 : -1
+    document.getElementById(button.getAttribute('aria-controls')).hidden = !active
+  }
+  if (selected.id === 'language-tab') {
+    requestAnimationFrame(() => languageEditor.requestMeasure())
+  }
+}
+
+tabButtons.forEach((button, index) => {
+  button.addEventListener('click', () => activateTab(button))
+  button.addEventListener('keydown', event => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    const direction = event.key === 'ArrowRight' ? 1 : -1
+    const next = tabButtons[(index + direction + tabButtons.length) % tabButtons.length]
+    activateTab(next)
+    next.focus()
+  })
+})
+
+parseLanguage()
