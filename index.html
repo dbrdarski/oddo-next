@@ -72,6 +72,13 @@
         <div id="ast-diagnostics" aria-live="polite"></div>
       </div>
       <aside class="ast-tree-pane" aria-label="Surface AST tree">
+        <section id="contract-card" aria-live="polite" hidden>
+          <header class="contract-card-header">
+            <strong id="contract-card-title"></strong>
+            <button id="contract-card-close" type="button" aria-label="Close resolved value details">×</button>
+          </header>
+          <div id="contract-card-details"></div>
+        </section>
         <div id="ast-tree"></div>
       </aside>
     </div>

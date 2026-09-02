@@ -232,6 +232,89 @@ button { cursor: pointer; padding: 0.35rem 1rem; border: 1px solid transparent; 
 
 #ast-tree { padding: 0.65rem 0.65rem 0.65rem 1.95rem; }
 
+#contract-card {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0.65rem 0.65rem 0 1.95rem;
+  padding: 0.65rem 0.75rem;
+  background: rgba(3, 4, 94, 0.96);
+  border: 1px solid rgba(72, 202, 228, 0.55);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(2, 3, 57, 0.42);
+}
+
+.contract-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.45rem;
+}
+
+#contract-card-title {
+  color: var(--cyan-soft);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+#contract-card-close {
+  flex: 0 0 auto;
+  margin: -0.25rem -0.35rem 0 0;
+  padding: 0 0.35rem;
+  color: var(--ice);
+  background: transparent;
+  border: 0;
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+
+.contract-row,
+.contract-compact {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 0.7rem;
+}
+
+.contract-row {
+  padding: 0.16rem 0;
+  border-top: 1px solid rgba(0, 119, 182, 0.22);
+}
+
+.contract-key,
+.contract-compact-key {
+  color: var(--ice);
+  opacity: 0.68;
+}
+
+.contract-value,
+.contract-compact-value {
+  min-width: 0;
+  color: var(--foam);
+  overflow-wrap: anywhere;
+}
+
+.contract-tooltip {
+  padding: 0.42rem 0.58rem;
+  color: var(--foam);
+  background: rgba(3, 4, 94, 0.97);
+  border: 1px solid rgba(72, 202, 228, 0.58);
+  border-radius: 7px;
+  box-shadow: 0 8px 24px rgba(2, 3, 57, 0.48);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.tree-contract-tooltip {
+  position: fixed;
+  z-index: 20;
+  max-width: min(34rem, calc(100vw - 24px));
+  pointer-events: none;
+}
+
+.cm-tooltip .contract-tooltip { max-width: min(34rem, calc(100vw - 24px)); }
+
 #ast-diagnostics {
   min-height: 1.6rem;
   max-height: 8rem;
@@ -280,6 +363,8 @@ button { cursor: pointer; padding: 0.35rem 1rem; border: 1px solid transparent; 
 .ast-key { color: var(--ice); opacity: 0.72; }
 .ast-type { color: var(--cyan-soft); }
 .ast-span { margin-left: 0.45rem; color: var(--ice); font-size: 0.72rem; opacity: 0.48; }
+
+.ast-node-label { display: inline; cursor: default; }
 
 .ast-leaf {
   display: flex;

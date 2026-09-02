@@ -6,7 +6,7 @@ import { EditorView, minimalSetup } from 'codemirror'
 import { indentWithTab } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { Decoration, keymap, ViewPlugin } from '@codemirror/view'
+import { Decoration, hoverTooltip, keymap, ViewPlugin } from '@codemirror/view'
 
 // Everything the modules export is in scope of the evaluated code, so the
 // playground speaks the same language as the source: Tuple, Record, the
@@ -22,6 +22,7 @@ import * as matching from './src/match.mjs'
 import * as canonicalization from './src/canonical.mjs'
 import * as functions from './src/function.mjs'
 import { parseCst, buildSurfaceAst } from './src/parser/index.mjs'
+import { resolveNode } from './playground-resolve.mjs'
 
 const api = {
   ...intern, ...contract, ...facts, ...enums, ...numeric,
@@ -770,6 +771,10 @@ const languageExamplePicker = document.getElementById('language-examples')
 const astTree = document.getElementById('ast-tree')
 const astStatus = document.getElementById('ast-status')
 const astDiagnostics = document.getElementById('ast-diagnostics')
+const contractCard = document.getElementById('contract-card')
+const contractCardTitle = document.getElementById('contract-card-title')
+const contractCardDetails = document.getElementById('contract-card-details')
+const contractCardClose = document.getElementById('contract-card-close')
 
 for (const { id, name } of languageExamples) {
   languageExamplePicker.append(new Option(name, id))
@@ -783,48 +788,19 @@ languageExamplePicker.value = initialLanguageExample.id
 
 let languageEditor
 let astEntries = []
-let nodeSummaries = new WeakMap()
 let selectedSummary = null
 let selectingFromTree = false
+
+const apiNames = new Map()
+for (const [name, value] of Object.entries(api)) {
+  if (!apiNames.has(value)) apiNames.set(value, name)
+}
 
 const isAstNode = value =>
   value != null &&
   !Array.isArray(value) &&
   typeof value === 'object' &&
   typeof value.type === 'string'
-
-const indexAst = (ast, metadata) => {
-  const entries = []
-
-  const visit = (value, valueMetadata, depth = 0) => {
-    if (value == null || typeof value !== 'object') return
-
-    if (Array.isArray(value)) {
-      value.forEach((child, index) =>
-        visit(child, valueMetadata[index], depth))
-      return
-    }
-
-    const node = isAstNode(value)
-    if (node) {
-      entries.push({
-        node: value,
-        metadata: valueMetadata,
-        depth,
-        width: valueMetadata.span.endOffset - valueMetadata.span.startOffset,
-      })
-    }
-
-    for (const [key, child] of Object.entries(value)) {
-      if (key !== 'type') {
-        visit(child, valueMetadata?.[key], depth + (node ? 1 : 0))
-      }
-    }
-  }
-
-  visit(ast, metadata)
-  return entries
-}
 
 const nodeAtOffset = (offset, sourceLength) => {
   const point = sourceLength > 0 && offset >= sourceLength
@@ -849,6 +825,28 @@ const nodeAtOffset = (offset, sourceLength) => {
   return selected
 }
 
+const resolvedAtOffset = (offset, sourceLength) => {
+  const point = sourceLength > 0 && offset >= sourceLength
+    ? sourceLength - 1
+    : Math.max(0, offset)
+  const candidates = astEntries
+    .filter(({ metadata }) => {
+      const { startOffset, endOffset } = metadata.span
+      return startOffset === endOffset
+        ? point === startOffset
+        : startOffset <= point && point < endOffset
+    })
+    .sort((left, right) =>
+      left.width - right.width || right.depth - left.depth)
+
+  for (const occurrence of candidates) {
+    const value = resolveNode(occurrence.node)
+    if (value != null) return { occurrence, value }
+  }
+
+  return null
+}
+
 const spanLabel = span =>
   `${span.startLine}:${span.startColumn}–${span.endLine}:${span.endColumn} · ` +
   `[${span.startOffset}, ${span.endOffset})`
@@ -867,7 +865,128 @@ const appendText = (parent, className, text) => {
   parent.append(span)
 }
 
-const renderAstValue = (value, key, metadata) => {
+const semanticLabel = value => {
+  const name = apiNames.get(value)
+  if (name != null) return name
+  if (typeof value === 'string') return JSON.stringify(value)
+  if (value == null || typeof value !== 'object') return String(value)
+
+  if (Array.isArray(value)) {
+    const parts = Array.from(value, semanticLabel).join(', ')
+    const tag = value[Symbol.toStringTag]
+    return tag == null ? `[${parts}]` : `${tag}(${parts})`
+  }
+
+  return `{ ${Object.entries(value)
+    .map(([key, child]) => `${key}: ${semanticLabel(child)}`)
+    .join(', ')} }`
+}
+
+const semanticRows = value => {
+  const rows = [['Expanded', value]]
+  const canonical = value?.[canonicalization.Canonical]
+  const consumes = facts.fact(value?.constructor, facts.Consumes)
+  const produces = contract.producedOf(value)
+
+  if (canonical != null) rows.push(['Canonical', canonical])
+  if (consumes != null) rows.push(['Consumes', consumes])
+  if (produces != null) rows.push(['Produces', produces])
+  rows.push(['Pure', enums.purityOf(value)])
+  return rows
+}
+
+const compactContract = value => {
+  const content = document.createElement('div')
+  content.className = 'contract-compact'
+  const canonical = value?.[canonicalization.Canonical]
+  const produces = contract.producedOf(value)
+
+  appendText(content, 'contract-compact-key', canonical == null ? 'Expanded' : 'Canonical')
+  appendText(content, 'contract-compact-value', semanticLabel(canonical ?? value))
+  if (produces != null) {
+    appendText(content, 'contract-compact-key', 'Produces')
+    appendText(content, 'contract-compact-value', semanticLabel(produces))
+  }
+  return content
+}
+
+const clearPinnedContract = () => {
+  contractCard.hidden = true
+  contractCardTitle.textContent = ''
+  contractCardDetails.textContent = ''
+}
+
+const pinContract = ({ occurrence, value }) => {
+  contractCardTitle.textContent =
+    `${occurrence.node.type} · ${spanLabel(occurrence.metadata.span)}`
+  contractCardDetails.textContent = ''
+
+  for (const [name, rowValue] of semanticRows(value)) {
+    const row = document.createElement('div')
+    row.className = 'contract-row'
+    appendText(row, 'contract-key', name)
+    appendText(row, 'contract-value', semanticLabel(rowValue))
+    contractCardDetails.append(row)
+  }
+
+  contractCard.hidden = false
+}
+
+contractCardClose.addEventListener('click', clearPinnedContract)
+
+const treeContractTooltip = document.createElement('div')
+treeContractTooltip.className = 'contract-tooltip tree-contract-tooltip'
+treeContractTooltip.setAttribute('role', 'tooltip')
+treeContractTooltip.hidden = true
+document.body.append(treeContractTooltip)
+
+let treeHoverTimer = null
+
+const hideTreeContract = () => {
+  clearTimeout(treeHoverTimer)
+  treeHoverTimer = null
+  treeContractTooltip.hidden = true
+}
+
+const showTreeContract = (label, occurrence) => {
+  hideTreeContract()
+  treeHoverTimer = setTimeout(() => {
+    const value = resolveNode(occurrence.node)
+    if (value == null) return
+
+    treeContractTooltip.replaceChildren(compactContract(value))
+    treeContractTooltip.hidden = false
+
+    const labelBounds = label.getBoundingClientRect()
+    const tooltipBounds = treeContractTooltip.getBoundingClientRect()
+    const left = Math.min(
+      labelBounds.left,
+      window.innerWidth - tooltipBounds.width - 12
+    )
+    const below = labelBounds.bottom + 8
+    const top = below + tooltipBounds.height <= window.innerHeight - 12
+      ? below
+      : labelBounds.top - tooltipBounds.height - 8
+
+    treeContractTooltip.style.left = `${Math.max(12, left)}px`
+    treeContractTooltip.style.top = `${Math.max(12, top)}px`
+  }, 650)
+}
+
+const connectContractInteraction = (label, occurrence) => {
+  label.addEventListener('pointerenter', () =>
+    showTreeContract(label, occurrence))
+  label.addEventListener('pointerleave', hideTreeContract)
+  label.addEventListener('dblclick', event => {
+    event.preventDefault()
+    event.stopPropagation()
+    hideTreeContract()
+    const value = resolveNode(occurrence.node)
+    if (value != null) pinContract({ occurrence, value })
+  })
+}
+
+const renderAstValue = (value, key, metadata, depth = 0) => {
   if (value == null || typeof value !== 'object') {
     const leaf = document.createElement('div')
     leaf.className = 'ast-leaf'
@@ -889,7 +1008,8 @@ const renderAstValue = (value, key, metadata) => {
       children.append(renderAstValue(
         child,
         `[${index}]`,
-        metadata[index]
+        metadata[index],
+        depth
       )))
     details.append(children)
     return details
@@ -903,14 +1023,24 @@ const renderAstValue = (value, key, metadata) => {
   if (isAstNode(value)) {
     details.className = 'ast-node'
     if (value.type === 'Program') details.open = true
-    appendText(summary, 'ast-key', `${key}: `)
-    appendText(summary, 'ast-type', value.type)
-    appendText(summary, 'ast-span', spanLabel(metadata.span))
-    nodeSummaries.set(metadata, summary)
+    const label = document.createElement('span')
+    label.className = 'ast-node-label'
+    appendText(label, 'ast-key', `${key}: `)
+    appendText(label, 'ast-type', value.type)
+    appendText(label, 'ast-span', spanLabel(metadata.span))
+    summary.append(label)
+    const occurrence = {
+      node: value,
+      metadata,
+      depth,
+      width: metadata.span.endOffset - metadata.span.startOffset,
+      summary,
+    }
+    astEntries.push(occurrence)
+    connectContractInteraction(label, occurrence)
     summary.addEventListener('click', event => {
       if (event.target === summary) return
       event.preventDefault()
-      const occurrence = { node: value, metadata }
       selectSourceNode(occurrence)
       requestAnimationFrame(() => revealNode(occurrence))
     })
@@ -922,17 +1052,19 @@ const renderAstValue = (value, key, metadata) => {
   details.append(summary)
   for (const [childKey, child] of Object.entries(value)) {
     if (childKey !== 'type') {
-      children.append(renderAstValue(child, childKey, metadata?.[childKey]))
+      children.append(renderAstValue(
+        child,
+        childKey,
+        metadata?.[childKey],
+        depth + (isAstNode(value) ? 1 : 0)
+      ))
     }
   }
   details.append(children)
   return details
 }
 
-const revealNode = ({ node, metadata }) => {
-  const summary = nodeSummaries.get(metadata)
-  if (summary == null) return
-
+const revealNode = ({ node, metadata, summary }) => {
   selectedSummary?.classList.remove('ast-selected')
   selectedSummary = summary
   selectedSummary.classList.add('ast-selected')
@@ -1020,11 +1152,12 @@ const showAstUnavailable = () => {
   astTree.append(empty)
   astStatus.textContent = 'Parse error'
   astEntries = []
-  nodeSummaries = new WeakMap()
   selectedSummary = null
 }
 
 const parseLanguage = () => {
+  hideTreeContract()
+  clearPinnedContract()
   const source = languageEditor.state.doc.toString()
   const result = parseCst(source)
   const errors = [...result.lexerErrors, ...result.parserErrors]
@@ -1047,8 +1180,7 @@ const parseLanguage = () => {
   }
 
   astDiagnostics.textContent = ''
-  astEntries = indexAst(ast, metadata)
-  nodeSummaries = new WeakMap()
+  astEntries = []
   selectedSummary = null
   astTree.textContent = ''
   astTree.append(renderAstValue(ast, '$', metadata))
@@ -1056,12 +1188,40 @@ const parseLanguage = () => {
   revealOffset(languageEditor.state.selection.main.head)
 }
 
+const sourceContractHover = hoverTooltip((view, position) => {
+  const resolved = resolvedAtOffset(position, view.state.doc.length)
+  if (resolved == null) return null
+
+  return {
+    pos: resolved.occurrence.metadata.span.startOffset,
+    end: resolved.occurrence.metadata.span.endOffset,
+    above: true,
+    create: () => ({ dom: compactContract(resolved.value) }),
+  }
+}, {
+  hoverTime: 650,
+  hideOnChange: true,
+})
+
+const sourceContractPinning = EditorView.domEventHandlers({
+  dblclick: (event, view) => {
+    const position = view.posAtCoords({ x: event.clientX, y: event.clientY })
+    if (position == null) return false
+
+    const resolved = resolvedAtOffset(position, view.state.doc.length)
+    if (resolved != null) pinContract(resolved)
+    return false
+  },
+})
+
 languageEditor = new EditorView({
   doc: localStorage.getItem('oddo.language') ?? initialLanguageExample.code,
   parent: languageEditorRoot,
   extensions: [
     minimalSetup,
     nextSyntaxHighlighting,
+    sourceContractHover,
+    sourceContractPinning,
     oneDark,
     editorTheme,
     EditorView.lineWrapping,
@@ -1082,6 +1242,8 @@ languageEditor = new EditorView({
 })
 
 const loadLanguageExample = example => {
+  hideTreeContract()
+  clearPinnedContract()
   languageEditor.dispatch({
     changes: {
       from: 0,
