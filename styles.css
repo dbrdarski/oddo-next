@@ -98,7 +98,6 @@ nav a:hover { color: var(--foam); border-bottom-color: var(--cyan); }
 }
 
 .playground-panel[hidden] { display: none; }
-.runtime-panel { max-width: 860px; }
 
 .bar { display: flex; gap: 0.5rem; margin: 1rem 0 0.75rem; align-items: center; }
 
