@@ -900,7 +900,9 @@ const renderAstValue = (value, key) => {
     appendText(summary, 'ast-type', value.type)
     appendText(summary, 'ast-span', spanLabel(value.span))
     nodeSummaries.set(value, summary)
-    summary.addEventListener('click', () => {
+    summary.addEventListener('click', event => {
+      if (event.target === summary) return
+      event.preventDefault()
       selectSourceNode(value)
       requestAnimationFrame(() => revealNode(value))
     })
