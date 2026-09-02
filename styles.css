@@ -192,6 +192,33 @@ button { cursor: pointer; padding: 0.35rem 1rem; border: 1px solid transparent; 
   height: clamp(460px, 68vh, 720px);
 }
 
+#language-editor .cm-next-keyword,
+#language-editor .cm-next-operator { color: #ff79c6; }
+
+#language-editor .cm-next-number,
+#language-editor .cm-next-constant { color: #bd93f9; }
+
+#language-editor .cm-next-string { color: #f1fa8c; }
+
+#language-editor .cm-next-definition,
+#language-editor .cm-next-modifier {
+  color: #50fa7b;
+  font-weight: 500;
+}
+
+#language-editor .cm-next-comment {
+  color: #6272a4;
+  font-style: italic;
+}
+
+#language-editor .cm-next-type,
+#language-editor .cm-next-function,
+#language-editor .cm-next-property,
+#language-editor .cm-next-special { color: #8be9fd; }
+
+#language-editor .cm-next-type { font-weight: 600; }
+#language-editor .cm-next-punctuation { color: #f8f8f2; opacity: 0.82; }
+
 .ast-source-pane { min-width: 0; }
 
 .ast-tree-pane {

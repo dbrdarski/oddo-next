@@ -6,7 +6,7 @@ import { EditorView, minimalSetup } from 'codemirror'
 import { indentWithTab } from '@codemirror/commands'
 import { javascript } from '@codemirror/lang-javascript'
 import { oneDark } from '@codemirror/theme-one-dark'
-import { keymap } from '@codemirror/view'
+import { Decoration, keymap, ViewPlugin } from '@codemirror/view'
 
 // Everything the modules export is in scope of the evaluated code, so the
 // playground speaks the same language as the source: Tuple, Record, the
@@ -603,6 +603,168 @@ loaded = import("source")`,
   },
 ]
 
+const nextContextualSeats = {
+  moduleHeader: ['Module'],
+  importStatement: ['Import', 'From'],
+  exportStatement: ['Export'],
+  whereClause: ['Where'],
+  armStatement: ['When'],
+  arm: ['When'],
+}
+
+const nextStringTokens = new Set([
+  'StringLiteral',
+  'TemplateStart',
+  'TemplateChunk',
+  'TemplateEnd',
+])
+
+const nextOperatorTokens = new Set([
+  'PowerMutate', 'AndMutate', 'OrMutate', 'NullishMutate',
+  'PlusMutate', 'MinusMutate', 'StarMutate', 'SlashMutate',
+  'PercentMutate', 'Ellipsis', 'Arrow', 'Match', 'PipeForward',
+  'PipeBackward', 'OptionalDot', 'Nullish', 'Or', 'And', 'Equal',
+  'NotEqual', 'LessEqual', 'GreaterEqual', 'Concat', 'Power', 'Mutate',
+  'Question', 'Colon', 'Less', 'Greater', 'Plus', 'Minus', 'Star',
+  'Slash', 'Percent', 'Bang', 'Tilde', 'Dot', 'Assign', 'Caret',
+  'Alternative', 'InterpolationStart', 'InterpolationRCurly',
+])
+
+const nextPunctuationTokens = new Set([
+  'LBracket', 'RBracket', 'LParen', 'RParen', 'LCurly', 'RCurly',
+  'Comma', 'InterpolationLCurly',
+])
+
+const nextContextualTokenNames = new Set([
+  'Module', 'Import', 'Export', 'From', 'When', 'Where',
+])
+
+const nextResidents = new Set([
+  'state', 'mutable', 'mutate', 'effect', 'computed', 'reactive',
+])
+
+const nextConstants = new Set(['true', 'false', 'null'])
+const nextCommentPattern =
+  /\/\/[^\r\n\u2028\u2029]*|\/\*(?:[^*]|\*(?!\/))*(?:\*\/|$)/g
+
+const nextSyntaxSeats = cst => {
+  const contextual = new Set()
+  const contractPatterns = new Set()
+
+  const visit = node => {
+    if (node?.name == null) return
+
+    for (const key of nextContextualSeats[node.name] ?? []) {
+      for (const token of node.children[key] ?? []) {
+        if (token.startOffset >= 0) contextual.add(token.startOffset)
+      }
+    }
+
+    if (node.name === 'sequencePattern' && node.children.Caret == null) {
+      for (const token of node.children.Identifier ?? []) {
+        if (/^\p{Lu}/u.test(token.image)) {
+          contractPatterns.add(token.startOffset)
+        }
+      }
+    }
+
+    for (const values of Object.values(node.children)) {
+      for (const child of values) {
+        if (child?.name != null) visit(child)
+      }
+    }
+  }
+
+  visit(cst)
+  return { contextual, contractPatterns }
+}
+
+const nextTokenClass = (token, index, tokens, seats) => {
+  const name = token.tokenType.name
+  const previous = tokens[index - 1]
+  const next = tokens[index + 1]
+
+  if (seats.contextual.has(token.startOffset)) return 'cm-next-keyword'
+  if (seats.contractPatterns.has(token.startOffset)) return 'cm-next-type'
+  if (name === 'NumberLiteral') return 'cm-next-number'
+  if (nextStringTokens.has(name)) return 'cm-next-string'
+  if (name === 'At') return 'cm-next-modifier'
+  if (name === 'Hask' || name === 'Wildcard' || name === 'IndexedHole') {
+    return 'cm-next-special'
+  }
+  if (nextOperatorTokens.has(name)) return 'cm-next-operator'
+  if (nextPunctuationTokens.has(name)) return 'cm-next-punctuation'
+
+  if (name === 'Identifier' || nextContextualTokenNames.has(name)) {
+    if (nextConstants.has(token.image)) return 'cm-next-constant'
+    if (previous?.tokenType.name === 'Caret') return null
+    if (previous?.tokenType.name === 'At' && nextResidents.has(token.image)) {
+      return 'cm-next-modifier'
+    }
+    if (previous != null &&
+      (previous.tokenType.name === 'Dot' ||
+        previous.tokenType.name === 'OptionalDot')) {
+      return 'cm-next-property'
+    }
+    if (next?.tokenType.name === 'LParen') return 'cm-next-function'
+    if (next != null &&
+      (next.tokenType.name === 'Assign' ||
+        next.tokenType.name === 'Arrow' ||
+        next.tokenType.name === 'Where')) {
+      return 'cm-next-definition'
+    }
+  }
+
+  return null
+}
+
+const nextCommentDecorations = (source, from, to, decorations) => {
+  const gap = source.slice(from, to)
+  for (const match of gap.matchAll(nextCommentPattern)) {
+    const start = from + match.index
+    decorations.push(
+      Decoration.mark({ class: 'cm-next-comment' })
+        .range(start, start + match[0].length)
+    )
+  }
+}
+
+const nextDecorations = source => {
+  const result = parseCst(source)
+  const seats = nextSyntaxSeats(result.cst)
+  const decorations = []
+  let offset = 0
+
+  result.tokens.forEach((token, index) => {
+    nextCommentDecorations(source, offset, token.startOffset, decorations)
+
+    const from = token.startOffset
+    const to = token.endOffset + 1
+    const className = nextTokenClass(token, index, result.tokens, seats)
+    if (className != null && to > from) {
+      decorations.push(Decoration.mark({ class: className }).range(from, to))
+    }
+    offset = to
+  })
+
+  nextCommentDecorations(source, offset, source.length, decorations)
+  return Decoration.set(decorations, true)
+}
+
+const nextSyntaxHighlighting = ViewPlugin.fromClass(class {
+  constructor(view) {
+    this.decorations = nextDecorations(view.state.doc.toString())
+  }
+
+  update(update) {
+    if (update.docChanged) {
+      this.decorations = nextDecorations(update.state.doc.toString())
+    }
+  }
+}, {
+  decorations: value => value.decorations,
+})
+
 const languageEditorRoot = document.getElementById('language-editor')
 const languageExamplePicker = document.getElementById('language-examples')
 const astTree = document.getElementById('ast-tree')
@@ -888,6 +1050,7 @@ languageEditor = new EditorView({
   parent: languageEditorRoot,
   extensions: [
     minimalSetup,
+    nextSyntaxHighlighting,
     oneDark,
     editorTheme,
     EditorView.lineWrapping,
