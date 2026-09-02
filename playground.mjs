@@ -378,7 +378,11 @@ picker.addEventListener('change', () => {
 // NEXT Surface AST Explorer
 // ==========================================
 
-const languageExample = `describe = value => value :: {
+const languageExamples = [
+  {
+    id: 'tour',
+    name: 'Language tour',
+    code: `describe = value => value :: {
   0 => "zero"
   Number when value > 10 => {
     doubled = value * 2
@@ -386,12 +390,234 @@ const languageExample = `describe = value => value :: {
   }
   Number => { kind: "number", value }
   _ => { kind: "other", value }
-}`
+}`,
+  },
+  {
+    id: 'functions',
+    name: 'Functions, blocks & exits',
+    code: `identity = value => value
+
+calculate = ([left, right], { scale }, ...rest) => {
+  total = left + right
+  scaled = total * scale
+  when scaled < 0 => 0
+  when scaled > 100 => {
+    capped = 100
+    => [capped, ...rest]
+  }
+  => [scaled, ...rest]
+}
+
+curry = left => right => left + right`,
+  },
+  {
+    id: 'patterns',
+    name: 'Match & patterns',
+    code: `classify = (value, expected, allowed) => value :: {
+  -1 | 0 => "small"
+  Number when allowed => "number"
+  [first, ...middle, last] => [first, middle, last]
+  { name, position: [x, y], ..._ } => { name, x, y }
+  ^expected => "expected"
+  _ => null
+}
+
+nested = packet => packet :: {
+  { payload: [head, ...tail], ..._ } => head :: {
+    Number => { kind: "number", value: head }
+    _ => { kind: "other", value: head }
+  }
+  _ => null
+}`,
+  },
+  {
+    id: 'operators',
+    name: 'Operators & truthiness',
+    code: `operators = (a, b, c, text, fallback) => {
+  arithmetic = a + b * c ** -2
+  grouped = -(a + b) ** 2
+  difference = a - b
+  remainder = a / b % c
+  message = "value: " ++ text
+  defaulted = a ?? fallback || c
+  strict = a == b && b != c
+  ordered = a < b && b <= c || a > b && b >= c
+  negated = !strict
+  choice = strict ? arithmetic : grouped
+  truthyOr = ~text || fallback
+  truthyAnd = ~text && message
+  truthyGroup = ~(text || fallback) && message
+  falsy = !~text
+  => {
+    arithmetic,
+    grouped,
+    difference,
+    remainder,
+    message,
+    defaulted,
+    ordered,
+    negated,
+    choice,
+    truthyOr,
+    truthyAnd,
+    truthyGroup,
+    falsy,
+  }
+}`,
+  },
+  {
+    id: 'hasks',
+    name: 'Hasks & pipes',
+    code: `double = # _ * 2
+configure = # target(_2, _, _1)
+variadic = # target(_1, ..._2)
+pipedHask = #(_ |> normalize |> render)
+
+pipeline = value => value |> normalize |> double
+backward = value => render <| decorate <| value
+
+matched = value => (
+  value :: {
+    Number => value
+    _ => 0
+  }
+) |> double
+
+nested = # target(_, # inner(_))
+
+escaped = #(_ :: {
+  ^_ => "same"
+  _ => "different"
+})`,
+  },
+  {
+    id: 'structures',
+    name: 'Structures, access & templates',
+    code: `build = (first, middle, last, name, key, base) => {
+  call = target(first, ...middle, last)
+  tuple = [first, ...middle, last,]
+  record = {
+    name,
+    fixed: 1,
+    [key]: last,
+    ...base,
+  }
+  empty = { tuple: [], record: {} }
+  plain = record.name
+  indexed = tuple[0]
+  totalField = record?.missing
+  totalIndex = tuple?.[1]
+  middleSlice = tuple[1...-1]
+  prefix = tuple[...2]
+  suffix = tuple[1...]
+  whole = tuple[...]
+  message = \`Hello \${name}; first: \${tuple[0]}\`
+  nested = \`outer \${\`inner \${last}\`}\`
+  => {
+    call,
+    tuple,
+    record,
+    empty,
+    plain,
+    indexed,
+    totalField,
+    totalIndex,
+    middleSlice,
+    prefix,
+    suffix,
+    whole,
+    message,
+    nested,
+  }
+}`,
+  },
+  {
+    id: 'modules',
+    name: 'Modules, where & contracts',
+    code: `module Examples.Contracts
+
+import { Number, String, Range, Equals, Union, Difference, Mod, Geo, HasField, } from Contracts
+import Tuple
+
+Percent = Range(0, 100)
+MaybeLabel = Union(Equals(null), String)
+NonZero = Difference(Number, Equals(0))
+Even = Mod(2, 0)
+Sequence = Geo(1, 2)
+Named = HasField("name")
+
+clamp where (Number, Percent) => Percent
+export clamp = (value, limit) => {
+  when value < 0 => 0
+  when value > limit => limit
+  => value
+}`,
+  },
+  {
+    id: 'privileged',
+    name: 'State, effects & mutation',
+    code: `@state count = 0
+@mutable cache = {}
+@computed doubled = value => value * 2
+
+@mutate update = (value, replacement) => {
+  count := value
+  count +:= 1
+  count -:= decrement
+  count *:= scale
+  count /:= divisor
+  count %:= modulus
+  count **:= exponent
+  cache.items[start...end] := replacement
+  cache.ready &&:= enabled
+  cache.ready ||:= fallbackReady
+  cache.choice ??:= fallback
+}
+
+@effect load = () => {
+  => null
+}
+
+@reactive () => {
+  current = count
+  => current
+}`,
+  },
+  {
+    id: 'literals',
+    name: 'Literals, comments & contextual names',
+    code: `/// Contextual words remain ordinary names outside their grammar seats.
+module = 0
+import = 0xff
+export = 0o755
+from = 0b1010
+when = 1_000_000
+where = 1e-2
+
+/* NEXT Numbers are exact; these are still surface literals here. */
+decimal = 5.0
+leading = .5
+truthValues = [true, false, null]
+escaped = "line\\nnext"
+loaded = import("source")`,
+  },
+]
 
 const languageEditorRoot = document.getElementById('language-editor')
+const languageExamplePicker = document.getElementById('language-examples')
 const astTree = document.getElementById('ast-tree')
 const astStatus = document.getElementById('ast-status')
 const astDiagnostics = document.getElementById('ast-diagnostics')
+
+for (const { id, name } of languageExamples) {
+  languageExamplePicker.append(new Option(name, id))
+}
+
+const initialLanguageExample = languageExamples.find(({ id }) =>
+  id === localStorage.getItem('oddo.language.example')
+) ?? languageExamples[0]
+
+languageExamplePicker.value = initialLanguageExample.id
 
 let languageEditor
 let astEntries = []
@@ -658,7 +884,7 @@ const parseLanguage = () => {
 }
 
 languageEditor = new EditorView({
-  doc: localStorage.getItem('oddo.language') ?? languageExample,
+  doc: localStorage.getItem('oddo.language') ?? initialLanguageExample.code,
   parent: languageEditorRoot,
   extensions: [
     minimalSetup,
@@ -681,16 +907,31 @@ languageEditor = new EditorView({
   ],
 })
 
-document.getElementById('language-example').addEventListener('click', () => {
+const loadLanguageExample = example => {
   languageEditor.dispatch({
     changes: {
       from: 0,
       to: languageEditor.state.doc.length,
-      insert: languageExample,
+      insert: example.code,
     },
     selection: { anchor: 0 },
     scrollIntoView: true,
   })
+}
+
+languageExamplePicker.addEventListener('change', () => {
+  const example = languageExamples.find(({ id }) =>
+    id === languageExamplePicker.value
+  )
+  localStorage.setItem('oddo.language.example', example.id)
+  loadLanguageExample(example)
+})
+
+document.getElementById('language-example').addEventListener('click', () => {
+  const example = languageExamples.find(({ id }) =>
+    id === languageExamplePicker.value
+  )
+  loadLanguageExample(example)
 })
 
 const tabButtons = Array.from(document.querySelectorAll('[role="tab"]'))

@@ -159,6 +159,12 @@ button { cursor: pointer; padding: 0.35rem 1rem; border: 1px solid transparent; 
 
 .language-bar strong { color: var(--ice-soft); }
 
+.language-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 #ast-status {
   margin-left: 0.65rem;
   color: var(--ice);
@@ -270,7 +276,9 @@ button { cursor: pointer; padding: 0.35rem 1rem; border: 1px solid transparent; 
 @media (max-width: 560px) {
   .playground-tabs { overflow-x: auto; }
   .playground-tab { flex: 1 0 auto; }
-  .language-bar { align-items: flex-start; }
+  .language-bar { flex-direction: column; align-items: stretch; }
+  .language-actions { flex-wrap: wrap; }
+  #language-examples { flex: 1 1 15rem; }
   #language-editor, .ast-tree-pane { height: 420px; }
 }
 
