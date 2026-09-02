@@ -230,7 +230,7 @@ button { cursor: pointer; padding: 0.35rem 1rem; border: 1px solid transparent; 
   scrollbar-color: var(--blue) transparent;
 }
 
-#ast-tree { padding: 0.65rem; }
+#ast-tree { padding: 0.65rem 0.65rem 0.65rem 1.3rem; }
 
 #ast-diagnostics {
   min-height: 1.6rem;
