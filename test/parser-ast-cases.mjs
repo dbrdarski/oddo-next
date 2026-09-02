@@ -1,6 +1,9 @@
 import { NextLexer } from '../src/parser/tokens.mjs'
 import { nextParser } from '../src/parser/parser.mjs'
 import { buildSurfaceAst } from '../src/parser/ast-builder.mjs'
+import { Record, Tuple } from '../src/intern.mjs'
+import { isInstance } from '../src/contract.mjs'
+import { Number as OddoNumber } from '../src/numeric.mjs'
 import {
   parse as parseSource,
   parseCst as parseSourceCst,
@@ -24,7 +27,8 @@ const parseCst = source => {
   return cst
 }
 
-const parseAst = source => buildSurfaceAst(parseCst(source), source)
+const parseTrees = source => buildSurfaceAst(parseCst(source), source)
+const parseAst = source => parseTrees(source).ast
 
 const builderRejects = source => {
   const cst = parseCst(source)
@@ -60,18 +64,38 @@ const positionAt = (source, offset) => {
   return { line, column }
 }
 
-const everyNodeHasExactCoordinates = (source, value, parentSpan = null) => {
+const sameSpan = (span, expected) =>
+  Object.keys(span).length === Object.keys(expected).length &&
+  Object.entries(expected).every(([key, value]) => span[key] === value)
+
+const everyNodeHasExactCoordinates = (
+  source,
+  value,
+  metadata,
+  parentSpan = null
+) => {
   if (Array.isArray(value)) {
-    return value.every(child =>
-      everyNodeHasExactCoordinates(source, child, parentSpan))
+    return isInstance(value, Tuple) &&
+      isInstance(metadata, Tuple) &&
+      value.length === metadata.length &&
+      value.every((child, index) =>
+        everyNodeHasExactCoordinates(
+          source,
+          child,
+          metadata[index],
+          parentSpan
+        ))
   }
   if (value == null || typeof value !== 'object') return true
 
   const isNode = typeof value.type === 'string'
-  const span = isNode ? value.span : parentSpan
+  const span = isNode ? metadata?.span : parentSpan
 
   if (isNode) {
-    if (span == null ||
+    if (!isInstance(value, Record) ||
+      !isInstance(metadata, Record) ||
+      !isInstance(span, Record) ||
+      Object.hasOwn(value, 'span') ||
       !Number.isInteger(span.startOffset) ||
       !Number.isInteger(span.endOffset) ||
       span.startOffset < 0 ||
@@ -91,8 +115,12 @@ const everyNodeHasExactCoordinates = (source, value, parentSpan = null) => {
   }
 
   return Object.entries(value)
-    .filter(([key]) => key !== 'span')
-    .every(([, child]) => everyNodeHasExactCoordinates(source, child, span))
+    .every(([key, child]) => everyNodeHasExactCoordinates(
+      source,
+      child,
+      metadata?.[key],
+      span
+    ))
 }
 
 export const parserAstSuites = [
@@ -107,6 +135,8 @@ export const parserAstSuites = [
         && !Object.hasOwn(cstResult, 'ast')
         && result.cst.name === 'program'
         && result.ast.type === 'Program'
+        && result.metadata.span.startOffset === 0
+        && result.metadata.span.endOffset === 'value = 1'.length
         && result.ast.body[0].type === 'BindingStatement'
     }),
   ]),
@@ -124,11 +154,11 @@ export const parserAstSuites = [
       const [selected, moduleImport, assertion, exported] = ast.body
 
       return ast.type === 'Program'
-        && ast.moduleHeader.name.parts.map(part => part.name).join('.') ===
+        && Array.from(ast.moduleHeader.name.parts, part => part.name).join('.') ===
           'Geometry.Transform'
         && selected.type === 'ImportStatement'
         && selected.form === 'selected'
-        && selected.names.map(name => name.name).join(' ') === 'Range Equals'
+        && Array.from(selected.names, name => name.name).join(' ') === 'Range Equals'
         && selected.source.parts[0].name === 'Contracts'
         && moduleImport.form === 'module'
         && moduleImport.source.parts[0].name === 'Tuple'
@@ -166,7 +196,7 @@ export const parserAstSuites = [
 
       return ast.moduleHeader == null
         && ast.body.every(statement => statement.type === 'BindingStatement')
-        && ast.body.map(statement => statement.value.name).join(' ') ===
+        && Array.from(ast.body, statement => statement.value.name).join(' ') ===
           'import export when where'
     }),
 
@@ -191,7 +221,7 @@ export const parserAstSuites = [
 
       return fn.type === 'ArrowFunctionExpression'
         && tuple.type === 'TuplePattern'
-        && tuple.elements.map(element => element.name.name).join(' ') ===
+        && Array.from(tuple.elements, element => element.name.name).join(' ') ===
           'left right'
         && record.type === 'RecordPattern'
         && record.fields[0].type === 'RecordPatternField'
@@ -378,7 +408,7 @@ export const parserAstSuites = [
         'lower = value[start...]',
         'all = value[...]',
       ].join('\n'))
-      const values = ast.body.map(statement => statement.value)
+      const values = Array.from(ast.body, statement => statement.value)
 
       return values.every(value => value.type === 'SliceExpression')
         && values[0].start.name === 'start'
@@ -450,7 +480,7 @@ export const parserAstSuites = [
         && match.value.name === 'value'
         && piped.right.name === 'consume'
         && alternatives.pattern.type === 'AlternativePattern'
-        && alternatives.pattern.alternatives.map(pattern => pattern.raw).join(' ') ===
+        && Array.from(alternatives.pattern.alternatives, pattern => pattern.raw).join(' ') ===
           '-1 0'
         && contract.pattern.type === 'ContractPattern'
         && contract.pattern.name.name === 'Number'
@@ -560,6 +590,8 @@ export const parserAstSuites = [
       const matchResult = blockArm.result
       const block = bindingValue(parseAst(exitSource)).body
       const exitResult = block.body[0].result
+      const matchTrees = parseTrees(matchSource)
+      const exitTrees = parseTrees(exitSource)
 
       return recordArm.result.type === 'RecordExpression'
         && recordArm.result.fields[0].key.name === 'value'
@@ -568,8 +600,16 @@ export const parserAstSuites = [
         && matchResult.body[1].type === 'BlockExitStatement'
         && exitResult.type === 'BlockExpression'
         && exitResult.body[0].type === 'BlockExitStatement'
-        && everyNodeHasExactCoordinates(matchSource, parseAst(matchSource))
-        && everyNodeHasExactCoordinates(exitSource, parseAst(exitSource))
+        && everyNodeHasExactCoordinates(
+          matchSource,
+          matchTrees.ast,
+          matchTrees.metadata
+        )
+        && everyNodeHasExactCoordinates(
+          exitSource,
+          exitTrees.ast,
+          exitTrees.metadata
+        )
     }),
   ]),
 
@@ -603,6 +643,49 @@ export const parserAstSuites = [
   ]),
 
   suite('NEXT Surface AST — Source provenance', [
+    test('builds interned structural and parallel metadata trees', () => {
+      const source = [
+        'first = 1 + 2',
+        'second = 1 + 2',
+      ].join('\n')
+      const { ast, metadata } = parseTrees(source)
+      const first = ast.body[0].value
+      const second = ast.body[1].value
+      const firstMetadata = metadata.body[0].value
+      const secondMetadata = metadata.body[1].value
+
+      return isInstance(ast, Record)
+        && isInstance(ast.body, Tuple)
+        && isInstance(metadata, Record)
+        && isInstance(metadata.body, Tuple)
+        && first === second
+        && firstMetadata !== secondMetadata
+        && firstMetadata.span.startOffset === source.indexOf('1 + 2')
+        && secondMetadata.span.startOffset === source.lastIndexOf('1 + 2')
+    }),
+
+    test('decodes every Number spelling through the Oddo Number door', () => {
+      const raws = [
+        '0', '42', '.5', '5.0', '1e-2',
+        '0xff', '0o755', '0b1010', '1_000_000',
+      ]
+      const ast = parseAst(`values = [${raws.join(', ')}]`)
+      const numbers = bindingValue(ast).elements
+      const pattern = expressionValue(parseAst([
+        'value :: {',
+        '  -1 => 0',
+        '}',
+      ].join('\n'))).arms[0].pattern
+
+      return numbers.every((number, index) =>
+        number.raw === raws[index]
+          && number.value === OddoNumber(raws[index].replaceAll('_', ''))
+          && isInstance(number.value, OddoNumber))
+        && pattern.raw === '-1'
+        && pattern.value === OddoNumber('-1')
+        && isInstance(pattern.value, OddoNumber)
+    }),
+
     test('uses exact half-open offsets and exclusive end columns', () => {
       const source = [
         'value = [',
@@ -611,14 +694,19 @@ export const parserAstSuites = [
         ']',
         '',
       ].join('\n')
-      const ast = parseAst(source)
+      const { ast, metadata } = parseTrees(source)
       const binding = ast.body[0]
       const tuple = binding.value
       const number = tuple.elements[0]
       const record = tuple.elements[1]
       const string = record.fields[0].value
+      const bindingMetadata = metadata.body[0]
+      const tupleMetadata = bindingMetadata.value
+      const numberMetadata = tupleMetadata.elements[0]
+      const recordMetadata = tupleMetadata.elements[1]
+      const stringMetadata = recordMetadata.fields[0].value
 
-      return JSON.stringify(ast.span) === JSON.stringify({
+      return sameSpan(metadata.span, {
         startOffset: 0,
         endOffset: source.length,
         startLine: 1,
@@ -626,15 +714,21 @@ export const parserAstSuites = [
         endLine: 5,
         endColumn: 1,
       })
-        && source.slice(binding.span.startOffset, binding.span.endOffset) ===
+        && source.slice(
+          bindingMetadata.span.startOffset,
+          bindingMetadata.span.endOffset
+        ) ===
           source.trimEnd()
-        && source.slice(tuple.span.startOffset, tuple.span.endOffset) === [
+        && source.slice(
+          tupleMetadata.span.startOffset,
+          tupleMetadata.span.endOffset
+        ) === [
           '[',
           '  1,',
           '  { name: "x" },',
           ']',
         ].join('\n')
-        && JSON.stringify(number.span) === JSON.stringify({
+        && sameSpan(numberMetadata.span, {
           startOffset: source.indexOf('1'),
           endOffset: source.indexOf('1') + 1,
           startLine: 2,
@@ -642,9 +736,21 @@ export const parserAstSuites = [
           endLine: 2,
           endColumn: 4,
         })
-        && source.slice(record.span.startOffset, record.span.endOffset) ===
+        && source.slice(
+          recordMetadata.span.startOffset,
+          recordMetadata.span.endOffset
+        ) ===
           '{ name: "x" }'
-        && source.slice(string.span.startOffset, string.span.endOffset) === '"x"'
+        && source.slice(
+          stringMetadata.span.startOffset,
+          stringMetadata.span.endOffset
+        ) === '"x"'
+        && !Object.hasOwn(ast, 'span')
+        && !Object.hasOwn(binding, 'span')
+        && !Object.hasOwn(tuple, 'span')
+        && !Object.hasOwn(number, 'span')
+        && !Object.hasOwn(record, 'span')
+        && !Object.hasOwn(string, 'span')
     }),
 
     test('gives every recursively reachable AST node exact source coordinates', () => {
@@ -661,21 +767,24 @@ export const parserAstSuites = [
         '  _ => null',
         '}',
       ].join('\n')
-      const ast = parseAst(source)
+      const { ast, metadata } = parseTrees(source)
 
-      return everyNodeHasExactCoordinates(source, ast)
-        && ast.span.startOffset === 0
-        && ast.span.endOffset === source.length
+      return everyNodeHasExactCoordinates(source, ast, metadata)
+        && metadata.span.startOffset === 0
+        && metadata.span.endOffset === source.length
     }),
 
     test('tracks CRLF and Unicode line separators as single line advances', () => {
       const source = 'first = 1\r\nsecond = 2\u2028third = 3\u2029fourth = 4'
-      const ast = parseAst(source)
-      return everyNodeHasExactCoordinates(source, ast)
-        && ast.body.map(statement => statement.span.startLine).join(' ') ===
+      const { ast, metadata } = parseTrees(source)
+      return everyNodeHasExactCoordinates(source, ast, metadata)
+        && Array.from(
+          metadata.body,
+          statement => statement.span.startLine
+        ).join(' ') ===
           '1 2 3 4'
-        && ast.span.endLine === 4
-        && ast.span.endColumn === 11
+        && metadata.span.endLine === 4
+        && metadata.span.endColumn === 11
     }),
   ]),
 ]

@@ -791,17 +791,17 @@ const isAstNode = value =>
   value != null &&
   !Array.isArray(value) &&
   typeof value === 'object' &&
-  typeof value.type === 'string' &&
-  value.span != null
+  typeof value.type === 'string'
 
-const indexAst = ast => {
+const indexAst = (ast, metadata) => {
   const entries = []
 
-  const visit = (value, depth = 0) => {
+  const visit = (value, valueMetadata, depth = 0) => {
     if (value == null || typeof value !== 'object') return
 
     if (Array.isArray(value)) {
-      value.forEach(child => visit(child, depth))
+      value.forEach((child, index) =>
+        visit(child, valueMetadata[index], depth))
       return
     }
 
@@ -809,17 +809,20 @@ const indexAst = ast => {
     if (node) {
       entries.push({
         node: value,
+        metadata: valueMetadata,
         depth,
-        width: value.span.endOffset - value.span.startOffset,
+        width: valueMetadata.span.endOffset - valueMetadata.span.startOffset,
       })
     }
 
     for (const [key, child] of Object.entries(value)) {
-      if (key !== 'span' && key !== 'type') visit(child, depth + (node ? 1 : 0))
+      if (key !== 'type') {
+        visit(child, valueMetadata?.[key], depth + (node ? 1 : 0))
+      }
     }
   }
 
-  visit(ast)
+  visit(ast, metadata)
   return entries
 }
 
@@ -830,7 +833,7 @@ const nodeAtOffset = (offset, sourceLength) => {
   let selected = null
 
   for (const entry of astEntries) {
-    const { startOffset, endOffset } = entry.node.span
+    const { startOffset, endOffset } = entry.metadata.span
     const contains = startOffset === endOffset
       ? point === startOffset
       : startOffset <= point && point < endOffset
@@ -843,7 +846,7 @@ const nodeAtOffset = (offset, sourceLength) => {
     }
   }
 
-  return selected?.node ?? null
+  return selected
 }
 
 const spanLabel = span =>
@@ -864,7 +867,7 @@ const appendText = (parent, className, text) => {
   parent.append(span)
 }
 
-const renderAstValue = (value, key) => {
+const renderAstValue = (value, key, metadata) => {
   if (value == null || typeof value !== 'object') {
     const leaf = document.createElement('div')
     leaf.className = 'ast-leaf'
@@ -883,7 +886,11 @@ const renderAstValue = (value, key) => {
     const children = document.createElement('div')
     children.className = 'ast-children'
     value.forEach((child, index) =>
-      children.append(renderAstValue(child, `[${index}]`)))
+      children.append(renderAstValue(
+        child,
+        `[${index}]`,
+        metadata[index]
+      )))
     details.append(children)
     return details
   }
@@ -898,13 +905,14 @@ const renderAstValue = (value, key) => {
     if (value.type === 'Program') details.open = true
     appendText(summary, 'ast-key', `${key}: `)
     appendText(summary, 'ast-type', value.type)
-    appendText(summary, 'ast-span', spanLabel(value.span))
-    nodeSummaries.set(value, summary)
+    appendText(summary, 'ast-span', spanLabel(metadata.span))
+    nodeSummaries.set(metadata, summary)
     summary.addEventListener('click', event => {
       if (event.target === summary) return
       event.preventDefault()
-      selectSourceNode(value)
-      requestAnimationFrame(() => revealNode(value))
+      const occurrence = { node: value, metadata }
+      selectSourceNode(occurrence)
+      requestAnimationFrame(() => revealNode(occurrence))
     })
   } else {
     details.className = 'ast-collection'
@@ -913,16 +921,16 @@ const renderAstValue = (value, key) => {
 
   details.append(summary)
   for (const [childKey, child] of Object.entries(value)) {
-    if (childKey !== 'type' && childKey !== 'span') {
-      children.append(renderAstValue(child, childKey))
+    if (childKey !== 'type') {
+      children.append(renderAstValue(child, childKey, metadata?.[childKey]))
     }
   }
   details.append(children)
   return details
 }
 
-const revealNode = node => {
-  const summary = nodeSummaries.get(node)
+const revealNode = ({ node, metadata }) => {
+  const summary = nodeSummaries.get(metadata)
   if (summary == null) return
 
   selectedSummary?.classList.remove('ast-selected')
@@ -936,22 +944,22 @@ const revealNode = node => {
   }
 
   astStatus.textContent =
-    `${astEntries.length} nodes · ${node.type} · ${spanLabel(node.span)}`
+    `${astEntries.length} nodes · ${node.type} · ${spanLabel(metadata.span)}`
   summary.scrollIntoView({ block: 'nearest' })
 }
 
 const revealOffset = offset => {
   const sourceLength = languageEditor.state.doc.length
-  const node = nodeAtOffset(offset, sourceLength)
-  if (node != null) revealNode(node)
+  const occurrence = nodeAtOffset(offset, sourceLength)
+  if (occurrence != null) revealNode(occurrence)
 }
 
-const selectSourceNode = node => {
+const selectSourceNode = ({ metadata }) => {
   selectingFromTree = true
   languageEditor.dispatch({
     selection: {
-      anchor: node.span.startOffset,
-      head: node.span.endOffset,
+      anchor: metadata.span.startOffset,
+      head: metadata.span.endOffset,
     },
     scrollIntoView: true,
   })
@@ -1028,8 +1036,9 @@ const parseLanguage = () => {
   }
 
   let ast
+  let metadata
   try {
-    ast = buildSurfaceAst(result.cst, source)
+    ({ ast, metadata } = buildSurfaceAst(result.cst, source))
   } catch (error) {
     if (!(error instanceof SyntaxError) || error.span == null) throw error
     showDiagnostics([error], source.length)
@@ -1038,11 +1047,11 @@ const parseLanguage = () => {
   }
 
   astDiagnostics.textContent = ''
-  astEntries = indexAst(ast)
+  astEntries = indexAst(ast, metadata)
   nodeSummaries = new WeakMap()
   selectedSummary = null
   astTree.textContent = ''
-  astTree.append(renderAstValue(ast, '$'))
+  astTree.append(renderAstValue(ast, '$', metadata))
   astStatus.textContent = `${astEntries.length} nodes · parsed`
   revealOffset(languageEditor.state.selection.main.head)
 }

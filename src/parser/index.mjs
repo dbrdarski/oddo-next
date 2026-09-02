@@ -20,9 +20,12 @@ export const parse = source => {
   const error = result.lexerErrors[0] ?? result.parserErrors[0]
   if (error) throw error
 
+  const { ast, metadata } = buildSurfaceAst(result.cst, source)
+
   return {
     ...result,
-    ast: buildSurfaceAst(result.cst, source),
+    ast,
+    metadata,
   }
 }
 

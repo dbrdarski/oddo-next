@@ -1,4 +1,6 @@
 import { nextParser } from './parser.mjs'
+import { Record, Tuple } from '../intern.mjs'
+import { Number as OddoNumber } from '../numeric.mjs'
 
 const BaseCstVisitor = nextParser.getBaseCstVisitorConstructor()
 
@@ -97,6 +99,46 @@ const decodeEscapes = text => {
   }
 
   return value
+}
+
+const decodeNumber = raw => OddoNumber(raw.replaceAll('_', ''))
+
+const separateSurfaceTree = value => {
+  if (Array.isArray(value)) {
+    const ast = []
+    const metadata = []
+
+    for (const child of value) {
+      const separated = separateSurfaceTree(child)
+      ast.push(separated.ast)
+      metadata.push(separated.metadata)
+    }
+
+    return {
+      ast: Tuple(...ast),
+      metadata: Tuple(...metadata),
+    }
+  }
+
+  if (value == null || typeof value !== 'object' || typeof value.type !== 'string') {
+    return { ast: value, metadata: null }
+  }
+
+  const ast = {}
+  const metadata = { span: Record(value.span) }
+
+  for (const [key, child] of Object.entries(value)) {
+    if (key === 'span') continue
+
+    const separated = separateSurfaceTree(child)
+    ast[key] = separated.ast
+    if (separated.metadata != null) metadata[key] = separated.metadata
+  }
+
+  return {
+    ast: Record(ast),
+    metadata: Record(metadata),
+  }
 }
 
 const bindingNames = pattern => {
@@ -950,6 +992,7 @@ export class SurfaceAstBuilder extends BaseCstVisitor {
       return {
         type: 'NumberLiteral',
         raw: token.image,
+        value: decodeNumber(token.image),
         span: spanFrom(token),
       }
     }
@@ -1139,7 +1182,7 @@ export class SurfaceAstBuilder extends BaseCstVisitor {
         type: 'LiteralPattern',
         literalKind: 'number',
         raw: this.source.slice(span.startOffset, span.endOffset),
-        value: null,
+        value: decodeNumber(this.source.slice(span.startOffset, span.endOffset)),
         span,
       }
     }
@@ -1302,4 +1345,4 @@ export class SurfaceAstBuilder extends BaseCstVisitor {
 }
 
 export const buildSurfaceAst = (cst, source) =>
-  new SurfaceAstBuilder(source).visit(cst)
+  separateSurfaceTree(new SurfaceAstBuilder(source).visit(cst))
